@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "144617374104",
+    "project_id": "cnbmobile-2053c",
+    "storage_bucket": "cnbmobile-2053c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:144617374104:android:cb38f3303f12616f37abed",
+        "android_client_info": {
+          "package_name": "com.cnb.cnbappv2"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBTx_mrEx6_k9jbN8MeOYztJbsOc6zryl0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

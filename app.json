@@ -1,29 +1,36 @@
 {
   "expo": {
-    "name": "CNBMobile2",
-    "slug": "CNBMobile2",
-    "version": "1.0.0",
+    "name": "CNB Mobile",
+    "slug": "cnbmobile",
+    "version": "1.0.7",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": false,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#0A0F1E"
     },
+    "scheme": "com.cnb.cnbappv2",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.cnb.cnbappv2",
+      "usesAppleSignIn": false
     },
     "android": {
+      "package": "com.cnb.cnbappv2",
+      "versionCode": 55,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#0A0F1E"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": false,
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": []
   }
 }
