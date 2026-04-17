@@ -1,0 +1,96 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Configuração do app (leitura pública autenticada, escrita bloqueada) ───
+    match /config/{doc} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    // ── Sessões (token de dispositivo único, isolado por usuário) ────────────
+    match /sessions/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // ── Perfis de usuário ────────────────────────────────────────────────────
+    match /usuarios/{uid} {
+      allow read:   if request.auth != null;
+      allow create: if request.auth != null && request.auth.uid == uid;
+      allow delete: if request.auth != null && request.auth.uid == uid;
+
+      // Atualização 1 — campos não-financeiros (perfil e sessão)
+      allow update: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['nome', 'avatarURL', 'sessionToken', 'codigoAfiliado']);
+
+      // Atualização 2 — referidoPor: pode ser definido uma única vez, nunca alterado
+      allow update: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['referidoPor'])
+        && resource.data.get('referidoPor', null) == null
+        && request.resource.data.referidoPor is string
+        && request.resource.data.referidoPor.size() > 0
+        && request.resource.data.referidoPor != uid;
+
+      // Atualização 3 — acúmulo de pontos (carregamento + login diário)
+      // Máximo 60 pts por chamada (10/min + 50 bônus = 60 no pior caso).
+      // Inclui ultimoLogin para cobrir registrarLoginDiario().
+      // minutos só pode aumentar 1 por operação quando presente.
+      allow update: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['pontos', 'minutos', 'ultimoLogin'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasAny(['pontos'])
+        && request.resource.data.pontos > resource.data.pontos
+        && request.resource.data.pontos <= resource.data.pontos + 60
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['minutos'])
+            || request.resource.data.minutos == resource.data.minutos + 1);
+
+      // Atualização 4 — saque: pontos diminui, saques aumenta 1
+      allow update: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['pontos', 'saques'])
+        && request.resource.data.pontos < resource.data.pontos
+        && request.resource.data.pontos >= 0
+        && request.resource.data.saques == resource.data.saques + 1;
+
+      // NOTA: atualizações cross-user (comissões, crédito de indicação) são
+      // exclusivamente feitas pelo SDK Admin nas Cloud Functions — sem regra necessária.
+    }
+
+    // ── Lookup de códigos de afiliado ────────────────────────────────────────
+    match /codigos/{codigo} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+                    && request.resource.data.uid == request.auth.uid;
+      allow delete: if request.auth != null
+                    && resource.data.uid == request.auth.uid;
+      allow update: if false;
+    }
+
+    // ── Solicitações de saque ────────────────────────────────────────────────
+    match /saques/{saqueId} {
+      allow read: if request.auth != null
+                  && request.auth.uid == resource.data.uid;
+      allow create: if request.auth != null
+                    && request.auth.uid == request.resource.data.uid;
+      allow update, delete: if false;
+    }
+
+    // ── Fila de eventos de indicação (processada pela Cloud Function) ────────
+    // O cliente cria; a Function credita o indicador e deleta via Admin SDK.
+    match /referral_events/{uid} {
+      allow create: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasAll(['referrerUid'])
+        && request.resource.data.referrerUid is string
+        && request.resource.data.referrerUid != uid;
+      allow read, update, delete: if false;
+    }
+
+  }
+}

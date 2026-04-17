@@ -1,5 +1,6 @@
-import { initializeApp } from 'firebase/app';
-import { initializeAuth, inMemoryPersistence } from 'firebase/auth';
+import { initializeApp, getApps } from 'firebase/app';
+import { initializeAuth, getAuth, getReactNativePersistence } from 'firebase/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
@@ -12,9 +13,19 @@ const firebaseConfig = {
   appId: "1:144617374104:web:cb38f3303f12616f37abed",
 };
 
-const app = initializeApp(firebaseConfig);
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 
-// Old Architecture: initializeAuth no nível do módulo funciona sem problema
-export const auth = initializeAuth(app, { persistence: inMemoryPersistence });
+// initializeAuth com AsyncStorage mantém a sessão entre fechamentos do app.
+// O try/catch trata hot-reload do Expo Go (onde auth já pode estar inicializado).
+export const auth = (() => {
+  try {
+    return initializeAuth(app, {
+      persistence: getReactNativePersistence(AsyncStorage),
+    });
+  } catch {
+    return getAuth(app);
+  }
+})();
+
 export const db = getFirestore(app);
 export const storage = getStorage(app);

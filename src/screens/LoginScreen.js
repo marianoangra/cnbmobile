@@ -4,11 +4,14 @@ import {
   KeyboardAvoidingView, Platform, ScrollView, Alert, ActivityIndicator, Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
+import { useTranslation } from 'react-i18next';
 import { auth } from '../services/firebase';
+import { logLogin } from '../services/analytics';
 import { colors } from '../theme/colors';
 
 export default function LoginScreen({ navigation }) {
+  const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [loading, setLoading] = useState(false);
@@ -24,18 +27,47 @@ export default function LoginScreen({ navigation }) {
   }, []);
 
   async function handleLogin() {
-    if (!email || !senha) return Alert.alert('Atenção', 'Preencha todos os campos.');
+    if (!email || !senha) return Alert.alert(t('common.attention'), t('login.errorEmpty'));
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email.trim(), senha);
+      logLogin();
+      navigation.goBack();
     } catch (e) {
-      if (e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential') {
-        Alert.alert('Erro', 'E-mail ou senha inválidos.');
+      if (
+        e.code === 'auth/user-not-found' ||
+        e.code === 'auth/wrong-password' ||
+        e.code === 'auth/invalid-credential'
+      ) {
+        Alert.alert(t('common.error'), t('login.errorInvalid'));
       } else {
-        Alert.alert('Erro', 'Não foi possível entrar. Tente novamente.');
+        Alert.alert(t('common.error'), t('login.errorGeneric'));
       }
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleRecuperarSenha() {
+    const emailDigitado = email.trim();
+    if (!emailDigitado) {
+      return Alert.alert(
+        'Recuperar senha',
+        'Digite seu e-mail no campo acima e toque em "Recuperar senha".',
+      );
+    }
+    try {
+      await sendPasswordResetEmail(auth, emailDigitado);
+      Alert.alert(
+        '✅ E-mail enviado',
+        `Verifique sua caixa de entrada em ${emailDigitado} e siga as instruções para redefinir sua senha.`,
+      );
+    } catch (e) {
+      if (e.code === 'auth/user-not-found' || e.code === 'auth/invalid-email') {
+        Alert.alert('Erro', 'E-mail não encontrado. Verifique e tente novamente.');
+      } else {
+        Alert.alert('Erro', 'Não foi possível enviar o e-mail. Tente novamente.');
+      }
     }
   }
 
@@ -53,12 +85,12 @@ export default function LoginScreen({ navigation }) {
           </Animated.View>
 
           <Animated.View style={[styles.form, { opacity, transform: [{ translateY }] }]}>
-            <Text style={styles.title}>Entrar</Text>
-            <Text style={styles.subtitle}>Bem-vindo de volta</Text>
+            <Text style={styles.title}>{t('login.title')}</Text>
+            <Text style={styles.subtitle}>{t('login.subtitle')}</Text>
 
             <TextInput
               style={styles.input}
-              placeholder="E-mail"
+              placeholder={t('login.email')}
               placeholderTextColor={colors.secondary}
               value={email}
               onChangeText={setEmail}
@@ -67,7 +99,7 @@ export default function LoginScreen({ navigation }) {
             />
             <TextInput
               style={styles.input}
-              placeholder="Senha"
+              placeholder={t('login.password')}
               placeholderTextColor={colors.secondary}
               value={senha}
               onChangeText={setSenha}
@@ -77,11 +109,19 @@ export default function LoginScreen({ navigation }) {
             <TouchableOpacity style={styles.btn} onPress={handleLogin} disabled={loading} activeOpacity={0.85}>
               {loading
                 ? <ActivityIndicator color={colors.background} />
-                : <Text style={styles.btnText}>Entrar</Text>}
+                : <Text style={styles.btnText}>{t('login.submit')}</Text>}
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={() => navigation.navigate('Register')} activeOpacity={0.7} style={{ marginTop: 20 }}>
-              <Text style={styles.link}>Não tem conta? <Text style={styles.linkDest}>Cadastre-se</Text></Text>
+            <TouchableOpacity onPress={handleRecuperarSenha} activeOpacity={0.7} style={styles.forgotBtn}>
+              <Text style={styles.forgotText}>Esqueceu a senha?</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={() => navigation.navigate('Register')} activeOpacity={0.7} style={{ marginTop: 24 }}>
+              <Text style={styles.link}>{t('login.noAccount')} <Text style={styles.linkDest}>{t('login.register')}</Text></Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7} style={{ marginTop: 8 }}>
+              <Text style={[styles.link, { fontSize: 12 }]}>Continuar sem login</Text>
             </TouchableOpacity>
           </Animated.View>
 
@@ -113,9 +153,21 @@ const styles = StyleSheet.create({
   },
   btn: {
     backgroundColor: colors.primary, borderRadius: 14,
-    padding: 16, alignItems: 'center', marginBottom: 24,
+    padding: 16, alignItems: 'center', marginBottom: 16,
   },
   btnText: { color: colors.background, fontWeight: 'bold', fontSize: 16 },
+  forgotBtn: { alignItems: 'flex-end', marginBottom: 4, marginTop: -8 },
+  forgotText: { color: colors.secondary, fontSize: 13 },
   link: { color: colors.secondary, textAlign: 'center', fontSize: 14 },
   linkDest: { color: colors.primary, fontWeight: '600' },
+  divider: { flexDirection: 'row', alignItems: 'center', marginVertical: 20 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: colors.border },
+  dividerText: { color: colors.secondary, fontSize: 12, marginHorizontal: 12 },
+  btnGoogle: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: colors.card, borderRadius: 14, padding: 14,
+    borderWidth: 1, borderColor: colors.border, marginBottom: 20, gap: 10,
+  },
+  btnGoogleIcon: { fontSize: 18, fontWeight: 'bold', color: '#4285F4' },
+  btnGoogleText: { color: colors.white, fontWeight: '600', fontSize: 15 },
 });

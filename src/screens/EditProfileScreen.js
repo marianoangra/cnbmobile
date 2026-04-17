@@ -4,15 +4,18 @@ import {
   Alert, ActivityIndicator, Animated, ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as ImagePicker from 'expo-image-picker';
 import { colors } from '../theme/colors';
 import Avatar from '../components/Avatar';
-import { atualizarNome } from '../services/pontos';
+import { atualizarNome, uploadAvatar } from '../services/pontos';
 
 export default function EditProfileScreen({ route, navigation }) {
   const { perfil, onSalvar } = route.params || {};
 
   const [nome, setNome] = useState(perfil?.nome ?? '');
+  const [avatarURL, setAvatarURL] = useState(perfil?.avatarURL ?? null);
   const [salvando, setSalvando] = useState(false);
+  const [trocandoAvatar, setTrocandoAvatar] = useState(false);
   const [alterado, setAlterado] = useState(false);
 
   const opacity = useRef(new Animated.Value(0)).current;
@@ -25,19 +28,47 @@ export default function EditProfileScreen({ route, navigation }) {
     ]).start();
   }, []);
 
+  async function handleTrocarAvatar() {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permissão necessária', 'Permita o acesso à galeria para trocar a foto.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.7,
+    });
+    if (result.canceled || !result.assets?.[0]) return;
+
+    setTrocandoAvatar(true);
+    try {
+      const url = await uploadAvatar(perfil.uid, result.assets[0].uri);
+      setAvatarURL(url);
+      onSalvar?.({ avatarURL: url });
+    } catch (e) {
+      Alert.alert('Erro ao salvar foto', e?.message ?? 'Tente novamente.');
+    } finally {
+      setTrocandoAvatar(false);
+    }
+  }
+
   async function handleSalvar() {
     if (!nome.trim()) return Alert.alert('Atenção', 'O nome não pode estar vazio.');
-    if (nome.trim() === perfil?.nome) {
+    const nomeIgual = nome.trim() === perfil?.nome;
+    if (nomeIgual) {
       navigation.goBack();
       return;
     }
+
     setSalvando(true);
     try {
       await atualizarNome(perfil.uid, nome.trim());
-      onSalvar?.({ nome: nome.trim(), avatarURL: perfil?.avatarURL });
+      onSalvar?.({ nome: nome.trim() });
       navigation.goBack();
-    } catch {
-      Alert.alert('Erro', 'Não foi possível salvar as alterações.');
+    } catch (e) {
+      console.error('[EditProfile] erro ao salvar:', e);
+      const detalhe = e?.code ?? e?.message ?? 'erro desconhecido';
+      Alert.alert('Erro ao salvar', detalhe);
     } finally {
       setSalvando(false);
     }
@@ -49,9 +80,17 @@ export default function EditProfileScreen({ route, navigation }) {
 
         <Animated.View style={[styles.content, { opacity, transform: [{ translateY }] }]}>
 
-          {/* Avatar (somente exibição) */}
+          {/* Avatar */}
           <View style={styles.avatarSection}>
-            <Avatar uri={perfil?.avatarURL} nome={nome || perfil?.nome} size={110} borderColor={colors.primary} />
+            <TouchableOpacity onPress={handleTrocarAvatar} activeOpacity={0.8} disabled={trocandoAvatar} style={styles.avatarTouchable}>
+              <Avatar uri={avatarURL} nome={nome || perfil?.nome} size={110} borderColor={colors.primary} />
+              <View style={styles.avatarCameraBtn}>
+                {trocandoAvatar
+                  ? <ActivityIndicator color={colors.background} size="small" />
+                  : <Text style={styles.avatarCameraIcon}>📷</Text>}
+              </View>
+            </TouchableOpacity>
+            <Text style={styles.avatarHint}>Toque para alterar a foto</Text>
           </View>
 
           {/* Nome */}
@@ -67,7 +106,7 @@ export default function EditProfileScreen({ route, navigation }) {
               maxLength={40}
               returnKeyType="done"
             />
-            <Text style={styles.campoHint}>{nome.length}/40 caracteres</Text>
+            <Text style={styles.campoHint}>{nome.trim().length}/40 caracteres</Text>
           </View>
 
           {/* Botão salvar */}
@@ -97,6 +136,16 @@ const styles = StyleSheet.create({
   content: { alignItems: 'center' },
 
   avatarSection: { alignItems: 'center', marginBottom: 36, marginTop: 8 },
+  avatarTouchable: { alignItems: 'center', marginBottom: 6 },
+  avatarCameraBtn: {
+    position: 'absolute', bottom: 4, right: 4,
+    backgroundColor: colors.primary,
+    borderRadius: 18, width: 34, height: 34,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: colors.background,
+  },
+  avatarCameraIcon: { fontSize: 15 },
+  avatarHint: { fontSize: 12, color: colors.secondary },
 
   campo: { width: '100%', marginBottom: 24 },
   campoLabel: { fontSize: 13, color: colors.secondary, marginBottom: 8, fontWeight: '600' },

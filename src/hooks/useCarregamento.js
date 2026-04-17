@@ -1,37 +1,12 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { AppState } from 'react-native';
 import * as Battery from 'expo-battery';
-import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { adicionarPontos } from '../services/pontos';
+import { iniciarForegroundService, pararForegroundService, servicoRodando, SESSAO_KEY } from '../services/backgroundService';
+import { logInicioCarregamento, logFimCarregamento, logBonusHora } from '../services/analytics';
 
-const SESSAO_KEY = 'cnb_sessao_carregamento';
-
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-  }),
-});
-
-async function pedirPermissao() {
-  await Notifications.requestPermissionsAsync();
-}
-
-async function notificar(titulo, corpo) {
-  await Notifications.scheduleNotificationAsync({
-    content: { title: titulo, body: corpo },
-    trigger: null,
-  });
-}
-
-// Calcula pontos + bônus horário para N minutos partindo de um acumulado
-function calcularPontos(minutosJaAcumulados, novosMinutos) {
-  const horasAntes = Math.floor(minutosJaAcumulados / 60);
-  const horasDepois = Math.floor((minutosJaAcumulados + novosMinutos) / 60);
-  return novosMinutos * 10 + (horasDepois - horasAntes) * 50;
+function calcularPontosTotal(minutos) {
+  return minutos * 10 + Math.floor(minutos / 60) * 50;
 }
 
 function estaCarregando(state) {
@@ -43,68 +18,30 @@ export function useCarregamento(uid, onPontosAdicionados) {
   const [pontosGanhos, setPontosGanhos] = useState(0);
   const [segundosRestantes, setSegundosRestantes] = useState(3600);
 
-  // Refs para acesso estável dentro de callbacks/timers
   const uidRef = useRef(uid);
   const carregandoRef = useRef(false);
   const minutosRef = useRef(0);
   const onAtualizarRef = useRef(onPontosAdicionados);
-  const intervalRef = useRef(null);
   const countdownRef = useRef(null);
+  const minuteTickRef = useRef(null);
+  const montadoRef = useRef(true);
+
+  // Mutex: evita chamadas concorrentes de iniciar/parar sessão
+  const iniciandoSessaoRef = useRef(false);
+  const parandoSessaoRef = useRef(false);
+
+  // Debounce: aguarda Android estabilizar o estado da bateria antes de agir
+  const batteryDebounceRef = useRef(null);
 
   useEffect(() => { uidRef.current = uid; }, [uid]);
   useEffect(() => { onAtualizarRef.current = onPontosAdicionados; }, [onPontosAdicionados]);
   useEffect(() => { carregandoRef.current = carregando; }, [carregando]);
+  useEffect(() => {
+    montadoRef.current = true;
+    return () => { montadoRef.current = false; };
+  }, []);
 
-  // ─── AsyncStorage helpers ───────────────────────────────────────────────────
-
-  async function salvarSessao(minutos) {
-    if (!uidRef.current) return;
-    await AsyncStorage.setItem(SESSAO_KEY, JSON.stringify({
-      uid: uidRef.current,
-      ultimoRegistro: Date.now(),
-      minutosAcumulados: minutos,
-    }));
-  }
-
-  async function limparSessao() {
-    await AsyncStorage.removeItem(SESSAO_KEY);
-  }
-
-  // ─── Recuperação de background ──────────────────────────────────────────────
-
-  async function recuperarBackground() {
-    try {
-      const raw = await AsyncStorage.getItem(SESSAO_KEY);
-      if (!raw) return 0;
-
-      const { uid: savedUid, ultimoRegistro, minutosAcumulados } = JSON.parse(raw);
-      if (savedUid !== uidRef.current) return 0;
-
-      // Verifica se ainda está carregando
-      const state = await Battery.getBatteryStateAsync();
-      if (!estaCarregando(state)) {
-        await limparSessao();
-        return 0;
-      }
-
-      const minutosBackground = Math.floor((Date.now() - ultimoRegistro) / 60000);
-      if (minutosBackground <= 0) return 0;
-
-      const pontos = calcularPontos(minutosAcumulados, minutosBackground);
-      await adicionarPontos(savedUid, pontos, minutosBackground);
-      onAtualizarRef.current?.();
-
-      // Atualiza acumulado e salva
-      minutosRef.current = minutosAcumulados + minutosBackground;
-      await salvarSessao(minutosRef.current);
-
-      return pontos;
-    } catch {
-      return 0;
-    }
-  }
-
-  // ─── Contador visual de segundos ────────────────────────────────────────────
+  // ─── Timers visuais ──────────────────────────────────────────────────────────
 
   const iniciarContador = useCallback(() => {
     if (countdownRef.current) return;
@@ -115,100 +52,169 @@ export function useCarregamento(uid, onPontosAdicionados) {
   }, []);
 
   const pararContador = useCallback(() => {
-    if (countdownRef.current) {
-      clearInterval(countdownRef.current);
-      countdownRef.current = null;
-    }
+    if (countdownRef.current) { clearInterval(countdownRef.current); countdownRef.current = null; }
+    if (minuteTickRef.current) { clearInterval(minuteTickRef.current); minuteTickRef.current = null; }
   }, []);
 
-  // ─── Sessão de carregamento ─────────────────────────────────────────────────
+  // ─── Sessão ──────────────────────────────────────────────────────────────────
 
-  const iniciarSessao = useCallback(() => {
-    if (intervalRef.current) return;
-    pedirPermissao();
-    iniciarContador();
-    salvarSessao(minutosRef.current);
+  const iniciarSessao = useCallback(async () => {
+    if (!uidRef.current) return;
+    // Mutex: impede chamadas concorrentes (Android pode disparar múltiplos eventos de bateria)
+    if (iniciandoSessaoRef.current) return;
+    iniciandoSessaoRef.current = true;
 
-    intervalRef.current = setInterval(async () => {
-      if (!uidRef.current) return;
-      minutosRef.current += 1;
-      const bonus = minutosRef.current % 60 === 0 ? 50 : 0;
-      const total = 10 + bonus;
+    try {
+      // Restaura minutos acumulados de sessão existente (app voltou ao foreground)
       try {
-        await adicionarPontos(uidRef.current, total, 1);
-        setPontosGanhos(prev => prev + total);
-        onAtualizarRef.current?.();
-        await salvarSessao(minutosRef.current);
-        if (bonus > 0) {
-          notificar('🎁 Bônus de 1 hora!', `Você ganhou +${total} pontos (10 + 50 de bônus)!`);
-        } else if (minutosRef.current % 30 === 0) {
-          notificar('⚡ Pontos ganhos!', `+${minutosRef.current * 10} pts acumulados. Continue carregando!`);
+        const raw = await AsyncStorage.getItem(SESSAO_KEY);
+        if (raw) {
+          const { uid: savedUid, minutosAcumulados } = JSON.parse(raw);
+          if (savedUid === uidRef.current && minutosAcumulados > minutosRef.current) {
+            minutosRef.current = minutosAcumulados;
+            if (montadoRef.current) setPontosGanhos(calcularPontosTotal(minutosAcumulados));
+          }
         }
-      } catch { /* ignora erros de rede */ }
-    }, 60000);
+      } catch {}
+
+      iniciarContador();
+      logInicioCarregamento();
+
+      // Tick local a cada minuto — só atualiza UI (Firestore é gravado pelo Foreground Service)
+      if (!minuteTickRef.current) {
+        minuteTickRef.current = setInterval(() => {
+          minutosRef.current += 1;
+          if (montadoRef.current) {
+            setPontosGanhos(calcularPontosTotal(minutosRef.current));
+            if (minutosRef.current % 60 === 0) logBonusHora(minutosRef.current);
+          }
+        }, 60000);
+      }
+
+      // Inicia o Foreground Service — roda em background e escreve no Firestore
+      try {
+        await iniciarForegroundService(uidRef.current);
+      } catch (e) {
+        console.warn('[Carregar] Erro ao iniciar serviço:', e?.message);
+      }
+    } finally {
+      iniciandoSessaoRef.current = false;
+    }
   }, [iniciarContador]);
 
-  const pararSessao = useCallback(() => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
+  const pararSessao = useCallback(async (minutosFinal) => {
+    // Mutex: impede chamadas concorrentes
+    if (parandoSessaoRef.current) return;
+    parandoSessaoRef.current = true;
+
+    try {
+      const minutos = minutosFinal ?? minutosRef.current;
+      if (minutos > 0) logFimCarregamento(minutos, calcularPontosTotal(minutos));
+      pararContador();
+      minutosRef.current = 0;
+      if (montadoRef.current) {
+        setPontosGanhos(0);
+        setSegundosRestantes(3600);
+      }
+      // Limpa AsyncStorage aqui: se o serviço foi morto pelo SO, ele nunca
+      // executa removeItem, e a próxima sessão carregaria os minutos antigos.
+      await AsyncStorage.removeItem(SESSAO_KEY).catch(() => {});
+      try { await pararForegroundService(); } catch {}
+      if (minutos > 0) onAtualizarRef.current?.();
+    } finally {
+      parandoSessaoRef.current = false;
     }
-    pararContador();
-    minutosRef.current = 0;
-    setSegundosRestantes(3600);
-    limparSessao();
   }, [pararContador]);
 
-  // ─── AppState: retorno ao foreground ───────────────────────────────────────
+  // ─── Sincroniza ao retornar ao foreground ────────────────────────────────────
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', async (nextState) => {
       if (nextState !== 'active') return;
       if (!carregandoRef.current) return;
 
-      const pontosRecuperados = await recuperarBackground();
-      if (pontosRecuperados > 0) {
-        setPontosGanhos(prev => prev + pontosRecuperados);
-        notificar(
-          '⚡ Pontos recuperados!',
-          `+${pontosRecuperados} pts contabilizados enquanto você estava fora.`,
-        );
+      try {
+        const raw = await AsyncStorage.getItem(SESSAO_KEY);
+        if (raw) {
+          const { minutosAcumulados } = JSON.parse(raw);
+          if (minutosAcumulados > minutosRef.current) {
+            minutosRef.current = minutosAcumulados;
+            if (montadoRef.current) setPontosGanhos(calcularPontosTotal(minutosAcumulados));
+          }
+        }
+      } catch {}
+
+      // Detecta serviço morto pelo SO: UI acha que está carregando mas serviço parou.
+      // Reinicia se bateria ainda está carregando — o listener de bateria cuida do caso contrário.
+      if (!servicoRodando() && uidRef.current) {
+        try {
+          const state = await Battery.getBatteryStateAsync();
+          if (estaCarregando(state)) {
+            await iniciarForegroundService(uidRef.current);
+          }
+        } catch {}
       }
+
+      onAtualizarRef.current?.();
     });
     return () => sub.remove();
   }, []);
 
-  // ─── Inicialização: bateria ─────────────────────────────────────────────────
+  // ─── Inicialização: detecção de bateria ──────────────────────────────────────
 
   useEffect(() => {
     let sub;
+    let ativo = true;
+
     (async () => {
       try {
         const state = await Battery.getBatteryStateAsync();
+        if (!ativo) return;
         const charging = estaCarregando(state);
-
+        if (montadoRef.current) setCarregando(charging);
         if (charging) {
-          const recuperados = await recuperarBackground();
-          if (recuperados > 0) setPontosGanhos(recuperados);
+          await iniciarSessao();
         }
-
-        setCarregando(charging);
-        if (charging) iniciarSessao();
-        else pararSessao();
+        // Não chama pararSessao() no mount quando não está carregando —
+        // evita chamar onAtualizar desnecessariamente na abertura da tela
 
         sub = Battery.addBatteryStateListener(({ batteryState }) => {
-          const c = estaCarregando(batteryState);
-          setCarregando(c);
-          if (c) iniciarSessao();
-          else pararSessao();
+          // Debounce: Android pode disparar múltiplos eventos ao conectar/desconectar USB.
+          // Aguarda 1500ms para o estado estabilizar antes de agir.
+          if (batteryDebounceRef.current) clearTimeout(batteryDebounceRef.current);
+          batteryDebounceRef.current = setTimeout(async () => {
+            batteryDebounceRef.current = null;
+            if (!ativo) return;
+            try {
+              const c = estaCarregando(batteryState);
+              if (montadoRef.current) setCarregando(c);
+              if (c) {
+                await iniciarSessao();
+              } else {
+                await pararSessao();
+              }
+            } catch (e) {
+              console.warn('[Carregar] Erro no listener de bateria:', e);
+            }
+          }, 1500);
         });
       } catch (e) {
-        console.warn('Erro ao inicializar bateria:', e);
-        setCarregando(false);
+        console.warn('[Carregar] Erro ao inicializar bateria:', e);
+        if (ativo && montadoRef.current) setCarregando(false);
       }
     })();
-    return () => { sub?.remove(); pararSessao(); };
-  }, [iniciarSessao, pararSessao]);
+
+    return () => {
+      ativo = false;
+      if (batteryDebounceRef.current) {
+        clearTimeout(batteryDebounceRef.current);
+        batteryDebounceRef.current = null;
+      }
+      sub?.remove();
+      pararContador();
+      pararForegroundService().catch(() => {});
+    };
+  }, [iniciarSessao, pararSessao, pararContador]);
 
   return { carregando, pontosGanhos, segundosRestantes };
 }

@@ -7,20 +7,46 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:144617374104:android:cb38f3303f12616f37abed",
+        "mobilesdk_app_id": "1:144617374104:android:7b56fbe61d2da12537abed",
         "android_client_info": {
           "package_name": "com.cnb.cnbappv2"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "144617374104-ijgbscm0mcpj5j0c0iprjgri6at307o9.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.cnb.cnbappv2",
+            "certificate_hash": "64623dbba1fbf815e513b5db39383aaabf78677e"
+          }
+        },
+        {
+          "client_id": "144617374104-pbv1rjnhlg6o1b6351i9dgoa8bioq7f7.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.cnb.cnbappv2",
+            "certificate_hash": "3c30ab805063c1edbbe0da56e6fd9dac2db2a227"
+          }
+        },
+        {
+          "client_id": "144617374104-uf0ruk2f94d2qvh0sj8u7dqgbgo1k0hm.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
-          "current_key": "AIzaSyBTx_mrEx6_k9jbN8MeOYztJbsOc6zryl0"
+          "current_key": "AIzaSyCaocvbLGKRn-5uyYTtert2jQagWU62bLM"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "144617374104-uf0ruk2f94d2qvh0sj8u7dqgbgo1k0hm.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

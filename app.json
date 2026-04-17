@@ -2,7 +2,7 @@
   "expo": {
     "name": "CNB Mobile",
     "slug": "cnbmobile",
-    "version": "1.0.7",
+    "version": "1.2.31",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -16,11 +16,25 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.cnb.cnbappv2",
-      "usesAppleSignIn": false
+      "buildNumber": "151",
+"infoPlist": {
+        "NSCameraUsageDescription": "Usada para foto de perfil.",
+        "NSPhotoLibraryUsageDescription": "Usada para selecionar foto de perfil.",
+        "NSUserTrackingUsageDescription": "Este app não rastreia você para fins publicitários. Esta permissão é solicitada por componentes do sistema de autenticação.",
+        "UIBackgroundModes": [
+          "fetch",
+          "remote-notification"
+        ],
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.cnb.cnbappv2",
-      "versionCode": 55,
+      "versionCode": 151,
+      "permissions": [
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_DATA_SYNC"
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0A0F1E"
@@ -31,6 +45,18 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": []
+    "plugins": [
+      "expo-web-browser",
+      "expo-tracking-transparency",
+      ["@react-native-firebase/app", {
+        "ios": { "useFrameworks": "static" }
+      }]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "92b79039-a34d-43b2-b749-140b565e5a4c"
+      }
+    },
+    "owner": "marianoangra"
   }
 }

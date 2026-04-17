@@ -1,14 +1,15 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert,
+  View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity, Alert,
   ActivityIndicator, Animated, Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
 import { signOut } from 'firebase/auth';
 import { auth } from '../services/firebase';
-import { getSaques, excluirConta, getAfiliados } from '../services/pontos';
+import { limparSessao } from '../services/session';
+import { getSaques, excluirConta, getAfiliados, processarIndicacao } from '../services/pontos';
 import { colors } from '../theme/colors';
 import Avatar from '../components/Avatar';
 
@@ -27,13 +28,16 @@ function useEntrada(delay = 0) {
   return { opacity, transform: [{ translateY }] };
 }
 
-export default function ProfileScreen({ route, navigation, onLogout }) {
-  const { perfil, onAtualizar } = route.params || {};
+export default function ProfileScreen({ route, navigation }) {
+  const { user, perfil, onAtualizar, atualizarPerfil } = route.params || {};
   const [saques, setSaques] = useState([]);
   const [loadingSaques, setLoadingSaques] = useState(true);
   const [afiliados, setAfiliados] = useState({ codigo: '', total: 0 });
   const [perfilLocal, setPerfilLocal] = useState(perfil);
-
+  const [codigoParaAplicar, setCodigoParaAplicar] = useState('');
+  const [aplicandoCodigo, setAplicandoCodigo] = useState(false);
+  const afiliadosCacheRef = useRef({ data: null, ts: 0 });
+  const CACHE_TTL = 5 * 60 * 1000;
   useEffect(() => { if (perfil) setPerfilLocal(perfil); }, [perfil]);
 
   const a = useEntrada(0);
@@ -44,23 +48,62 @@ export default function ProfileScreen({ route, navigation, onLogout }) {
 
   useEffect(() => {
     if (!perfil?.uid) return;
-    getSaques(perfil.uid).then(setSaques).finally(() => setLoadingSaques(false));
+    const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 10000));
+    Promise.race([getSaques(perfil.uid), timeout])
+      .then(setSaques)
+      .catch(() => setSaques([]))
+      .finally(() => setLoadingSaques(false));
   }, [perfil?.uid]);
 
-  // Atualiza contador de afiliados sempre que a aba for focada
+  // Sempre que a aba for focada: refaz fetch do perfil e dos afiliados (com cache de 5 min)
   useFocusEffect(useCallback(() => {
     if (!perfil?.uid) return;
-    getAfiliados(perfil.uid).then(setAfiliados);
+    let active = true;
+    onAtualizar?.();
+    const now = Date.now();
+    if (afiliadosCacheRef.current.data && (now - afiliadosCacheRef.current.ts) < CACHE_TTL) {
+      setAfiliados(afiliadosCacheRef.current.data);
+      return;
+    }
+    const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 10000));
+    Promise.race([getAfiliados(perfil.uid), timeout])
+      .then(data => {
+        if (active) {
+          afiliadosCacheRef.current = { data, ts: Date.now() };
+          setAfiliados(data);
+        }
+      })
+      .catch(() => {});
+    return () => { active = false; };
   }, [perfil?.uid]));
 
   function handleEditarPerfil() {
     navigation.navigate('EditProfile', {
       perfil: perfilLocal,
       onSalvar: (updates) => {
+        // Atualiza App.js diretamente (sem refetch Firestore) — evita race condition
+        // A HomeScreen e demais telas recebem o perfil atualizado via prop
+        atualizarPerfil?.(updates);
+        // Atualiza estado local imediatamente (antes do re-render via prop)
         setPerfilLocal(prev => ({ ...prev, ...updates }));
-        onAtualizar?.(); // propaga para App.js → HomeScreen recebe avatar atualizado
       },
     });
+  }
+
+  async function handleAplicarCodigo() {
+    const codigo = codigoParaAplicar.trim().toUpperCase();
+    if (!codigo) return Alert.alert('Atenção', 'Digite um código de indicação.');
+    setAplicandoCodigo(true);
+    try {
+      await processarIndicacao(perfil.uid, codigo);
+      setCodigoParaAplicar('');
+      afiliadosCacheRef.current = { data: null, ts: 0 }; // invalida cache
+      Alert.alert('✅ Código aplicado!', 'Você foi indicado com sucesso. O indicador recebeu +100 pts.');
+    } catch (e) {
+      Alert.alert('Erro', e.message ?? 'Código inválido ou já utilizado.');
+    } finally {
+      setAplicandoCodigo(false);
+    }
   }
 
   async function handleCompartilharCodigo() {
@@ -84,9 +127,9 @@ export default function ProfileScreen({ route, navigation, onLogout }) {
   }
 
   async function handleLogout() {
-    Alert.alert('Sair', 'Deseja mesmo sair?', [
+    Alert.alert('Sair', 'Deseja mesmo sair da conta?', [
       { text: 'Cancelar', style: 'cancel' },
-      { text: 'Sair', style: 'destructive', onPress: () => signOut(auth) },
+      { text: 'Sair', style: 'destructive', onPress: () => { limparSessao(); signOut(auth); } },
     ]);
   }
 
@@ -122,14 +165,36 @@ export default function ProfileScreen({ route, navigation, onLogout }) {
     return d.toLocaleDateString('pt-BR');
   }
 
+  if (!user) {
+    return (
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <View style={styles.loginGate}>
+          <View style={styles.loginGateAvatar}>
+            <Text style={styles.loginGateIcon}>👤</Text>
+          </View>
+          <Text style={styles.loginGateTitle}>Faça login para ver seu perfil</Text>
+          <Text style={styles.loginGateSub}>Acesse sua conta para ver pontos, saques e programa de indicação.</Text>
+          <TouchableOpacity
+            style={styles.loginGateBtn}
+            onPress={() => navigation.navigate('Login')}
+            activeOpacity={0.85}>
+            <Text style={styles.loginGateBtnText}>Entrar / Cadastrar</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
         {/* Avatar + nome + botão editar */}
         <Animated.View style={[styles.avatarSection, a]}>
-          <View style={styles.avatarRing}>
-            <Avatar uri={perfilLocal?.avatarURL} nome={perfilLocal?.nome} size={84} borderColor={colors.primary} />
+          <View style={styles.avatarTouchable}>
+            <View style={styles.avatarRing}>
+              <Avatar uri={perfilLocal?.avatarURL} nome={perfilLocal?.nome} size={84} borderColor={colors.primary} />
+            </View>
           </View>
           <Text style={styles.nome}>{perfilLocal?.nome ?? 'Usuário'}</Text>
           <Text style={styles.email}>{perfilLocal?.email ?? ''}</Text>
@@ -146,21 +211,6 @@ export default function ProfileScreen({ route, navigation, onLogout }) {
           <Text style={styles.pontos}>{(perfilLocal?.pontos ?? 0).toLocaleString('pt-BR')}</Text>
           {(perfilLocal?.pontos ?? 0) >= 100000 && <Text style={styles.podeSacarBadge}>🎉 Disponível para saque!</Text>}
         </Animated.View>
-
-        {/* Stats */}
-        <Animated.View style={[styles.row, b]}>
-          <View style={[styles.statCard, styles.half]}>
-            <Text style={styles.statIcon}>⏱</Text>
-            <Text style={styles.statVal}>{perfilLocal?.minutos ?? 0}</Text>
-            <Text style={styles.statLabel}>Min. carregando</Text>
-          </View>
-          <View style={[styles.statCard, styles.half]}>
-            <Text style={styles.statIcon}>💸</Text>
-            <Text style={styles.statVal}>{perfilLocal?.saques ?? 0}</Text>
-            <Text style={styles.statLabel}>Saques realizados</Text>
-          </View>
-        </Animated.View>
-
 
         {/* Afiliados */}
         <Animated.View style={[styles.afiliadoCard, c]}>
@@ -187,6 +237,33 @@ export default function ProfileScreen({ route, navigation, onLogout }) {
           <TouchableOpacity style={styles.compartilharBtn} onPress={handleCompartilharCodigo} activeOpacity={0.85}>
             <Text style={styles.compartilharBtnText}>🚀 Compartilhar código</Text>
           </TouchableOpacity>
+
+          {/* Aplicar código de indicação — só aparece para quem ainda não foi indicado */}
+          {!perfilLocal?.referidoPor && (
+            <View style={styles.aplicarBox}>
+              <Text style={styles.aplicarLabel}>🎁 Tem um código de referência?</Text>
+              <View style={styles.aplicarRow}>
+                <TextInput
+                  style={styles.aplicarInput}
+                  placeholder="Digite o código aqui"
+                  placeholderTextColor={colors.secondary}
+                  value={codigoParaAplicar}
+                  onChangeText={v => setCodigoParaAplicar(v.toUpperCase())}
+                  autoCapitalize="characters"
+                  maxLength={10}
+                />
+                <TouchableOpacity
+                  style={[styles.aplicarBtn, aplicandoCodigo && { opacity: 0.5 }]}
+                  onPress={handleAplicarCodigo}
+                  disabled={aplicandoCodigo}
+                  activeOpacity={0.85}>
+                  {aplicandoCodigo
+                    ? <ActivityIndicator color={colors.background} size="small" />
+                    : <Text style={styles.aplicarBtnText}>Aplicar</Text>}
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
         </Animated.View>
 
         {/* Histórico saques */}
@@ -237,12 +314,20 @@ const styles = StyleSheet.create({
   content: { padding: 20, alignItems: 'center', paddingBottom: 40 },
 
   avatarSection: { alignItems: 'center', marginBottom: 24, width: '100%' },
+  avatarTouchable: { alignItems: 'center', marginBottom: 12 },
   avatarRing: {
     width: 96, height: 96, borderRadius: 48,
     borderWidth: 2.5, borderColor: colors.primary,
     alignItems: 'center', justifyContent: 'center',
-    marginBottom: 12,
   },
+  avatarCameraBtn: {
+    position: 'absolute', bottom: 0, right: 0,
+    backgroundColor: colors.primary,
+    borderRadius: 16, width: 30, height: 30,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: colors.background,
+  },
+  avatarCameraIcon: { fontSize: 13 },
   nome: { fontSize: 22, fontWeight: 'bold', color: colors.white, marginBottom: 4 },
   email: { fontSize: 13, color: colors.secondary, marginBottom: 14 },
 
@@ -260,14 +345,6 @@ const styles = StyleSheet.create({
   pontos: { fontSize: 44, fontWeight: 'bold', color: colors.primary },
   podeSacarBadge: { fontSize: 13, color: colors.primary, marginTop: 8, fontWeight: '600' },
 
-  row: { flexDirection: 'row', gap: 12, marginBottom: 14, width: '100%' },
-  half: { flex: 1 },
-  statCard: { backgroundColor: colors.card, borderRadius: 16, padding: 16, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
-  statIcon: { fontSize: 20, marginBottom: 6 },
-  statVal: { fontSize: 26, fontWeight: 'bold', color: colors.primary },
-  statLabel: { fontSize: 11, color: colors.secondary, marginTop: 4, textAlign: 'center' },
-
-
   afiliadoCard: { backgroundColor: colors.card, borderRadius: 18, padding: 18, marginBottom: 24, width: '100%', borderWidth: 1, borderColor: '#1a3a1a' },
   afiliadoHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   afiliadoTitle: { fontSize: 15, fontWeight: 'bold', color: colors.white },
@@ -283,6 +360,13 @@ const styles = StyleSheet.create({
   copiarBtnText: { fontSize: 13, color: colors.white },
   compartilharBtn: { backgroundColor: '#0d2a0d', borderRadius: 12, padding: 14, alignItems: 'center', borderWidth: 1, borderColor: colors.primary },
   compartilharBtnText: { color: colors.primary, fontWeight: 'bold', fontSize: 14 },
+
+  aplicarBox: { marginTop: 14, borderTopWidth: 1, borderTopColor: '#1a2a1a', paddingTop: 14 },
+  aplicarLabel: { fontSize: 13, color: colors.secondary, marginBottom: 8, fontWeight: '600' },
+  aplicarRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  aplicarInput: { flex: 1, backgroundColor: '#0a1a0a', borderRadius: 10, padding: 12, color: colors.white, fontSize: 15, borderWidth: 1, borderColor: colors.border, letterSpacing: 2 },
+  aplicarBtn: { backgroundColor: colors.primary, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 12 },
+  aplicarBtnText: { color: colors.background, fontWeight: 'bold', fontSize: 14 },
 
   sectionTitle: { fontSize: 17, fontWeight: 'bold', color: colors.white, marginBottom: 12, alignSelf: 'flex-start' },
   emptyCard: { backgroundColor: colors.card, borderRadius: 14, padding: 24, width: '100%', alignItems: 'center', marginBottom: 16 },
@@ -300,4 +384,22 @@ const styles = StyleSheet.create({
   logoutBtnText: { color: colors.danger, fontWeight: 'bold', fontSize: 15 },
   excluirBtn: { padding: 12, alignItems: 'center', width: '100%' },
   excluirBtnText: { color: colors.secondary, fontSize: 13 },
+
+  // Login gate
+  loginGate: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
+  loginGateAvatar: {
+    width: 100, height: 100, borderRadius: 50,
+    backgroundColor: colors.card,
+    borderWidth: 2, borderColor: colors.border,
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: 28,
+  },
+  loginGateIcon: { fontSize: 44 },
+  loginGateTitle: { fontSize: 20, fontWeight: 'bold', color: colors.white, textAlign: 'center', marginBottom: 10 },
+  loginGateSub: { fontSize: 14, color: colors.secondary, textAlign: 'center', lineHeight: 21, marginBottom: 32 },
+  loginGateBtn: {
+    backgroundColor: colors.primary, borderRadius: 16,
+    paddingVertical: 16, width: '100%', alignItems: 'center',
+  },
+  loginGateBtnText: { color: colors.background, fontWeight: 'bold', fontSize: 16 },
 });

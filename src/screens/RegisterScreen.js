@@ -5,12 +5,15 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { useTranslation } from 'react-i18next';
 import { auth } from '../services/firebase';
 import { criarPerfil } from '../services/pontos';
-import { lerReferrerInstalacao, limparReferrer } from '../services/installReferrer';
+import { lerReferrerInstalacao } from '../services/installReferrer';
+import { logCadastro, logIndicacaoUsada } from '../services/analytics';
 import { colors } from '../theme/colors';
 
 export default function RegisterScreen({ navigation }) {
+  const { t } = useTranslation();
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
@@ -32,22 +35,26 @@ export default function RegisterScreen({ navigation }) {
   }, []);
 
   async function handleRegister() {
-    if (!nome || !email || !senha || !confirmar) return Alert.alert('Atenção', 'Preencha todos os campos.');
-    if (senha !== confirmar) return Alert.alert('Atenção', 'As senhas não coincidem.');
-    if (senha.length < 6) return Alert.alert('Atenção', 'Senha mínima de 6 caracteres.');
+    if (!nome || !email || !senha || !confirmar) return Alert.alert(t('common.attention'), t('register.errorEmpty'));
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return Alert.alert(t('common.attention'), 'Informe um e-mail válido.');
+    if (senha !== confirmar) return Alert.alert(t('common.attention'), t('register.errorPasswordMatch'));
+    if (senha.length < 6) return Alert.alert(t('common.attention'), t('register.errorPasswordLength'));
     setLoading(true);
     try {
       const { user } = await createUserWithEmailAndPassword(auth, email.trim(), senha);
       await updateProfile(user, { displayName: nome });
       const result = await criarPerfil(user.uid, nome, email.trim(), codigoIndicacao.trim().toUpperCase() || null);
+      logCadastro();
       if (result._indicacaoOk) {
-        await limparReferrer();
-        Alert.alert('🎁 Indicação registrada!', 'Seu amigo recebeu +100 pontos pela sua indicação!');
+        logIndicacaoUsada();
+        Alert.alert(t('register.referralSuccess'), t('register.referralSuccessMsg'));
       }
+      // Volta para o app (pula a tela de Login que pode estar abaixo)
+      navigation.navigate('MainTabs');
     } catch (e) {
-      if (e.code === 'auth/email-already-in-use') Alert.alert('Erro', 'E-mail já cadastrado.');
-      else if (e.message === 'Código inválido.') Alert.alert('Código inválido', 'O código de indicação não foi encontrado.');
-      else Alert.alert('Erro', 'Não foi possível criar a conta.');
+      if (e.code === 'auth/email-already-in-use') Alert.alert(t('common.error'), t('register.errorEmailInUse'));
+      else if (e.message === 'Código inválido.') Alert.alert(t('common.error'), t('register.errorInvalidCode'));
+      else Alert.alert(t('common.error'), t('register.errorGeneric'));
     } finally {
       setLoading(false);
     }
@@ -66,39 +73,39 @@ export default function RegisterScreen({ navigation }) {
               </View>
             </View>
 
-            <Text style={styles.title}>Criar Conta</Text>
-            <Text style={styles.subtitle}>Junte-se à comunidade CNB</Text>
+            <Text style={styles.title}>{t('register.title')}</Text>
+            <Text style={styles.subtitle}>{t('register.subtitle')}</Text>
 
-            <TextInput style={styles.input} placeholder="Nome completo" placeholderTextColor={colors.secondary}
+            <TextInput style={styles.input} placeholder={t('register.name')} placeholderTextColor={colors.secondary}
               value={nome} onChangeText={setNome} autoCapitalize="words" />
-            <TextInput style={styles.input} placeholder="E-mail" placeholderTextColor={colors.secondary}
+            <TextInput style={styles.input} placeholder={t('register.email')} placeholderTextColor={colors.secondary}
               value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
-            <TextInput style={styles.input} placeholder="Senha" placeholderTextColor={colors.secondary}
+            <TextInput style={styles.input} placeholder={t('register.password')} placeholderTextColor={colors.secondary}
               value={senha} onChangeText={setSenha} secureTextEntry />
-            <TextInput style={styles.input} placeholder="Confirmar senha" placeholderTextColor={colors.secondary}
+            <TextInput style={styles.input} placeholder={t('register.confirmPassword')} placeholderTextColor={colors.secondary}
               value={confirmar} onChangeText={setConfirmar} secureTextEntry />
 
             <View style={styles.indicacaoBox}>
-              <Text style={styles.indicacaoLabel}>🎁 Código de indicação</Text>
+              <Text style={styles.indicacaoLabel}>🎁 {t('register.referralCode')}</Text>
               <TextInput
                 style={[styles.input, styles.indicacaoInput]}
-                placeholder="Opcional — ganhe bônus!"
+                placeholder={t('register.referralPlaceholder')}
                 placeholderTextColor={colors.secondary}
                 value={codigoIndicacao}
-                onChangeText={t => setCodigoIndicacao(t.toUpperCase())}
+                onChangeText={v => setCodigoIndicacao(v.toUpperCase())}
                 autoCapitalize="characters"
-                maxLength={8}
+                maxLength={10}
               />
             </View>
 
             <TouchableOpacity style={styles.btn} onPress={handleRegister} disabled={loading} activeOpacity={0.85}>
               {loading
                 ? <ActivityIndicator color={colors.background} />
-                : <Text style={styles.btnText}>Criar Conta</Text>}
+                : <Text style={styles.btnText}>{t('register.submit')}</Text>}
             </TouchableOpacity>
 
             <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7}>
-              <Text style={styles.link}>Já tem conta? <Text style={styles.linkDest}>Entrar</Text></Text>
+              <Text style={styles.link}>{t('register.hasAccount')} <Text style={styles.linkDest}>{t('register.login')}</Text></Text>
             </TouchableOpacity>
 
           </Animated.View>

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { View, Text, FlatList, StyleSheet, RefreshControl, ActivityIndicator, TouchableOpacity, Animated } from 'react-native';
+import { View, Text, FlatList, StyleSheet, RefreshControl, ActivityIndicator, TouchableOpacity, Animated } from 'react-native'; // TouchableOpacity kept for error retry button
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getRanking, getPosicaoRanking } from '../services/pontos';
 import { colors } from '../theme/colors';
@@ -8,7 +8,7 @@ import Avatar from '../components/Avatar';
 const medalhas = { 1: '🥇', 2: '🥈', 3: '🥉' };
 const medalhasBg = { 1: '#2a2000', 2: '#1c1c24', 3: '#201208' };
 
-function RankingItem({ item, uid, onPress, index }) {
+function RankingItem({ item, uid, index }) {
   const opacity = useRef(new Animated.Value(0)).current;
   const translateX = useRef(new Animated.Value(30)).current;
 
@@ -24,12 +24,9 @@ function RankingItem({ item, uid, onPress, index }) {
 
   return (
     <Animated.View style={{ opacity, transform: [{ translateX }] }}>
-      <TouchableOpacity
-        style={[styles.item, isMe && styles.itemMe, isTop3 && { backgroundColor: medalhasBg[item.posicao] }]}
-        onPress={onPress}
-        activeOpacity={0.75}>
+      <View style={[styles.item, isMe && styles.itemMe, isTop3 && { backgroundColor: medalhasBg[item.posicao] }]}>
         <View style={styles.posBox}>
-          <Text style={[styles.pos, isTop3 && styles.posTop]}>{medalhas[item.posicao] ?? `#${item.posicao}`}</Text>
+          <Text style={[styles.pos, isTop3 && styles.posTop]}>{medalhas[item.posicao] ?? item.posicao}</Text>
         </View>
         <Avatar uri={item.avatarURL} nome={item.nome} size={40} borderColor={isMe ? colors.primary : colors.border} />
         <View style={styles.info}>
@@ -38,13 +35,12 @@ function RankingItem({ item, uid, onPress, index }) {
           </Text>
           <Text style={styles.pts}>{(item.pontos ?? 0).toLocaleString('pt-BR')} pts</Text>
         </View>
-        <Text style={styles.arrow}>›</Text>
-      </TouchableOpacity>
+      </View>
     </Animated.View>
   );
 }
 
-export default function RankingScreen({ route, navigation }) {
+export default function RankingScreen({ route }) {
   const { uid, perfil } = route.params || {};
   const [ranking, setRanking] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -55,9 +51,12 @@ export default function RankingScreen({ route, navigation }) {
   const carregar = useCallback(async () => {
     setErro(false);
     try {
-      const [lista, pos] = await Promise.all([
-        getRanking(),
-        uid ? getPosicaoRanking(uid) : null,
+      const timeout = new Promise((_, rej) =>
+        setTimeout(() => rej(new Error('timeout')), 15000)
+      );
+      const [lista, pos] = await Promise.race([
+        Promise.all([getRanking(), uid ? getPosicaoRanking(uid) : null]),
+        timeout,
       ]);
       setRanking(lista);
       if (pos) setMinhaPos(pos);
@@ -94,38 +93,20 @@ export default function RankingScreen({ route, navigation }) {
       ListHeaderComponent={
         <View style={styles.header}>
           <Text style={styles.title}>🏆 Ranking Global</Text>
-          <Text style={styles.subtitle}>Top {ranking.length} jogadores</Text>
 
           {minhaPos && (
             <View style={styles.minhaPosCard}>
-              <View style={styles.minhaPosLeft}>
-                <Avatar uri={perfil?.avatarURL} nome={perfil?.nome} size={42} borderColor={colors.primary} />
-                <View>
-                  <Text style={styles.minhaPosNome} numberOfLines={1}>
-                    {perfil?.nome?.split(' ')[0] ?? 'Você'}
-                  </Text>
-                  <Text style={styles.minhaPosPts}>
-                    {(minhaPos.pontos ?? 0).toLocaleString('pt-BR')} pts
-                  </Text>
-                </View>
-              </View>
-              <View style={styles.minhaPosRight}>
-                <Text style={styles.minhaPosLabel}>Sua posição</Text>
-                <Text style={styles.minhaPosNum}>
-                  {minhaPos.posicao <= 3
-                    ? medalhas[minhaPos.posicao]
-                    : `#${minhaPos.posicao}`}
-                </Text>
-              </View>
+              <Text style={styles.minhaPosLabel}>Sua posição</Text>
+              <Text style={styles.minhaPosNum}>
+                {minhaPos.posicao <= 3 ? medalhas[minhaPos.posicao] : minhaPos.posicao}
+              </Text>
+              <Text style={styles.minhaPosPts}>{(minhaPos.pontos ?? 0).toLocaleString('pt-BR')} pts</Text>
             </View>
           )}
         </View>
       }
       renderItem={({ item, index }) => (
-        <RankingItem
-          item={item} uid={uid} index={index}
-          onPress={() => navigation.navigate('RankingDetail', { item, isMe: item.uid === uid })}
-        />
+        <RankingItem item={item} uid={uid} index={index} />
       )}
     />
     </SafeAreaView>
@@ -143,23 +124,19 @@ const styles = StyleSheet.create({
 
   minhaPosCard: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: colors.card, borderRadius: 16, padding: 14,
-    borderWidth: 1.5, borderColor: colors.primary,
+    backgroundColor: colors.card, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 10,
+    borderWidth: 1.5, borderColor: colors.primary, marginTop: 10,
   },
-  minhaPosLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  minhaPosNome: { fontSize: 15, fontWeight: '700', color: colors.primary, maxWidth: 160 },
-  minhaPosPts: { fontSize: 12, color: colors.secondary, marginTop: 2 },
-  minhaPosRight: { alignItems: 'center', minWidth: 64 },
-  minhaPosLabel: { fontSize: 10, color: colors.secondary, marginBottom: 2 },
-  minhaPosNum: { fontSize: 28, fontWeight: 'bold', color: colors.primary },
+  minhaPosLabel: { fontSize: 11, color: colors.secondary, marginBottom: 2 },
+  minhaPosNum: { fontSize: 22, fontWeight: 'bold', color: colors.primary },
+  minhaPosPts: { fontSize: 13, color: colors.secondary },
   item: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.card, borderRadius: 14, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: colors.border, gap: 10 },
   itemMe: { borderColor: colors.primary, borderWidth: 1.5 },
   posBox: { width: 36, alignItems: 'center' },
-  pos: { fontSize: 20 },
+  pos: { fontSize: 20, color: colors.white },
   posTop: { fontSize: 26 },
   info: { flex: 1 },
   nome: { fontSize: 15, fontWeight: '600', color: colors.white },
   nomeMe: { color: colors.primary },
   pts: { fontSize: 13, color: colors.secondary, marginTop: 2 },
-  arrow: { fontSize: 20, color: colors.secondary },
 });

@@ -4,42 +4,14 @@ import {
   Animated, useWindowDimensions, FlatList, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useTranslation } from 'react-i18next';
 import { colors } from '../theme/colors';
 
-const slides = [
-  {
-    id: '1',
-    emoji: '⚡',
-    title: 'Bem-vindo ao\nCNB Mobile',
-    desc: 'Transforme o tempo de carregamento do seu celular em recompensas reais, direto no seu PIX.',
-    corFundo: '#0d2a0d',
-    corBorda: colors.primary,
-  },
-  {
-    id: '2',
-    emoji: '🔌',
-    title: 'Conecte e\nganhe pontos',
-    desc: '+10 pontos por minuto carregando. A cada hora completa, receba +50 pts de bônus automático!',
-    corFundo: '#0a1a2a',
-    corBorda: '#3A8DFF',
-  },
-  {
-    id: '3',
-    emoji: '💰',
-    title: 'Saque via PIX\nsem complicação',
-    desc: 'Acumule 100.000 pontos e solicite um saque direto para sua chave PIX em até 72 horas.',
-    corFundo: '#2a1000',
-    corBorda: '#F5A623',
-  },
-  {
-    id: '4',
-    emoji: '👥',
-    title: 'Convide amigos\ne ganhe mais',
-    desc: 'Compartilhe seu código único e ganhe +100 pontos por cada amigo que se cadastrar!',
-    corFundo: '#12082a',
-    corBorda: '#A855F7',
-  },
+const SLIDE_META = [
+  { id: '1', emoji: '⚡', corFundo: '#0d2a0d', corBorda: colors.primary },
+  { id: '2', emoji: '🔌', corFundo: '#0a1a2a', corBorda: '#3A8DFF' },
+  { id: '3', emoji: '💰', corFundo: '#2a1000', corBorda: '#F5A623' },
+  { id: '4', emoji: '👥', corFundo: '#12082a', corBorda: '#A855F7' },
 ];
 
 function Dot({ active, corAtiva }) {
@@ -62,11 +34,19 @@ function Dot({ active, corAtiva }) {
 }
 
 export default function OnboardingScreen({ onConcluir }) {
+  const { t } = useTranslation();
   const { width } = useWindowDimensions();
   const [indice, setIndice] = useState(0);
   const listRef = useRef(null);
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
+
+  const slides = [
+    { ...SLIDE_META[0], title: t('onboarding.slide1Title'), desc: t('onboarding.slide1Desc') },
+    { ...SLIDE_META[1], title: t('onboarding.slide2Title'), desc: t('onboarding.slide2Desc') },
+    { ...SLIDE_META[2], title: t('onboarding.slide3Title'), desc: t('onboarding.slide3Desc') },
+    { ...SLIDE_META[3], title: t('onboarding.slide4Title'), desc: t('onboarding.slide4Desc') },
+  ];
 
   const slide = slides[indice];
   const isUltimo = indice === slides.length - 1;
@@ -86,17 +66,8 @@ export default function OnboardingScreen({ onConcluir }) {
     });
   }, []);
 
-  async function concluir() {
-    try {
-      await AsyncStorage.setItem('onboarding_completo', 'true');
-    } catch (e) {
-      console.warn('Erro ao salvar onboarding:', e);
-    }
-    onConcluir();
-  }
-
   function avancar() {
-    if (isUltimo) concluir();
+    if (isUltimo) onConcluir();
     else irPara(indice + 1);
   }
 
@@ -106,8 +77,8 @@ export default function OnboardingScreen({ onConcluir }) {
       {/* Pular */}
       <View style={styles.topBar}>
         {!isUltimo && (
-          <TouchableOpacity onPress={concluir} activeOpacity={0.7} style={styles.pularBtn}>
-            <Text style={styles.pularText}>Pular</Text>
+          <TouchableOpacity onPress={onConcluir} activeOpacity={0.7} style={styles.pularBtn}>
+            <Text style={styles.pularText}>{t('onboarding.skip')}</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -156,13 +127,13 @@ export default function OnboardingScreen({ onConcluir }) {
           onPress={avancar}
           activeOpacity={0.85}>
           <Text style={[styles.btnAvancarText, { color: isUltimo ? colors.background : slide.corBorda }]}>
-            {isUltimo ? '🚀 Começar agora' : 'Próximo  →'}
+            {isUltimo ? t('onboarding.start') : t('onboarding.next')}
           </Text>
         </TouchableOpacity>
 
         {isUltimo && (
-          <TouchableOpacity onPress={concluir} style={styles.jaTemContaBtn} activeOpacity={0.7}>
-            <Text style={styles.jaTemContaText}>Já tenho uma conta</Text>
+          <TouchableOpacity onPress={onConcluir} style={styles.jaTemContaBtn} activeOpacity={0.7}>
+            <Text style={styles.jaTemContaText}>{t('onboarding.hasAccount')}</Text>
           </TouchableOpacity>
         )}
       </View>

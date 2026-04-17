@@ -43,36 +43,25 @@ const BANNERS = [
     sub: 'Veja sua posição entre os maiores acumuladores.',
     cor: '#EAB308',
   },
-  {
-    id: 'whatsapp',
-    icon: '💬',
-    iconBg: '#075E54',
-    bg: '#021f1a',
-    border: '#25D366',
-    titulo: 'Entre no grupo CNB!',
-    sub: 'Dicas, novidades e suporte direto no WhatsApp.',
-    cor: '#25D366',
-  },
 ];
 
 const INTERVALO = 6000;
 
-export default function BannerAd({ onPress }) {
+export default function BannerAd({ onPress, active = true }) {
   const [indice, setIndice] = useState(0);
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
   const scale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
+    if (!active) return;
     const timer = setInterval(() => {
-      // Sai
       Animated.parallel([
         Animated.timing(fadeAnim, { toValue: 0, duration: 250, useNativeDriver: true }),
         Animated.timing(slideAnim, { toValue: -12, duration: 250, useNativeDriver: true }),
       ]).start(() => {
         setIndice(prev => (prev + 1) % BANNERS.length);
         slideAnim.setValue(12);
-        // Entra
         Animated.parallel([
           Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
           Animated.timing(slideAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
@@ -81,7 +70,7 @@ export default function BannerAd({ onPress }) {
     }, INTERVALO);
 
     return () => clearInterval(timer);
-  }, []);
+  }, [active]);
 
   const banner = BANNERS[indice];
 

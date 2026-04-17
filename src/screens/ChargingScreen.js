@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
+import { View, Text, StyleSheet, Animated, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../theme/colors';
 import { useCarregamento } from '../hooks/useCarregamento';
@@ -10,8 +10,10 @@ function formatarTempo(segundos) {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
-export default function ChargingScreen({ route }) {
-  const { uid, onAtualizar } = route.params || {};
+export default function ChargingScreen({ route, navigation }) {
+  const { user, uid, onAtualizar } = route.params || {};
+
+  // Hook sempre chamado (regras dos hooks) — sem uid, não faz nada
   const { carregando, pontosGanhos, segundosRestantes } = useCarregamento(uid, onAtualizar);
 
   const pulse = useRef(new Animated.Value(1)).current;
@@ -49,73 +51,96 @@ export default function ChargingScreen({ route }) {
     return () => { pulseAnim.stop(); glowAnim.stop(); };
   }, [carregando]);
 
+  // Overlay de login quando não autenticado
+  if (!user) {
+    return (
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <Animated.View style={[styles.loginGate, { opacity: entradaOpacity, transform: [{ translateY: entradaY }] }]}>
+          <View style={styles.loginGateCircle}>
+            <Text style={styles.loginGateIcon}>🔌</Text>
+          </View>
+          <Text style={styles.loginGateTitle}>Faça login para ganhar pontos</Text>
+          <Text style={styles.loginGateSub}>
+            Conecte-se à sua conta e acumule pontos reais enquanto carrega seu celular.
+          </Text>
+          <TouchableOpacity
+            style={styles.loginGateBtn}
+            onPress={() => navigation.navigate('Login')}
+            activeOpacity={0.85}>
+            <Text style={styles.loginGateBtnText}>Entrar / Cadastrar</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      </SafeAreaView>
+    );
+  }
+
   const progBonus = 1 - segundosRestantes / 3600;
   const minRestantes = Math.ceil(segundosRestantes / 60);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-    <Animated.View style={[styles.container, { opacity: entradaOpacity, transform: [{ translateY: entradaY }] }]}>
+      <Animated.View style={[styles.container, { opacity: entradaOpacity, transform: [{ translateY: entradaY }] }]}>
 
-      <View style={styles.circleArea}>
-        <Animated.View style={[styles.glowRing, { opacity: glowOpacity }]} />
-        <Animated.View style={[styles.circle, { transform: [{ scale: pulse }] }]}>
-          <Text style={styles.icon}>{carregando ? '⚡' : '🔌'}</Text>
-        </Animated.View>
-      </View>
+        <View style={styles.circleArea}>
+          <Animated.View style={[styles.glowRing, { opacity: glowOpacity }]} />
+          <Animated.View style={[styles.circle, { transform: [{ scale: pulse }] }]}>
+            <Text style={styles.icon}>{carregando ? '⚡' : '🔌'}</Text>
+          </Animated.View>
+        </View>
 
-      <Text style={styles.status}>{carregando ? 'Carregando' : 'Desconectado'}</Text>
-      <Text style={styles.sub}>
-        {carregando ? 'Você está ganhando pontos!' : 'Conecte o cabo USB para começar.'}
-      </Text>
+        <Text style={styles.status}>{carregando ? 'Carregando' : 'Desconectado'}</Text>
+        <Text style={styles.sub}>
+          {carregando ? 'Você está ganhando pontos!' : 'Conecte o cabo USB para começar.'}
+        </Text>
 
-      {carregando && (
-        <>
-          <View style={styles.row}>
-            <View style={[styles.card, styles.half]}>
-              <Text style={styles.cardLabel}>Sessão atual</Text>
-              <Text style={styles.cardVal}>+{pontosGanhos.toLocaleString('pt-BR')}</Text>
-              <Text style={styles.cardSub}>pontos</Text>
+        {carregando && (
+          <>
+            <View style={styles.row}>
+              <View style={[styles.card, styles.half]}>
+                <Text style={styles.cardLabel}>Sessão atual</Text>
+                <Text style={styles.cardVal}>+{pontosGanhos.toLocaleString('pt-BR')}</Text>
+                <Text style={styles.cardSub}>pontos</Text>
+              </View>
+              <View style={[styles.card, styles.half, styles.bonusCard]}>
+                <Text style={styles.cardLabel}>🎁 Próximo bônus</Text>
+                <Text style={[styles.cardVal, styles.timerText]}>{formatarTempo(segundosRestantes)}</Text>
+                <Text style={styles.cardSub}>{minRestantes} min restantes</Text>
+              </View>
             </View>
-            <View style={[styles.card, styles.half, styles.bonusCard]}>
-              <Text style={styles.cardLabel}>🎁 Próximo bônus</Text>
-              <Text style={[styles.cardVal, styles.timerText]}>{formatarTempo(segundosRestantes)}</Text>
-              <Text style={styles.cardSub}>{minRestantes} min restantes</Text>
+
+            <View style={styles.progressCard}>
+              <View style={styles.progressHeader}>
+                <Text style={styles.progressLabel}>Progresso para o bônus</Text>
+                <Text style={styles.progressPct}>{Math.round(progBonus * 100)}%</Text>
+              </View>
+              <View style={styles.progressBg}>
+                <View style={[styles.progressFill, { width: `${Math.round(progBonus * 100)}%` }]} />
+              </View>
             </View>
+          </>
+        )}
+
+        <View style={styles.infoCard}>
+          <Text style={styles.infoTitle}>Como ganhar pontos</Text>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoIcon}>⚡</Text>
+            <Text style={styles.infoText}>+10 pts por minuto carregando</Text>
           </View>
-
-          <View style={styles.progressCard}>
-            <View style={styles.progressHeader}>
-              <Text style={styles.progressLabel}>Progresso para o bônus</Text>
-              <Text style={styles.progressPct}>{Math.round(progBonus * 100)}%</Text>
-            </View>
-            <View style={styles.progressBg}>
-              <View style={[styles.progressFill, { width: `${Math.round(progBonus * 100)}%` }]} />
-            </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoIcon}>🎁</Text>
+            <Text style={styles.infoText}>+50 pts bônus a cada hora completa</Text>
           </View>
-        </>
-      )}
+          <View style={styles.infoRow}>
+            <Text style={styles.infoIcon}>📅</Text>
+            <Text style={styles.infoText}>+10 pts por login diário</Text>
+          </View>
+          <View style={[styles.infoRow, { marginBottom: 0 }]}>
+            <Text style={styles.infoIcon}>👥</Text>
+            <Text style={styles.infoText}>+100 pts por amigo indicado</Text>
+          </View>
+        </View>
 
-      <View style={styles.infoCard}>
-        <Text style={styles.infoTitle}>Como ganhar pontos</Text>
-        <View style={styles.infoRow}>
-          <Text style={styles.infoIcon}>⚡</Text>
-          <Text style={styles.infoText}>+10 pts por minuto carregando</Text>
-        </View>
-        <View style={styles.infoRow}>
-          <Text style={styles.infoIcon}>🎁</Text>
-          <Text style={styles.infoText}>+50 pts bônus a cada hora completa</Text>
-        </View>
-        <View style={styles.infoRow}>
-          <Text style={styles.infoIcon}>📅</Text>
-          <Text style={styles.infoText}>+10 pts por login diário</Text>
-        </View>
-        <View style={[styles.infoRow, { marginBottom: 0 }]}>
-          <Text style={styles.infoIcon}>👥</Text>
-          <Text style={styles.infoText}>+100 pts por amigo indicado</Text>
-        </View>
-      </View>
-
-    </Animated.View>
+      </Animated.View>
     </SafeAreaView>
   );
 }
@@ -124,12 +149,28 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   container: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', padding: 20 },
 
-  circleArea: { alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
-  glowRing: {
-    position: 'absolute',
-    width: 180, height: 180, borderRadius: 90,
-    backgroundColor: colors.primary,
+  // Login gate
+  loginGate: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
+  loginGateCircle: {
+    width: 130, height: 130, borderRadius: 65,
+    backgroundColor: colors.card,
+    borderWidth: 2.5, borderColor: colors.border,
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: 32,
   },
+  loginGateIcon: { fontSize: 52 },
+  loginGateTitle: { fontSize: 22, fontWeight: 'bold', color: colors.white, textAlign: 'center', marginBottom: 12 },
+  loginGateSub: { fontSize: 15, color: colors.secondary, textAlign: 'center', lineHeight: 22, marginBottom: 36 },
+  loginGateBtn: {
+    backgroundColor: colors.primary, borderRadius: 16,
+    paddingVertical: 16, paddingHorizontal: 48,
+    width: '100%', alignItems: 'center',
+  },
+  loginGateBtnText: { color: colors.background, fontWeight: 'bold', fontSize: 17 },
+
+  // Charging UI
+  circleArea: { alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
+  glowRing: { position: 'absolute', width: 180, height: 180, borderRadius: 90, backgroundColor: colors.primary },
   circle: {
     width: 130, height: 130, borderRadius: 65,
     backgroundColor: colors.card,

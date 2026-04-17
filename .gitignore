@@ -33,6 +33,9 @@ yarn-error.*
 # local env files
 .env*.local
 
+# EAS credentials (contém senha do keystore — nunca commitar)
+credentials.json
+
 # typescript
 *.tsbuildinfo
 
