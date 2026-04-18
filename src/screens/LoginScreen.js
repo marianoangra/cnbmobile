@@ -1,20 +1,38 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  KeyboardAvoidingView, Platform, ScrollView, Alert, ActivityIndicator, Animated,
+  KeyboardAvoidingView, Platform, ScrollView, Alert, ActivityIndicator, Animated, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { useTranslation } from 'react-i18next';
+import * as Google from 'expo-auth-session/providers/google';
+import * as WebBrowser from 'expo-web-browser';
 import { auth } from '../services/firebase';
 import { logLogin } from '../services/analytics';
+import {
+  WEB_CLIENT_ID,
+  ANDROID_CLIENT_ID,
+  assinarFirebaseComIdToken,
+  googleLoginDisponivel,
+} from '../services/authSocial';
 import { colors } from '../theme/colors';
+
+WebBrowser.maybeCompleteAuthSession();
 
 export default function LoginScreen({ navigation }) {
   const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadingGoogle, setLoadingGoogle] = useState(false);
+
+  const [googleRequest, googleResponse, googlePromptAsync] = Google.useAuthRequest({
+    androidClientId: ANDROID_CLIENT_ID,
+    webClientId: WEB_CLIENT_ID,
+    scopes: ['openid', 'profile', 'email'],
+    redirectUri: `com.googleusercontent.apps.${ANDROID_CLIENT_ID.split('.')[0]}:/oauthredirect`,
+  });
 
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(32)).current;
@@ -25,6 +43,37 @@ export default function LoginScreen({ navigation }) {
       Animated.timing(translateY, { toValue: 0, duration: 500, useNativeDriver: true }),
     ]).start();
   }, []);
+
+  useEffect(() => {
+    if (!googleResponse) return;
+    if (googleResponse.type === 'success') {
+      const idToken =
+        googleResponse.authentication?.idToken ?? googleResponse.params?.id_token;
+      if (!idToken) {
+        setLoadingGoogle(false);
+        return;
+      }
+      (async () => {
+        try {
+          await assinarFirebaseComIdToken(idToken);
+          logLogin();
+          navigation.goBack();
+        } catch (e) {
+          Alert.alert(t('common.error') || 'Erro', e?.message || 'Falha no login com Google');
+        } finally {
+          setLoadingGoogle(false);
+        }
+      })();
+    } else if (googleResponse.type === 'error') {
+      setLoadingGoogle(false);
+      Alert.alert(
+        t('common.error') || 'Erro',
+        googleResponse.error?.message || 'Falha no login com Google',
+      );
+    } else {
+      setLoadingGoogle(false);
+    }
+  }, [googleResponse]);
 
   async function handleLogin() {
     if (!email || !senha) return Alert.alert(t('common.attention'), t('login.errorEmpty'));
@@ -45,6 +94,17 @@ export default function LoginScreen({ navigation }) {
       }
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleLoginGoogle() {
+    if (!googleRequest) return;
+    setLoadingGoogle(true);
+    try {
+      await googlePromptAsync();
+    } catch (e) {
+      setLoadingGoogle(false);
+      Alert.alert(t('common.error') || 'Erro', e?.message || 'Falha no login com Google');
     }
   }
 
@@ -106,7 +166,7 @@ export default function LoginScreen({ navigation }) {
               secureTextEntry
             />
 
-            <TouchableOpacity style={styles.btn} onPress={handleLogin} disabled={loading} activeOpacity={0.85}>
+            <TouchableOpacity style={styles.btn} onPress={handleLogin} disabled={loading || loadingGoogle} activeOpacity={0.85}>
               {loading
                 ? <ActivityIndicator color={colors.background} />
                 : <Text style={styles.btnText}>{t('login.submit')}</Text>}
@@ -115,6 +175,33 @@ export default function LoginScreen({ navigation }) {
             <TouchableOpacity onPress={handleRecuperarSenha} activeOpacity={0.7} style={styles.forgotBtn}>
               <Text style={styles.forgotText}>Esqueceu a senha?</Text>
             </TouchableOpacity>
+
+            {googleLoginDisponivel && (
+              <>
+                <View style={styles.divider}>
+                  <View style={styles.dividerLine} />
+                  <Text style={styles.dividerText}>OU</Text>
+                  <View style={styles.dividerLine} />
+                </View>
+                <TouchableOpacity
+                  style={styles.btnGoogle}
+                  onPress={handleLoginGoogle}
+                  disabled={loading || loadingGoogle || !googleRequest}
+                  activeOpacity={0.9}
+                  accessibilityRole="button"
+                  accessibilityLabel="Entrar com Google"
+                >
+                  {loadingGoogle ? (
+                    <ActivityIndicator color="#1F1F1F" />
+                  ) : (
+                    <>
+                      <Image source={require('../../assets/google-g.png')} style={styles.btnGoogleIcon} />
+                      <Text style={styles.btnGoogleText}>Entrar com Google</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </>
+            )}
 
             <TouchableOpacity onPress={() => navigation.navigate('Register')} activeOpacity={0.7} style={{ marginTop: 24 }}>
               <Text style={styles.link}>{t('login.noAccount')} <Text style={styles.linkDest}>{t('login.register')}</Text></Text>
@@ -160,14 +247,36 @@ const styles = StyleSheet.create({
   forgotText: { color: colors.secondary, fontSize: 13 },
   link: { color: colors.secondary, textAlign: 'center', fontSize: 14 },
   linkDest: { color: colors.primary, fontWeight: '600' },
-  divider: { flexDirection: 'row', alignItems: 'center', marginVertical: 20 },
-  dividerLine: { flex: 1, height: 1, backgroundColor: colors.border },
-  dividerText: { color: colors.secondary, fontSize: 12, marginHorizontal: 12 },
-  btnGoogle: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    backgroundColor: colors.card, borderRadius: 14, padding: 14,
-    borderWidth: 1, borderColor: colors.border, marginBottom: 20, gap: 10,
+  divider: { flexDirection: 'row', alignItems: 'center', marginVertical: 24 },
+  dividerLine: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
+  dividerText: {
+    color: colors.secondary,
+    fontSize: 11,
+    marginHorizontal: 14,
+    letterSpacing: 2,
+    fontWeight: '600',
   },
-  btnGoogleIcon: { fontSize: 18, fontWeight: 'bold', color: '#4285F4' },
-  btnGoogleText: { color: colors.white, fontWeight: '600', fontSize: 15 },
+  btnGoogle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginBottom: 20,
+    minHeight: 52,
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+  btnGoogleIcon: { width: 20, height: 20, resizeMode: 'contain', marginRight: 12 },
+  btnGoogleText: {
+    color: '#1F1F1F',
+    fontSize: 15,
+    fontWeight: '600',
+    letterSpacing: 0.2,
+  },
 });

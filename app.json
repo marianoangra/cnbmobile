@@ -16,8 +16,8 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.cnb.cnbappv2",
-      "buildNumber": "151",
-"infoPlist": {
+      "buildNumber": "152",
+      "infoPlist": {
         "NSCameraUsageDescription": "Usada para foto de perfil.",
         "NSPhotoLibraryUsageDescription": "Usada para selecionar foto de perfil.",
         "NSUserTrackingUsageDescription": "Este app não rastreia você para fins publicitários. Esta permissão é solicitada por componentes do sistema de autenticação.",
@@ -30,7 +30,7 @@
     },
     "android": {
       "package": "com.cnb.cnbappv2",
-      "versionCode": 151,
+      "versionCode": 159,
       "permissions": [
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_DATA_SYNC"
@@ -48,9 +48,16 @@
     "plugins": [
       "expo-web-browser",
       "expo-tracking-transparency",
-      ["@react-native-firebase/app", {
-        "ios": { "useFrameworks": "static" }
-      }]
+      [
+        "@react-native-firebase/app",
+        {
+          "ios": {
+            "useFrameworks": "static"
+          }
+        }
+      ],
+      "expo-localization",
+      "@react-native-google-signin/google-signin"
     ],
     "extra": {
       "eas": {

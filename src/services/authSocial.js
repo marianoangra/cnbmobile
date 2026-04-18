@@ -1,17 +1,17 @@
-import { NativeModules, Platform } from 'react-native';
+import { Platform } from 'react-native';
 import { GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
 import { auth } from './firebase';
 
-const { FirebaseUISignIn } = NativeModules;
+export const WEB_CLIENT_ID =
+  '144617374104-uf0ruk2f94d2qvh0sj8u7dqgbgo1k0hm.apps.googleusercontent.com';
 
-export async function loginComGoogle() {
-  if (Platform.OS !== 'android') {
-    throw new Error('Login com Google disponível apenas no Android por enquanto.');
-  }
-  const result = await FirebaseUISignIn.signInWithGoogle();
-  const credential = GoogleAuthProvider.credential(result.idToken);
+export const ANDROID_CLIENT_ID =
+  '144617374104-f1na8of0dsq5d33fhi7qo8j1n9doddq7.apps.googleusercontent.com';
+
+export async function assinarFirebaseComIdToken(idToken) {
+  if (!idToken) throw new Error('idToken vazio recebido do Google.');
+  const credential = GoogleAuthProvider.credential(idToken);
   return signInWithCredential(auth, credential);
 }
 
-// Indica se o login Google está disponível na plataforma atual
-export const googleLoginDisponivel = Platform.OS === 'android';
+export const googleLoginDisponivel = Platform.OS === 'android' || Platform.OS === 'ios';

@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "144617374104-ge5q46gp39dd6d54711dvcig949gevcj.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.cnb.cnbappv2",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
           "client_id": "144617374104-ijgbscm0mcpj5j0c0iprjgri6at307o9.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
@@ -27,6 +35,14 @@
           "android_info": {
             "package_name": "com.cnb.cnbappv2",
             "certificate_hash": "3c30ab805063c1edbbe0da56e6fd9dac2db2a227"
+          }
+        },
+        {
+          "client_id": "144617374104-vmpql5bdcsrv31ponpt91n7i4spu93u2.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.cnb.cnbappv2",
+            "certificate_hash": "7266eb932c0a774221c1af44ae669c49b3bac223"
           }
         },
         {
