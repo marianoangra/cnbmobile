@@ -126,17 +126,21 @@ ios/build/
   "android": {
     "keystore": {
       "keystorePath": "android/app/cnbmobile-upload.keystore",
-      "keystorePassword": "CNBMobile@2024",
+      "keystorePassword": "<REDACTED — ver arquivo local, gitignored>",
       "keyAlias": "cnbmobile",
-      "keyPassword": "CNBMobile@2024"
+      "keyPassword": "<REDACTED — ver arquivo local, gitignored>"
     }
   }
 }
 ```
 
-**NÃO commitar este arquivo.** O keystore físico está em:
-- `android/app/cnbmobile-upload.keystore` (no projeto)
-- `~/Desktop/cnbmobile-upload.keystore` (backup)
-- `~/Documents/cnbmobile-upload.keystore` (backup)
+**NÃO commitar este arquivo.** O keystore físico fica em:
+- `android/app/cnbmobile-upload.keystore` (no projeto, gitignored via `/android`)
+- `~/Desktop/cnbmobile-upload.keystore` (backup Mac)
+- `~/Documents/cnbmobile-upload.keystore` (backup Mac)
+
+As senhas reais moram **apenas** em `credentials.json` (gitignored). O build.gradle
+lê as senhas de `android/keystore.properties` (também gitignored), gerado a partir
+de `credentials.json` pelo `patch_signing.py` antes de cada build.
 
 SHA1 esperado pelo Google Play: `3C:30:AB:80:50:63:C1:ED:BB:E0:DA:56:E6:FD:9D:AC:2D:B2:A2:27`
