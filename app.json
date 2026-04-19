@@ -18,6 +18,7 @@
       "bundleIdentifier": "com.cnb.cnbappv2",
       "buildNumber": "153",
       "usesAppleSignIn": true,
+      "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "NSCameraUsageDescription": "Usada para foto de perfil.",
         "NSPhotoLibraryUsageDescription": "Usada para selecionar foto de perfil.",
