@@ -16,7 +16,8 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.cnb.cnbappv2",
-      "buildNumber": "152",
+      "buildNumber": "153",
+      "usesAppleSignIn": true,
       "infoPlist": {
         "NSCameraUsageDescription": "Usada para foto de perfil.",
         "NSPhotoLibraryUsageDescription": "Usada para selecionar foto de perfil.",
@@ -56,7 +57,8 @@
           }
         }
       ],
-      "expo-localization"
+      "expo-localization",
+      "expo-apple-authentication"
     ],
     "extra": {
       "eas": {

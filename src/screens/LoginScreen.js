@@ -8,13 +8,17 @@ import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/aut
 import { useTranslation } from 'react-i18next';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
+import * as AppleAuthentication from 'expo-apple-authentication';
+import * as Crypto from 'expo-crypto';
 import { auth } from '../services/firebase';
 import { logLogin } from '../services/analytics';
 import {
   WEB_CLIENT_ID,
   ANDROID_CLIENT_ID,
   assinarFirebaseComIdToken,
+  assinarFirebaseComApple,
   googleLoginDisponivel,
+  appleLoginDisponivel,
 } from '../services/authSocial';
 import { colors } from '../theme/colors';
 
@@ -26,6 +30,8 @@ export default function LoginScreen({ navigation }) {
   const [senha, setSenha] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingGoogle, setLoadingGoogle] = useState(false);
+  const [loadingApple, setLoadingApple] = useState(false);
+  const [appleAvailable, setAppleAvailable] = useState(false);
 
   const [googleRequest, googleResponse, googlePromptAsync] = Google.useAuthRequest({
     androidClientId: ANDROID_CLIENT_ID,
@@ -42,6 +48,13 @@ export default function LoginScreen({ navigation }) {
       Animated.timing(opacity, { toValue: 1, duration: 500, useNativeDriver: true }),
       Animated.timing(translateY, { toValue: 0, duration: 500, useNativeDriver: true }),
     ]).start();
+  }, []);
+
+  useEffect(() => {
+    if (!appleLoginDisponivel) return;
+    AppleAuthentication.isAvailableAsync()
+      .then(setAppleAvailable)
+      .catch(() => setAppleAvailable(false));
   }, []);
 
   useEffect(() => {
@@ -108,6 +121,37 @@ export default function LoginScreen({ navigation }) {
     }
   }
 
+  async function handleLoginApple() {
+    setLoadingApple(true);
+    try {
+      const bytes = await Crypto.getRandomBytesAsync(32);
+      const rawNonce = Array.from(bytes)
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('');
+      const hashedNonce = await Crypto.digestStringAsync(
+        Crypto.CryptoDigestAlgorithm.SHA256,
+        rawNonce,
+      );
+      const cred = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+        nonce: hashedNonce,
+      });
+      if (!cred.identityToken) throw new Error('Sem identityToken retornado pela Apple.');
+      await assinarFirebaseComApple({ identityToken: cred.identityToken, rawNonce });
+      logLogin();
+      navigation.goBack();
+    } catch (e) {
+      if (e?.code !== 'ERR_REQUEST_CANCELED') {
+        Alert.alert(t('common.error') || 'Erro', e?.message || 'Falha no login com Apple');
+      }
+    } finally {
+      setLoadingApple(false);
+    }
+  }
+
   async function handleRecuperarSenha() {
     const emailDigitado = email.trim();
     if (!emailDigitado) {
@@ -166,7 +210,7 @@ export default function LoginScreen({ navigation }) {
               secureTextEntry
             />
 
-            <TouchableOpacity style={styles.btn} onPress={handleLogin} disabled={loading || loadingGoogle} activeOpacity={0.85}>
+            <TouchableOpacity style={styles.btn} onPress={handleLogin} disabled={loading || loadingGoogle || loadingApple} activeOpacity={0.85}>
               {loading
                 ? <ActivityIndicator color={colors.background} />
                 : <Text style={styles.btnText}>{t('login.submit')}</Text>}
@@ -176,30 +220,49 @@ export default function LoginScreen({ navigation }) {
               <Text style={styles.forgotText}>Esqueceu a senha?</Text>
             </TouchableOpacity>
 
-            {googleLoginDisponivel && (
+            {(googleLoginDisponivel || (appleLoginDisponivel && appleAvailable)) && (
               <>
                 <View style={styles.divider}>
                   <View style={styles.dividerLine} />
                   <Text style={styles.dividerText}>OU</Text>
                   <View style={styles.dividerLine} />
                 </View>
-                <TouchableOpacity
-                  style={styles.btnGoogle}
-                  onPress={handleLoginGoogle}
-                  disabled={loading || loadingGoogle || !googleRequest}
-                  activeOpacity={0.9}
-                  accessibilityRole="button"
-                  accessibilityLabel="Entrar com Google"
-                >
-                  {loadingGoogle ? (
-                    <ActivityIndicator color="#1F1F1F" />
+
+                {appleLoginDisponivel && appleAvailable && (
+                  loadingApple ? (
+                    <View style={[styles.btnApple, styles.btnAppleLoading]}>
+                      <ActivityIndicator color="#FFFFFF" />
+                    </View>
                   ) : (
-                    <>
-                      <Image source={require('../../assets/google-g.png')} style={styles.btnGoogleIcon} />
-                      <Text style={styles.btnGoogleText}>Entrar com Google</Text>
-                    </>
-                  )}
-                </TouchableOpacity>
+                    <AppleAuthentication.AppleAuthenticationButton
+                      buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+                      buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
+                      cornerRadius={14}
+                      style={styles.btnApple}
+                      onPress={handleLoginApple}
+                    />
+                  )
+                )}
+
+                {googleLoginDisponivel && (
+                  <TouchableOpacity
+                    style={styles.btnGoogle}
+                    onPress={handleLoginGoogle}
+                    disabled={loading || loadingGoogle || loadingApple || !googleRequest}
+                    activeOpacity={0.9}
+                    accessibilityRole="button"
+                    accessibilityLabel="Entrar com Google"
+                  >
+                    {loadingGoogle ? (
+                      <ActivityIndicator color="#1F1F1F" />
+                    ) : (
+                      <>
+                        <Image source={require('../../assets/google-g.png')} style={styles.btnGoogleIcon} />
+                        <Text style={styles.btnGoogleText}>Entrar com Google</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                )}
               </>
             )}
 
@@ -278,5 +341,15 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     letterSpacing: 0.2,
+  },
+  btnApple: {
+    height: 52,
+    marginBottom: 12,
+  },
+  btnAppleLoading: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import { GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
+import { GoogleAuthProvider, OAuthProvider, signInWithCredential } from 'firebase/auth';
 import { auth } from './firebase';
 
 export const WEB_CLIENT_ID =
@@ -14,4 +14,12 @@ export async function assinarFirebaseComIdToken(idToken) {
   return signInWithCredential(auth, credential);
 }
 
+export async function assinarFirebaseComApple({ identityToken, rawNonce }) {
+  if (!identityToken) throw new Error('identityToken vazio recebido da Apple.');
+  const provider = new OAuthProvider('apple.com');
+  const credential = provider.credential({ idToken: identityToken, rawNonce });
+  return signInWithCredential(auth, credential);
+}
+
 export const googleLoginDisponivel = Platform.OS === 'android' || Platform.OS === 'ios';
+export const appleLoginDisponivel = Platform.OS === 'ios';
