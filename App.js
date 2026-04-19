@@ -115,7 +115,7 @@ async function solicitarATT() {
 
 const ONBOARDING_KEY = '@cnb_onboarding_done';
 
-const VERSAO_ATUAL = '1.2.30';
+const VERSAO_ATUAL = '1.2.31';
 
 const STORE_URL = Platform.OS === 'ios'
   ? 'https://apps.apple.com/app/id6741577961'

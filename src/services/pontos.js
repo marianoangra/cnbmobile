@@ -6,7 +6,7 @@ import {
 import { deleteUser } from 'firebase/auth';
 import { ref, deleteObject } from 'firebase/storage';
 import { db, storage, auth } from './firebase';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
