@@ -60,6 +60,9 @@ service cloud.firestore {
 
       // NOTA: atualizações cross-user (comissões, crédito de indicação) são
       // exclusivamente feitas pelo SDK Admin nas Cloud Functions — sem regra necessária.
+      // Campos server-only (bloqueados pelos hasOnly acima): indicacoesAtivas,
+      // bonus5kGranted, bonus10kGranted, contadoComoAtivo — escritos apenas por
+      // onReferreeBecameActive / backfillMilestones.js via Admin SDK.
     }
 
     // ── Lookup de códigos de afiliado ────────────────────────────────────────

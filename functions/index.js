@@ -1,4 +1,4 @@
-const { onDocumentCreated } = require('firebase-functions/v2/firestore');
+const { onDocumentCreated, onDocumentUpdated } = require('firebase-functions/v2/firestore');
 const { defineSecret } = require('firebase-functions/params');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
@@ -153,5 +153,73 @@ exports.onReferralCreated = onDocumentCreated(
     await event.data.ref.delete();
 
     console.log(`Indicação: ${newUserUid} indicado por ${referrerUid} (+100 pts)`);
+  }
+);
+
+// ─── Bônus de milestone: 50k pts por 5 indicações ativas, 100k por 10 ──────
+// "Ativa" = indicado com minutos >= 1 (carregou pelo menos 1 vez).
+// Transição detectada por onDocumentUpdated em usuarios/{uid}: minutos 0 → ≥1.
+// Idempotência: contadoComoAtivo no indicado impede recontagem;
+// bonus5kGranted/bonus10kGranted no indicador impedem duplo crédito.
+exports.onReferreeBecameActive = onDocumentUpdated(
+  { document: 'usuarios/{uid}', region: 'us-central1' },
+  async (event) => {
+    const before = event.data?.before?.data();
+    const after = event.data?.after?.data();
+    if (!before || !after) return;
+
+    const minutosBefore = before.minutos ?? 0;
+    const minutosAfter = after.minutos ?? 0;
+    if (minutosBefore >= 1 || minutosAfter < 1) return;
+
+    const referidoPor = after.referidoPor;
+    if (!referidoPor) return;
+
+    if (after.contadoComoAtivo === true) return;
+
+    const refereeUid = event.params.uid;
+    const db = getFirestore();
+    const refereeRef = db.doc(`usuarios/${refereeUid}`);
+    const referrerRef = db.doc(`usuarios/${referidoPor}`);
+
+    try {
+      await db.runTransaction(async (t) => {
+        const refereeSnap = await t.get(refereeRef);
+        if (!refereeSnap.exists) return;
+        const refereeData = refereeSnap.data();
+        if (refereeData.contadoComoAtivo === true) return;
+        if ((refereeData.minutos ?? 0) < 1) return;
+
+        const referrerSnap = await t.get(referrerRef);
+        if (!referrerSnap.exists) {
+          t.update(refereeRef, { contadoComoAtivo: true });
+          return;
+        }
+        const referrerData = referrerSnap.data();
+        const ativasDepois = (referrerData.indicacoesAtivas ?? 0) + 1;
+
+        const update = { indicacoesAtivas: FieldValue.increment(1) };
+        let bonus = 0;
+        let log = '';
+        if (ativasDepois >= 5 && !referrerData.bonus5kGranted) {
+          bonus += 50000;
+          update.bonus5kGranted = true;
+          log += ' +50k (5 ativas)';
+        }
+        if (ativasDepois >= 10 && !referrerData.bonus10kGranted) {
+          bonus += 100000;
+          update.bonus10kGranted = true;
+          log += ' +100k (10 ativas)';
+        }
+        if (bonus > 0) update.pontos = FieldValue.increment(bonus);
+
+        t.update(refereeRef, { contadoComoAtivo: true });
+        t.update(referrerRef, update);
+
+        console.log(`Ativa: ${refereeUid} → ${referidoPor} (ativas=${ativasDepois})${log}`);
+      });
+    } catch (err) {
+      console.error(`Erro em onReferreeBecameActive ${refereeUid} → ${referidoPor}:`, err);
+    }
   }
 );
