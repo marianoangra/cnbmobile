@@ -56,8 +56,7 @@
           }
         }
       ],
-      "expo-localization",
-      "@react-native-google-signin/google-signin"
+      "expo-localization"
     ],
     "extra": {
       "eas": {
