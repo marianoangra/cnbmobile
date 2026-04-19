@@ -8,6 +8,9 @@ export const WEB_CLIENT_ID =
 export const ANDROID_CLIENT_ID =
   '144617374104-f1na8of0dsq5d33fhi7qo8j1n9doddq7.apps.googleusercontent.com';
 
+export const IOS_CLIENT_ID =
+  '144617374104-at4m556iuiqftj2ruum3ibpa749u0gdd.apps.googleusercontent.com';
+
 export async function assinarFirebaseComIdToken(idToken) {
   if (!idToken) throw new Error('idToken vazio recebido do Google.');
   const credential = GoogleAuthProvider.credential(idToken);

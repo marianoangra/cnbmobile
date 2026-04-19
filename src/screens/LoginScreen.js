@@ -15,6 +15,7 @@ import { logLogin } from '../services/analytics';
 import {
   WEB_CLIENT_ID,
   ANDROID_CLIENT_ID,
+  IOS_CLIENT_ID,
   assinarFirebaseComIdToken,
   assinarFirebaseComApple,
   googleLoginDisponivel,
@@ -33,11 +34,13 @@ export default function LoginScreen({ navigation }) {
   const [loadingApple, setLoadingApple] = useState(false);
   const [appleAvailable, setAppleAvailable] = useState(false);
 
+  const googleRedirectClientId = Platform.OS === 'ios' ? IOS_CLIENT_ID : ANDROID_CLIENT_ID;
   const [googleRequest, googleResponse, googlePromptAsync] = Google.useAuthRequest({
+    iosClientId: IOS_CLIENT_ID,
     androidClientId: ANDROID_CLIENT_ID,
     webClientId: WEB_CLIENT_ID,
     scopes: ['openid', 'profile', 'email'],
-    redirectUri: `com.googleusercontent.apps.${ANDROID_CLIENT_ID.split('.')[0]}:/oauthredirect`,
+    redirectUri: `com.googleusercontent.apps.${googleRedirectClientId.split('.')[0]}:/oauthredirect`,
   });
 
   const opacity = useRef(new Animated.Value(0)).current;
@@ -228,41 +231,50 @@ export default function LoginScreen({ navigation }) {
                   <View style={styles.dividerLine} />
                 </View>
 
-                {appleLoginDisponivel && appleAvailable && (
-                  loadingApple ? (
-                    <View style={[styles.btnApple, styles.btnAppleLoading]}>
-                      <ActivityIndicator color="#FFFFFF" />
+                <View style={styles.socialButtons}>
+                  {appleLoginDisponivel && appleAvailable && (
+                    <View
+                      style={[styles.socialBtnWrapper, loadingApple && styles.socialBtnDisabled]}
+                      pointerEvents={loadingApple || loadingGoogle || loading ? 'none' : 'auto'}
+                    >
+                      <AppleAuthentication.AppleAuthenticationButton
+                        buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+                        buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
+                        cornerRadius={14}
+                        style={styles.appleBtnNative}
+                        onPress={handleLoginApple}
+                      />
+                      {loadingApple && (
+                        <View style={styles.socialBtnOverlay} pointerEvents="none">
+                          <ActivityIndicator color="#0A0F1E" />
+                        </View>
+                      )}
                     </View>
-                  ) : (
-                    <AppleAuthentication.AppleAuthenticationButton
-                      buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
-                      buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
-                      cornerRadius={14}
-                      style={styles.btnApple}
-                      onPress={handleLoginApple}
-                    />
-                  )
-                )}
+                  )}
 
-                {googleLoginDisponivel && (
-                  <TouchableOpacity
-                    style={styles.btnGoogle}
-                    onPress={handleLoginGoogle}
-                    disabled={loading || loadingGoogle || loadingApple || !googleRequest}
-                    activeOpacity={0.9}
-                    accessibilityRole="button"
-                    accessibilityLabel="Entrar com Google"
-                  >
-                    {loadingGoogle ? (
-                      <ActivityIndicator color="#1F1F1F" />
-                    ) : (
-                      <>
-                        <Image source={require('../../assets/google-g.png')} style={styles.btnGoogleIcon} />
-                        <Text style={styles.btnGoogleText}>Entrar com Google</Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
-                )}
+                  {googleLoginDisponivel && (
+                    <TouchableOpacity
+                      style={[
+                        styles.btnGoogle,
+                        (loading || loadingGoogle || loadingApple || !googleRequest) && styles.socialBtnDisabled,
+                      ]}
+                      onPress={handleLoginGoogle}
+                      disabled={loading || loadingGoogle || loadingApple || !googleRequest}
+                      activeOpacity={0.9}
+                      accessibilityRole="button"
+                      accessibilityLabel="Entrar com Google"
+                    >
+                      {loadingGoogle ? (
+                        <ActivityIndicator color="#1F1F1F" />
+                      ) : (
+                        <>
+                          <Image source={require('../../assets/google-g.png')} style={styles.btnGoogleIcon} />
+                          <Text style={styles.btnGoogleText}>Entrar com Google</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  )}
+                </View>
               </>
             )}
 
@@ -319,21 +331,47 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     fontWeight: '600',
   },
+  socialButtons: {
+    gap: 12,
+    marginBottom: 4,
+  },
+  socialBtnWrapper: {
+    height: 52,
+    borderRadius: 14,
+    position: 'relative',
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
+  },
+  appleBtnNative: {
+    width: '100%',
+    height: '100%',
+  },
+  socialBtnOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  socialBtnDisabled: {
+    opacity: 0.55,
+  },
   btnGoogle: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#FFFFFF',
     borderRadius: 14,
-    paddingVertical: 14,
     paddingHorizontal: 16,
-    marginBottom: 20,
-    minHeight: 52,
+    height: 52,
     shadowColor: '#000',
-    shadowOpacity: 0.18,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 3,
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
   },
   btnGoogleIcon: { width: 20, height: 20, resizeMode: 'contain', marginRight: 12 },
   btnGoogleText: {
@@ -341,15 +379,5 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     letterSpacing: 0.2,
-  },
-  btnApple: {
-    height: 52,
-    marginBottom: 12,
-  },
-  btnAppleLoading: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 });
