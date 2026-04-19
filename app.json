@@ -50,16 +50,17 @@
     "plugins": [
       "expo-web-browser",
       "expo-tracking-transparency",
+      "@react-native-firebase/app",
+      "expo-localization",
+      "expo-apple-authentication",
       [
-        "@react-native-firebase/app",
+        "expo-build-properties",
         {
           "ios": {
             "useFrameworks": "static"
           }
         }
-      ],
-      "expo-localization",
-      "expo-apple-authentication"
+      ]
     ],
     "extra": {
       "eas": {
