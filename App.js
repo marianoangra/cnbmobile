@@ -104,14 +104,6 @@ function AppNavigator({ user, perfil, onAtualizar, atualizarPerfil }) {
   );
 }
 
-// Solicita permissão ATT no iOS (exigida pela App Store quando o framework está linkado)
-async function solicitarATT() {
-  if (Platform.OS !== 'ios') return;
-  try {
-    const { requestTrackingPermissionsAsync } = await import('expo-tracking-transparency');
-    await requestTrackingPermissionsAsync();
-  } catch { /* falha silenciosa — não bloqueia o app */ }
-}
 
 const ONBOARDING_KEY = '@cnb_onboarding_done';
 
@@ -137,14 +129,6 @@ export default function App() {
   const [onboardingFeito, setOnboardingFeito] = useState(null); // null = carregando
   const [updateObrigatorio, setUpdateObrigatorio] = useState(false);
   const sessaoUnsubRef = useRef(null);
-
-  // Solicita ATT depois que o app está pronto e o UI nativo está ativo.
-  // Chamar durante a splash screen no iOS 17+ pode silenciar o dialog.
-  useEffect(() => {
-    if (!pronto || onboardingFeito === null) return;
-    const t = setTimeout(solicitarATT, 300);
-    return () => clearTimeout(t);
-  }, [pronto, onboardingFeito]);
 
   useEffect(() => {
     getConfiguracaoApp().then(config => {
