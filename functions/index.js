@@ -1,4 +1,5 @@
 const { onDocumentCreated, onDocumentUpdated } = require('firebase-functions/v2/firestore');
+const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { defineSecret } = require('firebase-functions/params');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
@@ -8,6 +9,7 @@ initializeApp();
 
 const smtpUser = defineSecret('SMTP_USER');
 const smtpPass = defineSecret('SMTP_PASS');
+const solanaPrivateKey = defineSecret('SOLANA_PRIVATE_KEY');
 
 const DESTINATARIO = 'contato@rafaelmariano.com.br';
 
@@ -220,6 +222,125 @@ exports.onReferreeBecameActive = onDocumentUpdated(
       });
     } catch (err) {
       console.error(`Erro em onReferreeBecameActive ${refereeUid} → ${referidoPor}:`, err);
+    }
+  }
+);
+
+// ─── Resgatar pontos como CNB Tokens na Solana ───────────────────────────────
+// 1 ponto = 1 CNB token (6 decimais). Mínimo: 100.000 pontos.
+// A chave privada da carteira do projeto fica armazenada como Firebase Secret.
+const CNB_MINT = 'Ew92cAS3PmGqeNvUjsDCwHoVsiGeLSynFnzpdLTx2pu4';
+const MINIMO_RESGATE = 100000;
+
+exports.resgatarCNB = onCall(
+  { secrets: [solanaPrivateKey], region: 'us-central1' },
+  async (request) => {
+    if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
+
+    const uid = request.auth.uid;
+    const { walletAddress, quantidade } = request.data;
+
+    if (!walletAddress || typeof walletAddress !== 'string') {
+      throw new HttpsError('invalid-argument', 'Endereço de carteira inválido.');
+    }
+    if (!quantidade || typeof quantidade !== 'number' || quantidade < MINIMO_RESGATE) {
+      throw new HttpsError('invalid-argument', `Mínimo de ${MINIMO_RESGATE.toLocaleString()} pontos.`);
+    }
+
+    const {
+      Connection, Keypair, PublicKey, Transaction,
+    } = require('@solana/web3.js');
+    const {
+      getAssociatedTokenAddress,
+      createAssociatedTokenAccountInstruction,
+      createTransferInstruction,
+      getAccount,
+    } = require('@solana/spl-token');
+
+    // Valida endereço Solana
+    let userPublicKey;
+    try {
+      userPublicKey = new PublicKey(walletAddress);
+    } catch {
+      throw new HttpsError('invalid-argument', 'Endereço de carteira Solana inválido.');
+    }
+
+    const db = getFirestore();
+    const usuarioRef = db.collection('usuarios').doc(uid);
+
+    // Debita pontos atomicamente via transação Firestore
+    await db.runTransaction(async (t) => {
+      const snap = await t.get(usuarioRef);
+      if (!snap.exists) throw new HttpsError('not-found', 'Usuário não encontrado.');
+      const pontos = snap.data().pontos ?? 0;
+      if (pontos < quantidade) throw new HttpsError('failed-precondition', 'Pontos insuficientes.');
+      t.update(usuarioRef, {
+        pontos: FieldValue.increment(-quantidade),
+        saques: FieldValue.increment(1),
+      });
+    });
+
+    // Envia CNB tokens na Solana
+    try {
+      const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
+
+      const privateKeyArray = JSON.parse(solanaPrivateKey.value());
+      const projectKeypair = Keypair.fromSecretKey(new Uint8Array(privateKeyArray));
+      const mintPublicKey = new PublicKey(CNB_MINT);
+
+      const projectATA = await getAssociatedTokenAddress(mintPublicKey, projectKeypair.publicKey);
+      const userATA = await getAssociatedTokenAddress(mintPublicKey, userPublicKey);
+
+      const transaction = new Transaction();
+
+      // Cria ATA do usuário se não existir (custo ~0.002 SOL pago pela carteira do projeto)
+      try {
+        await getAccount(connection, userATA);
+      } catch {
+        transaction.add(
+          createAssociatedTokenAccountInstruction(
+            projectKeypair.publicKey,
+            userATA,
+            userPublicKey,
+            mintPublicKey,
+          )
+        );
+      }
+
+      // 1 CNB token = 10^6 unidades (6 decimais)
+      const amount = BigInt(quantidade) * BigInt(1_000_000);
+      transaction.add(
+        createTransferInstruction(projectATA, userATA, projectKeypair.publicKey, amount)
+      );
+
+      const { blockhash } = await connection.getLatestBlockhash();
+      transaction.recentBlockhash = blockhash;
+      transaction.feePayer = projectKeypair.publicKey;
+
+      const signature = await connection.sendTransaction(transaction, [projectKeypair]);
+      await connection.confirmTransaction(signature, 'confirmed');
+
+      // Registra o resgate
+      await db.collection('resgates_cnb').add({
+        uid,
+        walletAddress,
+        quantidade,
+        signature,
+        criadoEm: FieldValue.serverTimestamp(),
+        status: 'confirmado',
+      });
+
+      console.log(`Resgate CNB: ${uid} → ${walletAddress} | ${quantidade} CNB | sig: ${signature}`);
+      return { signature };
+
+    } catch (e) {
+      // Estorna pontos se o envio Solana falhar
+      await usuarioRef.update({
+        pontos: FieldValue.increment(quantidade),
+        saques: FieldValue.increment(-1),
+      });
+      console.error('[resgatarCNB] Erro Solana:', e);
+      throw new HttpsError('internal', 'Erro ao enviar tokens. Pontos estornados. Tente novamente.');
     }
   }
 );
