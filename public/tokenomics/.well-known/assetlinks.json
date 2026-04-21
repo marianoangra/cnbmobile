@@ -1,0 +1,13 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.cnb.cnbappv2",
+      "sha256_cert_fingerprints": [
+        "C9:AB:D7:09:72:48:A6:D5:8C:E7:BB:77:3D:84:FD:DD:82:D1:A8:19:88:F8:56:14:71:37:FA:29:10:34:6D:28",
+        "1D:42:06:34:10:82:03:83:5D:75:C5:14:EE:D9:F0:62:7B:1D:98:DE:15:15:0F:76:CA:46:84:BF:A9:4E:08:7C"
+      ]
+    }
+  }
+]

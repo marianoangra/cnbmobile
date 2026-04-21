@@ -34,6 +34,11 @@ export default function WithdrawScreen({ route, navigation }) {
 
   const pontosDisponiveis = perfil?.pontos ?? 0;
 
+  function formatarPontos(text) {
+    const digits = text.replace(/\D/g, '');
+    return digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  }
+
   // ── PIX ───────────────────────────────────────────────────────────────────
   const qtdPix = parseInt(quantidade.replace(/\D/g, ''), 10) || 0;
 
@@ -176,7 +181,7 @@ export default function WithdrawScreen({ route, navigation }) {
                 placeholder="Mínimo 100.000"
                 placeholderTextColor={colors.secondary}
                 value={quantidade}
-                onChangeText={setQuantidade}
+                onChangeText={v => setQuantidade(formatarPontos(v))}
                 keyboardType="numeric"
               />
               {qtdPix > 0 && qtdPix < 100000 && <Text style={styles.erro}>Mínimo de 100.000 pontos.</Text>}
@@ -221,7 +226,7 @@ export default function WithdrawScreen({ route, navigation }) {
                 placeholder="Mínimo 100.000"
                 placeholderTextColor={colors.secondary}
                 value={quantidadeCNB}
-                onChangeText={setQuantidadeCNB}
+                onChangeText={v => setQuantidadeCNB(formatarPontos(v))}
                 keyboardType="numeric"
               />
               {qtdCNB > 0 && (
