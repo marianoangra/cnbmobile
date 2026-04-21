@@ -214,8 +214,22 @@ export default function App() {
         if (!mounted) return;
 
         if (u) {
-          const novoToken = await registrarSessao(u.uid);
-          iniciarEscutaSessao(u.uid, novoToken);
+          // Timeout de 8s: se registrarSessao travar (Firestore lento/offline),
+          // o app não fica preso para sempre na tela de loading.
+          const registrarComTimeout = Promise.race([
+            registrarSessao(u.uid),
+            new Promise((_, rej) => setTimeout(() => rej(new Error('sessao_timeout')), 8000)),
+          ]);
+          let novoToken;
+          try {
+            novoToken = await registrarComTimeout;
+          } catch (e) {
+            // Se timeout ou falha de rede: continua sem token de sessão.
+            // O usuário fica logado mas sem proteção multi-device nesta sessão.
+            console.warn('[Sessão] registrarSessao falhou, continuando sem token:', e.message);
+            novoToken = null;
+          }
+          if (novoToken) iniciarEscutaSessao(u.uid, novoToken);
           setUser(u);
           setUsuarioId(u.uid);
           await carregarPerfil(u);
