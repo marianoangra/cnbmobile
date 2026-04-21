@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CNB Mobile — Painel da Equipe</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0A0F1E;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100vh}
+
+/* Login screen */
+#login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh}
+.login-card{background:#0d1421;border:1px solid #1a2535;border-radius:20px;padding:40px;text-align:center;max-width:380px;width:90%}
+.login-card h2{color:#00FF88;font-size:20px;margin-bottom:8px}
+.login-card p{color:#8a9a8a;font-size:14px;margin-bottom:28px}
+.google-btn{display:flex;align-items:center;justify-content:center;gap:10px;background:#fff;color:#0A0F1E;border:none;border-radius:10px;padding:14px 24px;font-size:15px;font-weight:600;cursor:pointer;width:100%;transition:.2s}
+.google-btn:hover{background:#f0f0f0}
+.google-btn img{width:20px;height:20px}
+
+/* App */
+#app-screen{display:none}
+header{background:#0d1421;border-bottom:1px solid #1a2535;padding:16px 28px;display:flex;justify-content:space-between;align-items:center;sticky;top:0}
+.logo h1{font-size:17px;font-weight:700;color:#00FF88}
+.logo p{font-size:11px;color:#8a9a8a}
+.user-info{display:flex;align-items:center;gap:12px}
+.user-email{font-size:13px;color:#8a9a8a}
+.logout-btn{border:1px solid #1a2535;color:#8a9a8a;padding:6px 14px;border-radius:8px;font-size:12px;cursor:pointer;background:transparent;transition:.2s}
+.logout-btn:hover{border-color:#ff4d4d;color:#ff4d4d}
+
+main{max-width:1100px;margin:0 auto;padding:28px 24px}
+
+.grid-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:28px}
+.card{background:#0d1421;border:1px solid #1a2535;border-radius:14px;padding:18px}
+.card.g{border-top:3px solid #00FF88}
+.card.p{border-top:3px solid #9945FF}
+.card.y{border-top:3px solid #FFB800}
+.card.r{border-top:3px solid #ff4d4d}
+.card-label{font-size:11px;color:#8a9a8a;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+.card-value{font-size:26px;font-weight:700}
+.card-value.green{color:#00FF88}
+.card-value.purple{color:#9945FF}
+.card-value.yellow{color:#FFB800}
+.card-value.red{color:#ff4d4d}
+
+.section{margin-bottom:28px}
+.section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.section-title{font-size:15px;font-weight:600}
+.count-badge{font-size:12px;background:#1a2535;padding:3px 10px;border-radius:10px;color:#8a9a8a}
+
+.table-wrap{background:#0d1421;border:1px solid #1a2535;border-radius:14px;overflow:hidden;overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:500px}
+thead th{text-align:left;padding:10px 14px;font-size:11px;color:#8a9a8a;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #1a2535}
+tbody tr{border-bottom:1px solid #111827;transition:.15s}
+tbody tr:hover{background:#111827}
+tbody td{padding:11px 14px;font-size:13px}
+.empty{text-align:center;padding:36px;color:#8a9a8a;font-size:13px}
+
+.status-badge{display:inline-flex;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600}
+.status-pendente{background:#2a1500;color:#FFB800}
+.status-processado{background:#0d1f0d;color:#00FF88}
+.status-confirmado{background:#0d1f0d;color:#00FF88}
+
+.btn-small{border:none;padding:5px 12px;border-radius:7px;font-size:12px;cursor:pointer;font-weight:600;transition:.2s}
+.btn-ok{background:#0d1f0d;color:#00FF88;border:1px solid #00FF88}
+.btn-ok:hover{background:#00FF88;color:#0A0F1E}
+
+.proof-link{color:#9945FF;font-size:12px}
+.proof-link:hover{text-decoration:underline}
+
+.wallet-addr{font-family:monospace;font-size:12px;color:#8a9a8a}
+
+#lastUpdate{font-size:11px;color:#555;text-align:right;margin-top:20px}
+
+footer{text-align:center;padding:20px;font-size:12px;color:#555;border-top:1px solid #1a2535;margin-top:16px}
+footer a{color:#8a9a8a}
+footer a:hover{color:#00FF88}
+</style>
+</head>
+<body>
+
+<!-- Login -->
+<div id="login-screen">
+  <div class="login-card">
+    <h2>🔐 Painel da Equipe</h2>
+    <p>Acesso restrito à equipe CNB Mobile</p>
+    <button class="google-btn" onclick="loginGoogle()">
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google">
+      Entrar com Google
+    </button>
+  </div>
+</div>
+
+<!-- App -->
+<div id="app-screen">
+  <header>
+    <div class="logo">
+      <h1>⚡ CNB Mobile — Painel da Equipe</h1>
+      <p>Dashboard privado · acesso restrito</p>
+    </div>
+    <div class="user-info">
+      <span class="user-email" id="user-email"></span>
+      <button class="logout-btn" onclick="logout()">Sair</button>
+      <a href="/" style="font-size:13px;color:#8a9a8a;margin-left:8px">← Público</a>
+    </div>
+  </header>
+
+  <main>
+    <!-- Stats grid -->
+    <div class="grid-2" id="stats-grid">
+      <div class="card g">
+        <div class="card-label">Total Usuários</div>
+        <div class="card-value green" id="a-users">—</div>
+      </div>
+      <div class="card p">
+        <div class="card-label">CNB Distribuídos</div>
+        <div class="card-value purple" id="a-cnb">—</div>
+      </div>
+      <div class="card y">
+        <div class="card-label">Saques PIX Pendentes</div>
+        <div class="card-value yellow" id="a-pendentes">—</div>
+      </div>
+      <div class="card g">
+        <div class="card-label">Indicações On-Chain</div>
+        <div class="card-value green" id="a-refs">—</div>
+      </div>
+      <div class="card p">
+        <div class="card-label">Resgates CNB</div>
+        <div class="card-value purple" id="a-resgates">—</div>
+      </div>
+      <div class="card g">
+        <div class="card-label">Minutos Totais</div>
+        <div class="card-value" id="a-min">—</div>
+      </div>
+    </div>
+
+    <!-- Saques PIX pendentes -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-title">💰 Saques PIX</div>
+        <span class="count-badge" id="saques-count">0 registros</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>Chave PIX</th>
+              <th>Pontos</th>
+              <th>Status</th>
+              <th>Data</th>
+              <th>Ação</th>
+            </tr>
+          </thead>
+          <tbody id="saques-body">
+            <tr><td colspan="6" class="empty">Carregando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Resgates CNB -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-title">◎ Resgates CNB Tokens</div>
+        <span class="count-badge" id="resgates-count">0 registros</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Carteira Solana</th>
+              <th>CNB Enviados</th>
+              <th>Status</th>
+              <th>Data</th>
+              <th>Transação</th>
+            </tr>
+          </thead>
+          <tbody id="resgates-body">
+            <tr><td colspan="5" class="empty">Carregando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Provas on-chain -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-title">📋 Provas On-Chain</div>
+        <span class="count-badge" id="provas-count">0 dias</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Usuários Ativos</th>
+              <th>Pontos</th>
+              <th>Minutos</th>
+              <th>Solana</th>
+            </tr>
+          </thead>
+          <tbody id="provas-body">
+            <tr><td colspan="5" class="empty">Carregando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="lastUpdate"></div>
+  </main>
+
+  <footer>
+    <p>
+      Painel privado CNB Mobile &middot;
+      <a href="https://console.firebase.google.com/project/cnbmobile-2053c" target="_blank">Firebase Console</a>
+      &middot;
+      <a href="https://solscan.io/token/Ew92cAS3PmGqeNvUjsDCwHoVsiGeLSynFnzpdLTx2pu4" target="_blank">Token Solscan</a>
+    </p>
+  </footer>
+</div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
+  from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
+import { getFirestore, doc, onSnapshot, collection, query, orderBy, limit, updateDoc }
+  from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+
+const ADMIN_EMAIL = 'contato@rafaelmariano.com.br';
+
+const app = initializeApp({
+  apiKey:"AIzaSyBTx_mrEx6_k9jbN8MeOYztJbsOc6zryl0",
+  authDomain:"cnbmobile-2053c.firebaseapp.com",
+  projectId:"cnbmobile-2053c",
+  storageBucket:"cnbmobile-2053c.firebasestorage.app",
+  messagingSenderId:"144617374104",
+  appId:"1:144617374104:web:cb38f3303f12616f37abed"
+});
+
+const auth = getAuth(app);
+const db = getFirestore(app);
+const provider = new GoogleAuthProvider();
+
+const fmt = n => (n == null ? '—' : Number(n).toLocaleString('pt-BR'));
+const fmtDate = ts => ts?.toDate ? ts.toDate().toLocaleDateString('pt-BR') : '—';
+
+let unsubscribers = [];
+
+window.loginGoogle = () => signInWithPopup(auth, provider);
+window.logout = () => { signOut(auth); unsubscribers.forEach(u => u()); unsubscribers = []; };
+
+window.marcarProcessado = async (id) => {
+  try {
+    await updateDoc(doc(db, 'saques', id), { status: 'processado' });
+  } catch(e) { alert('Erro: ' + e.message); }
+};
+
+onAuthStateChanged(auth, user => {
+  if (!user) {
+    document.getElementById('login-screen').style.display = 'flex';
+    document.getElementById('app-screen').style.display = 'none';
+    return;
+  }
+
+  if (user.email !== ADMIN_EMAIL) {
+    signOut(auth);
+    alert('Acesso negado. Este painel é restrito à equipe CNB Mobile.');
+    return;
+  }
+
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app-screen').style.display = 'block';
+  document.getElementById('user-email').textContent = user.email;
+
+  carregarDados();
+});
+
+function carregarDados() {
+  // Stats
+  unsubscribers.push(onSnapshot(doc(db, 'stats', 'public'), snap => {
+    if (!snap.exists()) return;
+    const d = snap.data();
+    document.getElementById('a-users').textContent   = fmt(d.totalUsuarios);
+    document.getElementById('a-cnb').textContent     = fmt(d.totalCNBDistribuidos);
+    document.getElementById('a-refs').textContent    = fmt(d.totalIndicacoes);
+    document.getElementById('a-resgates').textContent = fmt(d.totalResgateCNB);
+    document.getElementById('a-min').textContent     = fmt(d.totalMinutos);
+    if (d.atualizadoEm?.toDate) {
+      document.getElementById('lastUpdate').textContent =
+        'Última atualização: ' + d.atualizadoEm.toDate().toLocaleString('pt-BR');
+    }
+  }));
+
+  // Saques PIX
+  unsubscribers.push(onSnapshot(
+    query(collection(db,'saques'), orderBy('criadoEm','desc'), limit(50)),
+    snap => {
+      document.getElementById('saques-count').textContent = snap.size + ' registros';
+      const pendentes = snap.docs.filter(d => d.data().status === 'pendente').length;
+      document.getElementById('a-pendentes').textContent = pendentes;
+      const tbody = document.getElementById('saques-body');
+      if (snap.empty) { tbody.innerHTML = '<tr><td colspan="6" class="empty">Nenhum saque encontrado.</td></tr>'; return; }
+      tbody.innerHTML = snap.docs.map(d => {
+        const v = d.data();
+        const isPendente = v.status === 'pendente';
+        return `<tr>
+          <td>${v.nome ?? '—'}</td>
+          <td style="font-family:monospace;font-size:12px">${v.chavePix ?? '—'}</td>
+          <td>${fmt(v.pontos)}</td>
+          <td><span class="status-badge status-${v.status ?? 'pendente'}">${v.status ?? 'pendente'}</span></td>
+          <td>${fmtDate(v.criadoEm)}</td>
+          <td>${isPendente ? `<button class="btn-small btn-ok" onclick="marcarProcessado('${d.id}')">✓ Processado</button>` : '—'}</td>
+        </tr>`;
+      }).join('');
+    }
+  ));
+
+  // Resgates CNB
+  unsubscribers.push(onSnapshot(
+    query(collection(db,'resgates_cnb'), orderBy('criadoEm','desc'), limit(50)),
+    snap => {
+      document.getElementById('resgates-count').textContent = snap.size + ' registros';
+      const tbody = document.getElementById('resgates-body');
+      if (snap.empty) { tbody.innerHTML = '<tr><td colspan="5" class="empty">Nenhum resgate CNB ainda.</td></tr>'; return; }
+      tbody.innerHTML = snap.docs.map(d => {
+        const v = d.data();
+        const addr = v.walletAddress ?? '—';
+        const short = addr.length > 12 ? addr.slice(0,8)+'...'+addr.slice(-6) : addr;
+        return `<tr>
+          <td class="wallet-addr" title="${addr}">${short}</td>
+          <td>◎ ${fmt(v.quantidade)}</td>
+          <td><span class="status-badge status-${v.status ?? 'confirmado'}">${v.status ?? 'confirmado'}</span></td>
+          <td>${fmtDate(v.criadoEm)}</td>
+          <td>${v.signature ? `<a href="https://solscan.io/tx/${v.signature}" target="_blank" class="proof-link">◎ ver</a>` : '—'}</td>
+        </tr>`;
+      }).join('');
+    }
+  ));
+
+  // Provas on-chain
+  unsubscribers.push(onSnapshot(
+    query(collection(db,'provas_onchain'), orderBy('date','desc'), limit(30)),
+    snap => {
+      document.getElementById('provas-count').textContent = snap.size + ' dias';
+      const tbody = document.getElementById('provas-body');
+      if (snap.empty) { tbody.innerHTML = '<tr><td colspan="5" class="empty">Nenhuma prova ainda.</td></tr>'; return; }
+      tbody.innerHTML = snap.docs.map(d => {
+        const v = d.data();
+        return `<tr>
+          <td>${v.date ?? d.id}</td>
+          <td>${fmt(v.activeUsers)}</td>
+          <td>${fmt(v.totalPoints)}</td>
+          <td>${fmt(v.totalMinutes)} min</td>
+          <td>${v.solscanUrl ? `<a href="${v.solscanUrl}" target="_blank" class="proof-link">◎ ver prova</a>` : '—'}</td>
+        </tr>`;
+      }).join('');
+    }
+  ));
+}
+</script>
+</body>
+</html>

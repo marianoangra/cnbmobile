@@ -277,6 +277,56 @@ exports.onReferreeBecameActive = onDocumentUpdated(
   }
 );
 
+// ─── Atualiza stats/public para o dashboard ───────────────────────────────────
+// Roda a cada hora e agrega dados de todas as coleções.
+exports.atualizarStatsDashboard = onSchedule(
+  { schedule: 'every 60 minutes', region: 'us-central1' },
+  async () => {
+    const db = getFirestore();
+
+    const [
+      usersCount,
+      saquesCount,
+      referralsCount,
+      provasCount,
+      resgatesSnap,
+      usuariosSnap,
+    ] = await Promise.all([
+      db.collection('usuarios').count().get(),
+      db.collection('saques').count().get(),
+      db.collection('referrals_onchain').count().get(),
+      db.collection('provas_onchain').count().get(),
+      db.collection('resgates_cnb').get(),
+      db.collection('usuarios').select('minutos', 'pontos').get(),
+    ]);
+
+    let totalCNBDistribuidos = 0;
+    let totalResgateCNB = resgatesSnap.size;
+    resgatesSnap.forEach(d => { totalCNBDistribuidos += d.data().quantidade ?? 0; });
+
+    let totalMinutos = 0;
+    let totalPontos = 0;
+    usuariosSnap.forEach(d => {
+      totalMinutos += d.data().minutos ?? 0;
+      totalPontos += d.data().pontos ?? 0;
+    });
+
+    await db.collection('stats').doc('public').set({
+      totalUsuarios: usersCount.data().count,
+      totalCNBDistribuidos,
+      totalResgateCNB,
+      totalSaquesPIX: saquesCount.data().count,
+      totalIndicacoes: referralsCount.data().count,
+      diasAtividade: provasCount.data().count,
+      totalMinutos,
+      totalPontos,
+      atualizadoEm: FieldValue.serverTimestamp(),
+    });
+
+    console.log('[Stats] Dashboard atualizado.');
+  }
+);
+
 // ─── Relatório semanal por e-mail ────────────────────────────────────────────
 // Toda segunda-feira às 08:00 horário de Brasília, envia um resumo da semana.
 exports.relatorioSemanal = onSchedule(

@@ -6,6 +6,13 @@
   "storage": {
     "rules": "storage.rules"
   },
+  "hosting": {
+    "public": "public",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "rewrites": [
+      { "source": "/admin", "destination": "/admin.html" }
+    ]
+  },
   "functions": [
     {
       "source": "functions",

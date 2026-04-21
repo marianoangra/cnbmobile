@@ -85,7 +85,6 @@ service cloud.firestore {
     }
 
     // ── Fila de eventos de indicação (processada pela Cloud Function) ────────
-    // O cliente cria; a Function credita o indicador e deleta via Admin SDK.
     match /referral_events/{uid} {
       allow create: if request.auth != null
         && request.auth.uid == uid
@@ -95,5 +94,42 @@ service cloud.firestore {
       allow read, update, delete: if false;
     }
 
+    // ── Dashboard público ────────────────────────────────────────────────────
+    match /stats/{doc} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /provas_onchain/{doc} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /referrals_onchain/{doc} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // ── Dashboard privado (admin) ─────────────────────────────────────────────
+    match /saques/{saqueId} {
+      allow read: if (request.auth != null && request.auth.uid == resource.data.uid)
+                  || isAdmin();
+      allow create: if request.auth != null
+                    && request.auth.uid == request.resource.data.uid;
+      allow update: if isAdmin();
+      allow delete: if false;
+    }
+
+    match /resgates_cnb/{doc} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
   }
+}
+
+function isAdmin() {
+  return request.auth != null
+    && request.auth.token.email == 'contato@rafaelmariano.com.br'
+    && request.auth.token.email_verified == true;
 }
