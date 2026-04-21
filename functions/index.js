@@ -1,9 +1,11 @@
 const { onDocumentCreated, onDocumentUpdated } = require('firebase-functions/v2/firestore');
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
+const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { defineSecret } = require('firebase-functions/params');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const nodemailer = require('nodemailer');
+const crypto = require('crypto');
 
 initializeApp();
 
@@ -226,6 +228,245 @@ exports.onReferreeBecameActive = onDocumentUpdated(
   }
 );
 
+// ─── Relatório semanal por e-mail ────────────────────────────────────────────
+// Toda segunda-feira às 08:00 horário de Brasília, envia um resumo da semana.
+exports.relatorioSemanal = onSchedule(
+  {
+    schedule: '0 8 * * 1',
+    timeZone: 'America/Sao_Paulo',
+    secrets: [smtpUser, smtpPass],
+    region: 'us-central1',
+  },
+  async () => {
+    const db = getFirestore();
+
+    // Últimos 7 dias de provas on-chain
+    const seteDiasAtras = new Date();
+    seteDiasAtras.setDate(seteDiasAtras.getDate() - 7);
+
+    const provasSnap = await db.collection('provas_onchain')
+      .where('criadoEm', '>=', seteDiasAtras)
+      .orderBy('criadoEm', 'asc')
+      .get();
+
+    let totalUsuariosAtivos = 0;
+    let totalPontos = 0;
+    let totalMinutos = 0;
+    let diasComAtividade = 0;
+    let linhasDias = '';
+
+    provasSnap.forEach(doc => {
+      const d = doc.data();
+      totalUsuariosAtivos = Math.max(totalUsuariosAtivos, d.activeUsers ?? 0);
+      totalPontos += d.totalPoints ?? 0;
+      totalMinutos += d.totalMinutes ?? 0;
+      diasComAtividade++;
+      linhasDias += `
+        <tr>
+          <td style="padding:8px;border-bottom:1px solid #1a2a1a;">${d.date ?? doc.id}</td>
+          <td style="padding:8px;border-bottom:1px solid #1a2a1a;text-align:center;">${(d.activeUsers ?? 0).toLocaleString('pt-BR')}</td>
+          <td style="padding:8px;border-bottom:1px solid #1a2a1a;text-align:center;">${(d.totalPoints ?? 0).toLocaleString('pt-BR')}</td>
+          <td style="padding:8px;border-bottom:1px solid #1a2a1a;text-align:center;">${(d.totalMinutes ?? 0).toLocaleString('pt-BR')}</td>
+          <td style="padding:8px;border-bottom:1px solid #1a2a1a;font-size:11px;">
+            <a href="${d.solscanUrl ?? '#'}" style="color:#00FF88;">ver ◎</a>
+          </td>
+        </tr>`;
+    });
+
+    // Total de usuários cadastrados
+    const totalUsersSnap = await db.collection('usuarios').count().get();
+    const totalUsuarios = totalUsersSnap.data().count ?? 0;
+
+    // Total de saques da semana
+    const saquesSnap = await db.collection('saques')
+      .where('criadoEm', '>=', seteDiasAtras)
+      .get();
+    const totalSaques = saquesSnap.size;
+
+    // Resgates CNB da semana
+    const resgatesSnap = await db.collection('resgates_cnb')
+      .where('criadoEm', '>=', seteDiasAtras)
+      .get();
+    const totalResgatesCNB = resgatesSnap.size;
+    let totalCNBEnviado = 0;
+    resgatesSnap.forEach(d => { totalCNBEnviado += d.data().quantidade ?? 0; });
+
+    const semanaStr = `${seteDiasAtras.toLocaleDateString('pt-BR')} – ${new Date().toLocaleDateString('pt-BR')}`;
+
+    const html = `
+      <div style="font-family:Arial,sans-serif;max-width:650px;margin:0 auto;background:#0A0F1E;color:#fff;border-radius:12px;overflow:hidden;">
+        <div style="background:#0d1f0d;padding:28px 32px;border-bottom:2px solid #00FF88;">
+          <h1 style="margin:0;color:#00FF88;font-size:22px;">⚡ CNB Mobile — Relatório Semanal</h1>
+          <p style="margin:6px 0 0;color:#8a9a8a;font-size:14px;">${semanaStr}</p>
+        </div>
+        <div style="padding:28px 32px;">
+
+          <div style="display:flex;gap:16px;margin-bottom:28px;flex-wrap:wrap;">
+            <div style="flex:1;min-width:140px;background:#0d1f0d;border-radius:10px;padding:16px;border:1px solid #00FF88;">
+              <div style="font-size:11px;color:#8a9a8a;margin-bottom:4px;">USUÁRIOS TOTAIS</div>
+              <div style="font-size:28px;font-weight:bold;color:#00FF88;">${totalUsuarios.toLocaleString('pt-BR')}</div>
+            </div>
+            <div style="flex:1;min-width:140px;background:#0d0d20;border-radius:10px;padding:16px;border:1px solid #9945FF;">
+              <div style="font-size:11px;color:#8a9a8a;margin-bottom:4px;">CNB ENVIADOS</div>
+              <div style="font-size:28px;font-weight:bold;color:#9945FF;">◎ ${totalCNBEnviado.toLocaleString('pt-BR')}</div>
+            </div>
+            <div style="flex:1;min-width:140px;background:#1a1200;border-radius:10px;padding:16px;border:1px solid #FFB800;">
+              <div style="font-size:11px;color:#8a9a8a;margin-bottom:4px;">SAQUES PIX</div>
+              <div style="font-size:28px;font-weight:bold;color:#FFB800;">${totalSaques}</div>
+            </div>
+          </div>
+
+          <h3 style="color:#00FF88;margin-bottom:12px;">Atividade diária on-chain</h3>
+          ${diasComAtividade > 0 ? `
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead>
+              <tr style="background:#0d1f0d;color:#8a9a8a;">
+                <th style="padding:8px;text-align:left;">Data</th>
+                <th style="padding:8px;">Usuários</th>
+                <th style="padding:8px;">Pontos</th>
+                <th style="padding:8px;">Minutos</th>
+                <th style="padding:8px;">Prova</th>
+              </tr>
+            </thead>
+            <tbody>${linhasDias}</tbody>
+          </table>` : '<p style="color:#8a9a8a;">Nenhuma atividade registrada esta semana.</p>'}
+
+          <p style="margin-top:24px;font-size:12px;color:#555;">
+            Relatório automático do CNB Mobile ·
+            <a href="https://console.firebase.google.com/project/cnbmobile-2053c" style="color:#00FF88;">Firebase Console</a>
+          </p>
+        </div>
+      </div>`;
+
+    const transporter = nodemailer.createTransport({
+      host: 'smtp.gmail.com', port: 465, secure: true,
+      auth: { user: smtpUser.value(), pass: smtpPass.value() },
+    });
+
+    await transporter.sendMail({
+      from: `"CNB Mobile" <${smtpUser.value()}>`,
+      to: DESTINATARIO,
+      subject: `📊 CNB Mobile — Relatório Semanal (${semanaStr})`,
+      html,
+    });
+
+    console.log(`[RelatorioSemanal] E-mail enviado para ${DESTINATARIO}`);
+  }
+);
+
+// ─── Helper: carrega keypair do projeto a partir do secret ───────────────────
+function carregarKeypair(secretValue) {
+  const { Keypair } = require('@solana/web3.js');
+  const bs58 = require('bs58');
+  const value = secretValue.trim();
+  try {
+    return Keypair.fromSecretKey(new Uint8Array(JSON.parse(value)));
+  } catch {
+    return Keypair.fromSecretKey(bs58.decode(value));
+  }
+}
+
+// ─── Proof of Activity: registra resumo diário na Solana ─────────────────────
+// Roda todo dia às 03:00 horário de Brasília.
+// Escreve um Memo na Solana com: data, usuários ativos, pontos e minutos do dia.
+// Custo: ~0.000005 SOL por dia (~$0.001). Registro salvo em provas_onchain/{date}.
+exports.registrarAtividadeDiaria = onSchedule(
+  {
+    schedule: '0 3 * * *',
+    timeZone: 'America/Sao_Paulo',
+    secrets: [solanaPrivateKey],
+    region: 'us-central1',
+  },
+  async () => {
+    const { Connection, PublicKey, Transaction, TransactionInstruction } = require('@solana/web3.js');
+    const db = getFirestore();
+
+    // Data de ontem (a função roda às 3h, registra o dia anterior)
+    const ontem = new Date();
+    ontem.setDate(ontem.getDate() - 1);
+    const dateStr = ontem.toISOString().split('T')[0]; // ex: "2026-04-20"
+
+    // Evita duplicata
+    const provaRef = db.collection('provas_onchain').doc(dateStr);
+    const provaSnap = await provaRef.get();
+    if (provaSnap.exists) {
+      console.log(`[ActivityProof] ${dateStr} já registrado. Pulando.`);
+      return;
+    }
+
+    // Agrega dados do dia: usuários com ultimoLogin ontem
+    const inicioDia = new Date(ontem);
+    inicioDia.setHours(0, 0, 0, 0);
+    const fimDia = new Date(ontem);
+    fimDia.setHours(23, 59, 59, 999);
+
+    const snap = await db.collection('usuarios')
+      .where('ultimoLogin', '>=', inicioDia)
+      .where('ultimoLogin', '<=', fimDia)
+      .get();
+
+    let totalPontos = 0;
+    let totalMinutos = 0;
+    const uids = [];
+
+    snap.forEach(doc => {
+      const d = doc.data();
+      totalPontos += d.pontos ?? 0;
+      totalMinutos += d.minutos ?? 0;
+      uids.push(doc.id);
+    });
+
+    const usuariosAtivos = uids.length;
+    const payload = {
+      app: 'CNB Mobile',
+      date: dateStr,
+      activeUsers: usuariosAtivos,
+      totalPoints: totalPontos,
+      totalMinutes: totalMinutos,
+    };
+
+    // Hash SHA-256 do payload para integridade
+    const hash = crypto.createHash('sha256')
+      .update(JSON.stringify(payload) + uids.sort().join(','))
+      .digest('hex');
+
+    const memo = JSON.stringify({ ...payload, hash });
+
+    // Escreve no Solana Memo Program
+    const MEMO_PROGRAM = new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr');
+    const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
+    const projectKeypair = carregarKeypair(solanaPrivateKey.value());
+
+    const transaction = new Transaction();
+    transaction.add(new TransactionInstruction({
+      keys: [{ pubkey: projectKeypair.publicKey, isSigner: true, isWritable: false }],
+      programId: MEMO_PROGRAM,
+      data: Buffer.from(memo, 'utf8'),
+    }));
+
+    const { blockhash } = await connection.getLatestBlockhash();
+    transaction.recentBlockhash = blockhash;
+    transaction.feePayer = projectKeypair.publicKey;
+
+    const signature = await connection.sendTransaction(transaction, [projectKeypair]);
+    await connection.confirmTransaction(signature, 'confirmed');
+
+    // Salva no Firestore
+    await provaRef.set({
+      date: dateStr,
+      activeUsers: usuariosAtivos,
+      totalPoints: totalPontos,
+      totalMinutes: totalMinutos,
+      hash,
+      signature,
+      solscanUrl: `https://solscan.io/tx/${signature}`,
+      criadoEm: FieldValue.serverTimestamp(),
+    });
+
+    console.log(`[ActivityProof] ${dateStr} | ${usuariosAtivos} usuários | sig: ${signature}`);
+  }
+);
+
 // ─── Resgatar pontos como CNB Tokens na Solana ───────────────────────────────
 // 1 ponto = 1 CNB token (6 decimais). Mínimo: 100.000 pontos.
 // A chave privada da carteira do projeto fica armazenada como Firebase Secret.
@@ -284,8 +525,7 @@ exports.resgatarCNB = onCall(
     try {
       const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
 
-      const privateKeyArray = JSON.parse(solanaPrivateKey.value());
-      const projectKeypair = Keypair.fromSecretKey(new Uint8Array(privateKeyArray));
+      const projectKeypair = carregarKeypair(solanaPrivateKey.value());
       const mintPublicKey = new PublicKey(CNB_MINT);
 
       const projectATA = await getAssociatedTokenAddress(mintPublicKey, projectKeypair.publicKey);

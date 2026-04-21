@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, Alert, ActivityIndicator, KeyboardAvoidingView, Platform,
+  ScrollView, Alert, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getFunctions, httpsCallable } from 'firebase/functions';
@@ -113,8 +113,10 @@ export default function WithdrawScreen({ route, navigation }) {
 
   return (
     <SafeAreaView style={styles.flex} edges={['bottom']}>
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          contentContainerStyle={styles.container}
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets={true}>
           <Text style={styles.title}>Resgatar</Text>
 
           {/* Saldo */}
@@ -241,7 +243,6 @@ export default function WithdrawScreen({ route, navigation }) {
 
           <Text style={styles.aviso}>⚠️ Os pontos serão debitados da sua conta ao confirmar.</Text>
         </ScrollView>
-      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
