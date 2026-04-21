@@ -128,7 +128,7 @@ exports.processarComissaoSaque = onDocumentCreated(
 // Dispara ao criar referral_events/{uid} (via processarIndicacao no cliente).
 // Usa Admin SDK — bypassa regras do Firestore.
 exports.onReferralCreated = onDocumentCreated(
-  { document: 'referral_events/{uid}', region: 'us-central1' },
+  { document: 'referral_events/{uid}', region: 'us-central1', secrets: [solanaPrivateKey] },
   async (event) => {
     const data = event.data?.data();
     if (!data) return;
@@ -152,6 +152,55 @@ exports.onReferralCreated = onDocumentCreated(
       pontos: FieldValue.increment(100),
       referidos: FieldValue.increment(1),
     });
+
+    // Registra prova on-chain na Solana (não-bloqueante — falha silenciosa)
+    try {
+      const { Connection, PublicKey, Transaction, TransactionInstruction } = require('@solana/web3.js');
+      const MEMO_PROGRAM = new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr');
+      const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
+      const projectKeypair = carregarKeypair(solanaPrivateKey.value());
+
+      // Hashs dos UIDs para preservar privacidade na blockchain pública
+      const referrerHash = crypto.createHash('sha256').update(referrerUid).digest('hex').slice(0, 16);
+      const referredHash = crypto.createHash('sha256').update(newUserUid).digest('hex').slice(0, 16);
+
+      const memo = JSON.stringify({
+        app: 'CNB Mobile',
+        event: 'referral',
+        referrerHash,
+        referredHash,
+        timestamp: new Date().toISOString(),
+      });
+
+      const transaction = new Transaction();
+      transaction.add(new TransactionInstruction({
+        keys: [{ pubkey: projectKeypair.publicKey, isSigner: true, isWritable: false }],
+        programId: MEMO_PROGRAM,
+        data: Buffer.from(memo, 'utf8'),
+      }));
+
+      const { blockhash } = await connection.getLatestBlockhash();
+      transaction.recentBlockhash = blockhash;
+      transaction.feePayer = projectKeypair.publicKey;
+
+      const signature = await connection.sendTransaction(transaction, [projectKeypair]);
+      await connection.confirmTransaction(signature, 'confirmed');
+
+      // Salva prova no Firestore
+      await db.collection('referrals_onchain').add({
+        referrerUid,
+        newUserUid,
+        referrerHash,
+        referredHash,
+        signature,
+        solscanUrl: `https://solscan.io/tx/${signature}`,
+        criadoEm: FieldValue.serverTimestamp(),
+      });
+
+      console.log(`[ReferralProof] ${referrerHash} → ${referredHash} | sig: ${signature}`);
+    } catch (e) {
+      console.warn('[ReferralProof] Falha ao registrar on-chain (não crítico):', e.message);
+    }
 
     // Deleta o evento após processar (coleção é efêmera)
     await event.data.ref.delete();
