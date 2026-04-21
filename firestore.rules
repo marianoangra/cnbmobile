@@ -110,6 +110,11 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    match /provas_sessao/{doc} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     // ── Dashboard privado (admin) ─────────────────────────────────────────────
     match /saques/{saqueId} {
       allow read: if (request.auth != null && request.auth.uid == resource.data.uid)

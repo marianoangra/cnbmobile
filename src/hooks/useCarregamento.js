@@ -2,8 +2,11 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { AppState } from 'react-native';
 import * as Battery from 'expo-battery';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { iniciarForegroundService, pararForegroundService, servicoRodando, SESSAO_KEY } from '../services/backgroundService';
 import { logInicioCarregamento, logFimCarregamento, logBonusHora } from '../services/analytics';
+
+const registrarProvasSessao = httpsCallable(getFunctions(), 'registrarProvasSessao');
 
 function calcularPontosTotal(minutos) {
   return minutos * 10 + Math.floor(minutos / 60) * 50;
@@ -120,7 +123,11 @@ export function useCarregamento(uid, onPontosAdicionados) {
       // executa removeItem, e a próxima sessão carregaria os minutos antigos.
       await AsyncStorage.removeItem(SESSAO_KEY).catch(() => {});
       try { await pararForegroundService(); } catch {}
-      if (minutos > 0) onAtualizarRef.current?.();
+      if (minutos > 0) {
+        // Registra prova on-chain da sessão (não-bloqueante — falha silenciosa)
+        registrarProvasSessao({ duracaoMinutos: minutos }).catch(() => {});
+        onAtualizarRef.current?.();
+      }
     } finally {
       parandoSessaoRef.current = false;
     }

@@ -448,7 +448,25 @@ main{animation:fadeUp .5s .15s ease both}
     </div>
   </div>
 
-  <div class="section-label">Proof of Activity · Registro Diário On-Chain</div>
+  <div class="section-label">Proof of Engagement · Sessões por Usuário</div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Timestamp</th>
+          <th>Usuário (hash privado)</th>
+          <th>Duração</th>
+          <th>Pontos</th>
+          <th>Prova Solana</th>
+        </tr>
+      </thead>
+      <tbody id="sessoes-body">
+        <tr><td colspan="5" class="empty">Carregando sessões...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section-label">Proof of Activity · Resumo Diário On-Chain</div>
   <div class="table-wrap">
     <table>
       <thead>
@@ -541,6 +559,27 @@ onSnapshot(doc(db, 'stats', 'public'), snap => {
     document.getElementById('lastUpdate').textContent =
       'Última atualização: ' + d.atualizadoEm.toDate().toLocaleString('pt-BR');
   }
+});
+
+onSnapshot(query(collection(db,'provas_sessao'), orderBy('criadoEm','desc'), limit(20)), snap => {
+  const tbody = document.getElementById('sessoes-body');
+  if (snap.empty) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty">Nenhuma sessão registrada ainda. As provas são geradas ao fim de cada carregamento.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = snap.docs.map(d => {
+    const v = d.data();
+    const ts = v.ts ? new Date(v.ts).toLocaleString('pt-BR') : '—';
+    return `<tr>
+      <td class="td-date">${ts}</td>
+      <td class="td-num" style="font-family:'SF Mono',monospace;font-size:11px;color:var(--text-muted)">${v.uidHash ?? '—'}</td>
+      <td class="td-num">${fmt(v.duracaoMinutos)} min</td>
+      <td class="td-num">${fmt(v.pontos)}</td>
+      <td>${v.solscanUrl
+        ? `<a href="${v.solscanUrl}" target="_blank" class="proof-link">◎ ver prova</a>`
+        : '<span class="no-proof">—</span>'}</td>
+    </tr>`;
+  }).join('');
 });
 
 onSnapshot(query(collection(db,'provas_onchain'), orderBy('date','desc'), limit(30)), snap => {

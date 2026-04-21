@@ -210,8 +210,8 @@ exports.onReferralCreated = onDocumentCreated(
 );
 
 // ─── Bônus de milestone: 50k pts por 5 indicações ativas, 100k por 10 ──────
-// "Ativa" = indicado com minutos >= 1 (carregou pelo menos 1 vez).
-// Transição detectada por onDocumentUpdated em usuarios/{uid}: minutos 0 → ≥1.
+// "Ativa" = indicado com minutos >= 10 (carregou pelo menos 10 minutos).
+// Transição detectada por onDocumentUpdated em usuarios/{uid}: minutos < 10 → ≥10.
 // Idempotência: contadoComoAtivo no indicado impede recontagem;
 // bonus5kGranted/bonus10kGranted no indicador impedem duplo crédito.
 exports.onReferreeBecameActive = onDocumentUpdated(
@@ -223,7 +223,7 @@ exports.onReferreeBecameActive = onDocumentUpdated(
 
     const minutosBefore = before.minutos ?? 0;
     const minutosAfter = after.minutos ?? 0;
-    if (minutosBefore >= 1 || minutosAfter < 1) return;
+    if (minutosBefore >= 10 || minutosAfter < 10) return;
 
     const referidoPor = after.referidoPor;
     if (!referidoPor) return;
@@ -241,7 +241,7 @@ exports.onReferreeBecameActive = onDocumentUpdated(
         if (!refereeSnap.exists) return;
         const refereeData = refereeSnap.data();
         if (refereeData.contadoComoAtivo === true) return;
-        if ((refereeData.minutos ?? 0) < 1) return;
+        if ((refereeData.minutos ?? 0) < 10) return;
 
         const referrerSnap = await t.get(referrerRef);
         if (!referrerSnap.exists) {
@@ -563,6 +563,81 @@ exports.registrarAtividadeDiaria = onSchedule(
     });
 
     console.log(`[ActivityProof] ${dateStr} | ${usuariosAtivos} usuários | sig: ${signature}`);
+  }
+);
+
+// ─── Proof of Engagement: registra sessão individual na Solana ───────────────
+// Chamado pelo app ao fim de cada sessão de carregamento.
+// Escreve um Memo com: uidHash (privado), timestamp, duração e pontos da sessão.
+exports.registrarProvasSessao = onCall(
+  { secrets: [solanaPrivateKey], region: 'us-central1' },
+  async (request) => {
+    if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
+
+    const uid = request.auth.uid;
+    const { duracaoMinutos } = request.data;
+
+    if (
+      typeof duracaoMinutos !== 'number' ||
+      !Number.isInteger(duracaoMinutos) ||
+      duracaoMinutos < 1 ||
+      duracaoMinutos > 1440
+    ) {
+      throw new HttpsError('invalid-argument', 'Duração inválida (1–1440 minutos).');
+    }
+
+    const { Connection, PublicKey, Transaction, TransactionInstruction } = require('@solana/web3.js');
+    const MEMO_PROGRAM = new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr');
+    const db = getFirestore();
+
+    // Hash do UID para preservar privacidade na blockchain pública
+    const uidHash = crypto.createHash('sha256').update(uid).digest('hex').slice(0, 16);
+    const pontos = duracaoMinutos * 10 + Math.floor(duracaoMinutos / 60) * 50;
+    const ts = new Date().toISOString();
+
+    const memo = JSON.stringify({
+      app: 'CNB Mobile',
+      event: 'session',
+      uidHash,
+      ts,
+      dur: duracaoMinutos,
+      pts: pontos,
+    });
+
+    try {
+      const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
+      const projectKeypair = carregarKeypair(solanaPrivateKey.value());
+
+      const transaction = new Transaction();
+      transaction.add(new TransactionInstruction({
+        keys: [{ pubkey: projectKeypair.publicKey, isSigner: true, isWritable: false }],
+        programId: MEMO_PROGRAM,
+        data: Buffer.from(memo, 'utf8'),
+      }));
+
+      const { blockhash } = await connection.getLatestBlockhash();
+      transaction.recentBlockhash = blockhash;
+      transaction.feePayer = projectKeypair.publicKey;
+
+      const signature = await connection.sendTransaction(transaction, [projectKeypair]);
+      await connection.confirmTransaction(signature, 'confirmed');
+
+      await db.collection('provas_sessao').add({
+        uidHash,
+        duracaoMinutos,
+        pontos,
+        ts,
+        signature,
+        solscanUrl: `https://solscan.io/tx/${signature}`,
+        criadoEm: FieldValue.serverTimestamp(),
+      });
+
+      console.log(`[SessionProof] ${uidHash} | ${duracaoMinutos}min | ${pontos}pts | sig: ${signature}`);
+      return { signature };
+    } catch (e) {
+      console.warn('[SessionProof] Falha ao registrar on-chain (não crítico):', e.message);
+      return { error: 'falha' };
+    }
   }
 );
 
