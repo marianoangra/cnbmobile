@@ -107,7 +107,7 @@ function AppNavigator({ user, perfil, onAtualizar, atualizarPerfil }) {
 
 const ONBOARDING_KEY = '@cnb_onboarding_done';
 
-const VERSAO_ATUAL = '1.2.31';
+const VERSAO_ATUAL = '1.2.34';
 
 const STORE_URL = Platform.OS === 'ios'
   ? 'https://apps.apple.com/app/id6741577961'
