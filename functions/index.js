@@ -211,8 +211,8 @@ exports.onReferralCreated = onDocumentCreated(
 );
 
 // ─── Bônus de milestone: 50k pts por 5 indicações ativas, 100k por 10 ──────
-// "Ativa" = indicado com minutos >= 10 (carregou pelo menos 10 minutos).
-// Transição detectada por onDocumentUpdated em usuarios/{uid}: minutos < 10 → ≥10.
+// "Ativa" = indicado com minutos >= 3 (carregou pelo menos 3 minutos).
+// Transição detectada por onDocumentUpdated em usuarios/{uid}: minutos < 3 → ≥3.
 // Idempotência: contadoComoAtivo no indicado impede recontagem;
 // bonus5kGranted/bonus10kGranted no indicador impedem duplo crédito.
 exports.onReferreeBecameActive = onDocumentUpdated(
@@ -224,7 +224,7 @@ exports.onReferreeBecameActive = onDocumentUpdated(
 
     const minutosBefore = before.minutos ?? 0;
     const minutosAfter = after.minutos ?? 0;
-    if (minutosBefore >= 10 || minutosAfter < 10) return;
+    if (minutosBefore >= 3 || minutosAfter < 3) return;
 
     const referidoPor = after.referidoPor;
     if (!referidoPor) return;
@@ -242,7 +242,7 @@ exports.onReferreeBecameActive = onDocumentUpdated(
         if (!refereeSnap.exists) return;
         const refereeData = refereeSnap.data();
         if (refereeData.contadoComoAtivo === true) return;
-        if ((refereeData.minutos ?? 0) < 10) return;
+        if ((refereeData.minutos ?? 0) < 3) return;
 
         const referrerSnap = await t.get(referrerRef);
         if (!referrerSnap.exists) {
