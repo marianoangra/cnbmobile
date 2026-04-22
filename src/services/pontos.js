@@ -177,6 +177,30 @@ export async function adicionarPontos(uid, quantidade, minutosCarregando = 0) {
   });
 }
 
+/**
+ * Adiciona 1 minuto de carregamento e calcula o bônus de hora automaticamente.
+ * Usa transação para checar se o total de minutos cruzou um múltiplo de 60,
+ * garantindo que sessões fragmentadas (30 min + 30 min) acumulem para o bônus.
+ * Retorna true se o bônus de hora foi concedido neste minuto.
+ */
+export async function adicionarMinutoComBonus(uid) {
+  let bonusConcedido = false;
+  await runTransaction(db, async (t) => {
+    const ref = doc(db, 'usuarios', uid);
+    const snap = await t.get(ref);
+    if (!snap.exists()) return;
+    const minutosAtual = snap.data().minutos ?? 0;
+    const novoMinutos = minutosAtual + 1;
+    const bonus = Math.floor(novoMinutos / 60) > Math.floor(minutosAtual / 60) ? 50 : 0;
+    bonusConcedido = bonus > 0;
+    t.update(ref, {
+      pontos: increment(10 + bonus),
+      minutos: increment(1),
+    });
+  });
+  return bonusConcedido;
+}
+
 export async function registrarLoginDiario(uid) {
   let concedido = false;
   await runTransaction(db, async (t) => {

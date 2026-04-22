@@ -1,6 +1,6 @@
 import * as Battery from 'expo-battery';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { adicionarPontos } from './pontos';
+import { adicionarMinutoComBonus } from './pontos';
 
 export const SESSAO_KEY = 'cnb_sessao_carregamento';
 
@@ -77,13 +77,12 @@ async function tarefaCarregamento(taskData) {
     } catch {}
 
     minutos++;
-    const bonus = minutos % 60 === 0 ? 50 : 0;
-    const total = 10 + bonus;
 
     try {
-      await comRetentativa(() => adicionarPontos(uid, total, 1));
+      const bonusConcedido = await comRetentativa(() => adicionarMinutoComBonus(uid));
+      if (bonusConcedido) console.log(`[BackgroundService] Bônus de hora concedido! (min ${minutos})`);
     } catch (e) {
-      console.warn(`[BackgroundService] Falha ao gravar ${total} pts (min ${minutos}):`, e?.message);
+      console.warn(`[BackgroundService] Falha ao gravar min ${minutos}:`, e?.message);
     }
     try {
       await AsyncStorage.setItem(SESSAO_KEY, JSON.stringify({ uid, minutosAcumulados: minutos }));
