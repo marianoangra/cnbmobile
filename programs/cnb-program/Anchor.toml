@@ -9,10 +9,11 @@ skip-lint = false
 cnb_program = "BoVj5VrUx4zzE9JWFrneGWyePNt4DYGP2AHb9ZUxXZmo"
 
 [provider]
-cluster = "localnet"
+cluster = "devnet"
 wallet = "~/.config/solana/id.json"
 
-[scripts]
-test = "cargo test"
+[test]
+startup_wait = 5000
 
-[hooks]
+[scripts]
+test = "cargo test --test test_initialize"

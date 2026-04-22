@@ -6,6 +6,7 @@ const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
+const { acumularPontosOnChain, resgatarTokensOnChain } = require('./anchor-helper');
 
 initializeApp();
 
@@ -633,6 +634,15 @@ exports.registrarProvasSessao = onCall(
       });
 
       console.log(`[SessionProof] ${uidHash} | ${duracaoMinutos}min | ${pontos}pts | sig: ${signature}`);
+
+      // Dual-write: espelha pontos/minutos no Anchor program (devnet)
+      try {
+        const anchorSig = await acumularPontosOnChain(projectKeypair, uid, pontos, duracaoMinutos);
+        console.log(`[Anchor] acumular_pontos ok | sig: ${anchorSig}`);
+      } catch (anchorErr) {
+        console.warn('[Anchor] acumular_pontos falhou (não crítico):', anchorErr.message);
+      }
+
       return { signature };
     } catch (e) {
       console.warn('[SessionProof] Falha ao registrar on-chain (não crítico):', e.message);
@@ -683,7 +693,7 @@ exports.resgatarCNB = onCall(
     const db = getFirestore();
     const usuarioRef = db.collection('usuarios').doc(uid);
 
-    // Debita pontos atomicamente via transação Firestore
+    // Debita pontos atomicamente via transação Firestore (source of truth)
     await db.runTransaction(async (t) => {
       const snap = await t.get(usuarioRef);
       if (!snap.exists) throw new HttpsError('not-found', 'Usuário não encontrado.');
@@ -694,6 +704,16 @@ exports.resgatarCNB = onCall(
         saques: FieldValue.increment(1),
       });
     });
+
+    // Dual-write: espelha o débito no Anchor program (devnet)
+    try {
+      const projectKeypair = carregarKeypair(solanaPrivateKey.value());
+      const anchorSig = await resgatarTokensOnChain(projectKeypair, uid, quantidade);
+      console.log(`[Anchor] resgatar_tokens ok | sig: ${anchorSig}`);
+    } catch (anchorErr) {
+      // Não crítico: Firestore já debitou; Anchor é prova paralela
+      console.warn('[Anchor] resgatar_tokens falhou (não crítico):', anchorErr.message);
+    }
 
     // Envia CNB tokens na Solana
     try {

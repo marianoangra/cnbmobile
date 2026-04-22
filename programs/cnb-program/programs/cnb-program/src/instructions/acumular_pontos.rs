@@ -2,8 +2,8 @@ use anchor_lang::prelude::*;
 use crate::{state::UserAccount, constants::*, error::CnbError};
 
 /// Acumula pontos e minutos para um usuário.
-/// Chamado pela Cloud Function a cada minuto de carregamento.
-/// Máximo 60 pts por chamada (10/min + 50 bônus hora) — espelha a regra do Firestore.
+/// Chamado pela Cloud Function ao fim de cada sessão de carregamento.
+/// Aceita a sessão completa: até 20.000 pts e 1.440 min por chamada.
 #[derive(Accounts)]
 #[instruction(uid_hash: [u8; 16])]
 pub struct AcumularPontos<'info> {
@@ -25,10 +25,10 @@ pub fn handler(
     pontos: u64,
     minutos: u32,
 ) -> Result<()> {
-    // Valida quantidade de pontos (máx 60 por chamada)
-    require!(pontos >= 1 && pontos <= 60, CnbError::InvalidPontosAmount);
-    // Valida minutos (sempre 1 por chamada)
-    require!(minutos == 1, CnbError::InvalidMinutosAmount);
+    // Máximo de pontos por sessão: 1440 min * 10 pts + 24h * 50 bônus = 15.600 pts
+    require!(pontos >= 1 && pontos <= 20_000, CnbError::InvalidPontosAmount);
+    // Sessão de no máximo 24 horas
+    require!(minutos >= 1 && minutos <= 1440, CnbError::InvalidMinutosAmount);
 
     let user = &mut ctx.accounts.user_account;
     user.pontos = user.pontos.saturating_add(pontos);
