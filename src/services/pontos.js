@@ -227,6 +227,14 @@ export async function getRanking(limiteDocs = 100) {
   return snap.docs.map((d, i) => ({ uid: d.id, posicao: i + 1, ...d.data() }));
 }
 
+export async function getRankingIndicacoes(limiteDocs = 100) {
+  const q = query(collection(db, 'usuarios'), orderBy('referidos', 'desc'), limit(limiteDocs));
+  const snap = await getDocs(q);
+  return snap.docs
+    .map((d, i) => ({ uid: d.id, posicao: i + 1, ...d.data() }))
+    .filter(u => (u.referidos ?? 0) > 0);
+}
+
 export async function getPosicaoRanking(uid, pontosConhecidos) {
   let pontos = pontosConhecidos;
   if (pontos === undefined) {
