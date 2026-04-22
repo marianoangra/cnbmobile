@@ -9,7 +9,7 @@ skip-lint = false
 cnb_program = "BoVj5VrUx4zzE9JWFrneGWyePNt4DYGP2AHb9ZUxXZmo"
 
 [provider]
-cluster = "mainnet"
+cluster = "devnet"
 wallet = "~/.config/solana/id.json"
 
 [test]

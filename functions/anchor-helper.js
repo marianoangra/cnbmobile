@@ -14,7 +14,7 @@ const { AnchorProvider, Program, setProvider, web3 } = require('@coral-xyz/ancho
 const crypto = require('crypto');
 
 const PROGRAM_ID = 'BoVj5VrUx4zzE9JWFrneGWyePNt4DYGP2AHb9ZUxXZmo';
-const CLUSTER_URL = 'https://api.mainnet-beta.solana.com';
+const CLUSTER_URL = 'https://api.devnet.solana.com';
 
 // IDL gerado pelo `anchor build`
 const IDL = {
