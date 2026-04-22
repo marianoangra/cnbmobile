@@ -6,7 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { solicitarSaque } from '../services/pontos';
-import { logSaqueSolicitado } from '../services/analytics';
+import { logSaqueSolicitado, logResgateCNB, logResgateCNBSucesso } from '../services/analytics';
 import { colors } from '../theme/colors';
 
 const functions = getFunctions();
@@ -99,9 +99,11 @@ export default function WithdrawScreen({ route, navigation }) {
         {
           text: 'Confirmar', onPress: async () => {
             setLoadingCNB(true);
+            logResgateCNB(qtdCNB, wallet.trim());
             try {
               const result = await resgatarCNBFn({ walletAddress: wallet.trim(), quantidade: qtdCNB });
               const sig = result.data?.signature ?? '';
+              logResgateCNBSucesso(qtdCNB, sig);
               Alert.alert(
                 '✅ CNB enviado!',
                 `${qtdCNB.toLocaleString('pt-BR')} CNB tokens enviados para sua carteira Solana.\n\nSignature: ${sig.slice(0, 16)}...`,

@@ -72,7 +72,7 @@ export default function LoginScreen({ navigation }) {
       (async () => {
         try {
           await assinarFirebaseComIdToken(idToken);
-          logLogin();
+          logLogin('google');
           navigation.goBack();
         } catch (e) {
           Alert.alert(t('common.error') || 'Erro', e?.message || 'Falha no login com Google');
@@ -96,7 +96,7 @@ export default function LoginScreen({ navigation }) {
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email.trim(), senha);
-      logLogin();
+      logLogin('email');
       navigation.goBack();
     } catch (e) {
       if (
@@ -144,7 +144,7 @@ export default function LoginScreen({ navigation }) {
       });
       if (!cred.identityToken) throw new Error('Sem identityToken retornado pela Apple.');
       await assinarFirebaseComApple({ identityToken: cred.identityToken, rawNonce });
-      logLogin();
+      logLogin('apple');
       navigation.goBack();
     } catch (e) {
       if (e?.code !== 'ERR_REQUEST_CANCELED') {

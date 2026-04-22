@@ -3,6 +3,7 @@ import {
   collection, query, orderBy, limit, where, getDocs, getCountFromServer,
   serverTimestamp, increment, runTransaction, writeBatch,
 } from 'firebase/firestore';
+import { logBonusHora } from './analytics';
 import { deleteUser } from 'firebase/auth';
 import { ref, deleteObject } from 'firebase/storage';
 import { db, storage, auth } from './firebase';
@@ -185,6 +186,7 @@ export async function adicionarPontos(uid, quantidade, minutosCarregando = 0) {
  */
 export async function adicionarMinutoComBonus(uid) {
   let bonusConcedido = false;
+  let minutosAoCompletar = 0;
   await runTransaction(db, async (t) => {
     const ref = doc(db, 'usuarios', uid);
     const snap = await t.get(ref);
@@ -193,11 +195,13 @@ export async function adicionarMinutoComBonus(uid) {
     const novoMinutos = minutosAtual + 1;
     const bonus = Math.floor(novoMinutos / 60) > Math.floor(minutosAtual / 60) ? 50 : 0;
     bonusConcedido = bonus > 0;
+    minutosAoCompletar = novoMinutos;
     t.update(ref, {
       pontos: increment(10 + bonus),
       minutos: increment(1),
     });
   });
+  if (bonusConcedido) logBonusHora(minutosAoCompletar);
   return bonusConcedido;
 }
 
