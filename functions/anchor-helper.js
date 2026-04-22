@@ -1,10 +1,11 @@
 /**
  * anchor-helper.js
- * Integração Cloud Functions ↔ Anchor program (cnb-program na Solana).
+ * Integração Cloud Functions ↔ Anchor program (cnb-program na Solana mainnet).
  *
- * Estratégia Phase 2: dual-write.
- * Firestore continua como source of truth para leitura no app.
- * O Anchor program recebe os mesmos dados on-chain como prova auditável.
+ * Estratégia Phase 3:
+ * - acumular_pontos: on-chain (mainnet) + mirror Firestore
+ * - resgatar_tokens: Anchor é source of truth; Firestore é mirror
+ *   Fallback para Firestore se o usuário ainda não tem PDA inicializado.
  */
 
 'use strict';
@@ -13,9 +14,9 @@ const { AnchorProvider, Program, setProvider, web3 } = require('@coral-xyz/ancho
 const crypto = require('crypto');
 
 const PROGRAM_ID = 'BoVj5VrUx4zzE9JWFrneGWyePNt4DYGP2AHb9ZUxXZmo';
-const CLUSTER_URL = 'https://api.devnet.solana.com';
+const CLUSTER_URL = 'https://api.mainnet-beta.solana.com';
 
-// IDL gerado pelo `anchor build` — descreve as instruções do programa on-chain
+// IDL gerado pelo `anchor build`
 const IDL = {
   address: PROGRAM_ID,
   metadata: { name: 'cnb_program', version: '0.1.0', spec: '0.1.0' },
@@ -91,13 +92,10 @@ function uidToHashBytes(uid) {
 
 /**
  * Constrói o AnchorProvider e o Program a partir do keypair do projeto.
- * @param {web3.Keypair} keypair - authority (carteira do servidor)
- * @returns {{ program: Program, connection: web3.Connection }}
  */
 function buildAnchorProgram(keypair) {
   const connection = new web3.Connection(CLUSTER_URL, 'confirmed');
 
-  // AnchorProvider mínimo — sem wallet browser, só keypair do servidor
   const wallet = {
     publicKey: keypair.publicKey,
     signTransaction: async (tx) => { tx.partialSign(keypair); return tx; },
@@ -112,18 +110,25 @@ function buildAnchorProgram(keypair) {
 }
 
 /**
+ * Retorna o PDA do usuário (sem criar).
+ */
+function getUserPDA(programId, uidHashBytes) {
+  const [pda] = web3.PublicKey.findProgramAddressSync(
+    [Buffer.from('user'), Buffer.from(uidHashBytes)],
+    new web3.PublicKey(programId),
+  );
+  return pda;
+}
+
+/**
  * Garante que o UserAccount PDA existe na chain.
- * Se ainda não existir, chama initialize_user.
  * Idempotente — seguro chamar em toda sessão.
  */
 async function ensureUserPDA(program, connection, keypair, uidHashBytes) {
-  const [userPDA] = web3.PublicKey.findProgramAddressSync(
-    [Buffer.from('user'), Buffer.from(uidHashBytes)],
-    program.programId,
-  );
+  const userPDA = getUserPDA(PROGRAM_ID, uidHashBytes);
 
   const info = await connection.getAccountInfo(userPDA);
-  if (info !== null) return userPDA; // já existe
+  if (info !== null) return userPDA;
 
   await program.methods
     .initializeUser(uidHashBytes)
@@ -139,14 +144,8 @@ async function ensureUserPDA(program, connection, keypair, uidHashBytes) {
 }
 
 /**
- * Registra uma sessão de carregamento on-chain.
- * Cria o PDA se necessário, depois chama acumular_pontos.
- *
- * @param {web3.Keypair} keypair
- * @param {string} uid - Firebase UID
- * @param {number} pontos - pontos da sessão (1–20000)
- * @param {number} minutos - duração em minutos (1–1440)
- * @returns {Promise<string>} signature da transação
+ * Registra uma sessão de carregamento on-chain (mainnet).
+ * Cria o PDA automaticamente se for o primeiro acesso.
  */
 async function acumularPontosOnChain(keypair, uid, pontos, minutos) {
   const { program, connection } = buildAnchorProgram(keypair);
@@ -167,33 +166,51 @@ async function acumularPontosOnChain(keypair, uid, pontos, minutos) {
 }
 
 /**
- * Debita pontos on-chain antes do SPL transfer.
- * Lança erro se saldo insuficiente (InsufficientPontos).
+ * Tenta debitar pontos on-chain (mainnet).
  *
- * @param {web3.Keypair} keypair
- * @param {string} uid - Firebase UID
- * @param {number} quantidade - pontos a debitar
- * @returns {Promise<string>} signature da transação
+ * Retorna:
+ *   { success: true,  signature }  — Anchor debitou; prosseguir com SPL
+ *   { success: false, reason }     — PDA não existe ou saldo insuficiente on-chain;
+ *                                    usar fallback Firestore
+ *
+ * Nunca lança — o chamador decide o fluxo baseado em success.
  */
-async function resgatarTokensOnChain(keypair, uid, quantidade) {
-  const { program, connection } = buildAnchorProgram(keypair);
-  const uidHashBytes = uidToHashBytes(uid);
+async function tentarResgatarTokensOnChain(keypair, uid, quantidade) {
+  try {
+    const { program, connection } = buildAnchorProgram(keypair);
+    const uidHashBytes = uidToHashBytes(uid);
+    const userPDA = getUserPDA(PROGRAM_ID, uidHashBytes);
 
-  const [userPDA] = web3.PublicKey.findProgramAddressSync(
-    [Buffer.from('user'), Buffer.from(uidHashBytes)],
-    program.programId,
-  );
+    // Verifica se PDA existe antes de tentar debitar
+    const info = await connection.getAccountInfo(userPDA);
+    if (info === null) {
+      return { success: false, reason: 'pda_nao_existe' };
+    }
 
-  const sig = await program.methods
-    .resgatarTokens(uidHashBytes, BigInt(quantidade))
-    .accounts({
-      authority: keypair.publicKey,
-      userAccount: userPDA,
-    })
-    .signers([keypair])
-    .rpc();
+    const sig = await program.methods
+      .resgatarTokens(uidHashBytes, BigInt(quantidade))
+      .accounts({
+        authority: keypair.publicKey,
+        userAccount: userPDA,
+      })
+      .signers([keypair])
+      .rpc();
 
-  return sig;
+    return { success: true, signature: sig };
+  } catch (err) {
+    // InsufficientPontos = saldo on-chain ainda não espelha o Firestore (usuário antigo)
+    const isInsufficient = err?.message?.includes('InsufficientPontos') ||
+      err?.message?.includes('6003');
+    return {
+      success: false,
+      reason: isInsufficient ? 'saldo_insuficiente_onchain' : 'erro_desconhecido',
+      error: err.message,
+    };
+  }
 }
 
-module.exports = { uidToHashBytes, acumularPontosOnChain, resgatarTokensOnChain };
+module.exports = {
+  uidToHashBytes,
+  acumularPontosOnChain,
+  tentarResgatarTokensOnChain,
+};

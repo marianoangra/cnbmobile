@@ -6,7 +6,7 @@ const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
-const { acumularPontosOnChain, resgatarTokensOnChain } = require('./anchor-helper');
+const { acumularPontosOnChain, tentarResgatarTokensOnChain } = require('./anchor-helper');
 
 initializeApp();
 
@@ -652,8 +652,9 @@ exports.registrarProvasSessao = onCall(
 );
 
 // ─── Resgatar pontos como CNB Tokens na Solana ───────────────────────────────
+// Phase 3: Anchor on-chain é o source of truth para o débito.
+// Fallback para Firestore se o usuário ainda não tem PDA inicializado (usuário antigo).
 // 1 ponto = 1 CNB token (6 decimais). Mínimo: 100.000 pontos.
-// A chave privada da carteira do projeto fica armazenada como Firebase Secret.
 const CNB_MINT = 'Ew92cAS3PmGqeNvUjsDCwHoVsiGeLSynFnzpdLTx2pu4';
 const MINIMO_RESGATE = 100000;
 
@@ -672,9 +673,7 @@ exports.resgatarCNB = onCall(
       throw new HttpsError('invalid-argument', `Mínimo de ${MINIMO_RESGATE.toLocaleString()} pontos.`);
     }
 
-    const {
-      Connection, Keypair, PublicKey, Transaction,
-    } = require('@solana/web3.js');
+    const { Connection, PublicKey, Transaction } = require('@solana/web3.js');
     const {
       getAssociatedTokenAddress,
       createAssociatedTokenAccountInstruction,
@@ -682,7 +681,6 @@ exports.resgatarCNB = onCall(
       getAccount,
     } = require('@solana/spl-token');
 
-    // Valida endereço Solana
     let userPublicKey;
     try {
       userPublicKey = new PublicKey(walletAddress);
@@ -692,34 +690,37 @@ exports.resgatarCNB = onCall(
 
     const db = getFirestore();
     const usuarioRef = db.collection('usuarios').doc(uid);
+    const projectKeypair = carregarKeypair(solanaPrivateKey.value());
 
-    // Debita pontos atomicamente via transação Firestore (source of truth)
-    await db.runTransaction(async (t) => {
-      const snap = await t.get(usuarioRef);
-      if (!snap.exists) throw new HttpsError('not-found', 'Usuário não encontrado.');
-      const pontos = snap.data().pontos ?? 0;
-      if (pontos < quantidade) throw new HttpsError('failed-precondition', 'Pontos insuficientes.');
-      t.update(usuarioRef, {
+    // ── 1. Débito: Anchor on-chain (source of truth) ou Firestore (fallback) ──
+    const anchorResult = await tentarResgatarTokensOnChain(projectKeypair, uid, quantidade);
+    let anchorUsed = anchorResult.success;
+
+    if (anchorUsed) {
+      console.log(`[Anchor] resgatar_tokens debitado | sig: ${anchorResult.signature}`);
+      // Mirror: atualiza Firestore sem transação (Anchor já garantiu atomicidade)
+      await usuarioRef.update({
         pontos: FieldValue.increment(-quantidade),
         saques: FieldValue.increment(1),
       });
-    });
-
-    // Dual-write: espelha o débito no Anchor program (devnet)
-    try {
-      const projectKeypair = carregarKeypair(solanaPrivateKey.value());
-      const anchorSig = await resgatarTokensOnChain(projectKeypair, uid, quantidade);
-      console.log(`[Anchor] resgatar_tokens ok | sig: ${anchorSig}`);
-    } catch (anchorErr) {
-      // Não crítico: Firestore já debitou; Anchor é prova paralela
-      console.warn('[Anchor] resgatar_tokens falhou (não crítico):', anchorErr.message);
+    } else {
+      console.warn(`[Anchor] fallback Firestore — motivo: ${anchorResult.reason}`);
+      // Fallback: Firestore como source of truth (usuário antigo sem PDA)
+      await db.runTransaction(async (t) => {
+        const snap = await t.get(usuarioRef);
+        if (!snap.exists) throw new HttpsError('not-found', 'Usuário não encontrado.');
+        const pontos = snap.data().pontos ?? 0;
+        if (pontos < quantidade) throw new HttpsError('failed-precondition', 'Pontos insuficientes.');
+        t.update(usuarioRef, {
+          pontos: FieldValue.increment(-quantidade),
+          saques: FieldValue.increment(1),
+        });
+      });
     }
 
-    // Envia CNB tokens na Solana
+    // ── 2. Envia CNB tokens na Solana mainnet ──────────────────────────────────
     try {
       const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
-
-      const projectKeypair = carregarKeypair(solanaPrivateKey.value());
       const mintPublicKey = new PublicKey(CNB_MINT);
 
       const projectATA = await getAssociatedTokenAddress(mintPublicKey, projectKeypair.publicKey);
@@ -727,24 +728,23 @@ exports.resgatarCNB = onCall(
 
       const transaction = new Transaction();
 
-      // Cria ATA do usuário se não existir (custo ~0.002 SOL pago pela carteira do projeto)
       try {
         await getAccount(connection, userATA);
       } catch {
+        // Cria ATA do usuário se não existir (~0.002 SOL pago pelo projeto)
         transaction.add(
           createAssociatedTokenAccountInstruction(
-            projectKeypair.publicKey,
-            userATA,
-            userPublicKey,
-            mintPublicKey,
+            projectKeypair.publicKey, userATA, userPublicKey, mintPublicKey,
           )
         );
       }
 
       // 1 CNB token = 10^6 unidades (6 decimais)
-      const amount = BigInt(quantidade) * BigInt(1_000_000);
       transaction.add(
-        createTransferInstruction(projectATA, userATA, projectKeypair.publicKey, amount)
+        createTransferInstruction(
+          projectATA, userATA, projectKeypair.publicKey,
+          BigInt(quantidade) * BigInt(1_000_000),
+        )
       );
 
       const { blockhash } = await connection.getLatestBlockhash();
@@ -754,12 +754,13 @@ exports.resgatarCNB = onCall(
       const signature = await connection.sendTransaction(transaction, [projectKeypair]);
       await connection.confirmTransaction(signature, 'confirmed');
 
-      // Registra o resgate
       await db.collection('resgates_cnb').add({
         uid,
         walletAddress,
         quantidade,
         signature,
+        anchorSig: anchorUsed ? anchorResult.signature : null,
+        anchorUsed,
         criadoEm: FieldValue.serverTimestamp(),
         status: 'confirmado',
       });
@@ -768,13 +769,96 @@ exports.resgatarCNB = onCall(
       return { signature };
 
     } catch (e) {
-      // Estorna pontos se o envio Solana falhar
-      await usuarioRef.update({
-        pontos: FieldValue.increment(quantidade),
-        saques: FieldValue.increment(-1),
+      console.error('[resgatarCNB] Erro no SPL transfer:', e);
+
+      // SPL falhou após débito → armazena para retry assíncrono
+      await db.collection('resgates_pendentes').add({
+        uid,
+        walletAddress,
+        quantidade,
+        anchorUsed,
+        anchorSig: anchorUsed ? anchorResult.signature : null,
+        tentativas: 1,
+        criadoEm: FieldValue.serverTimestamp(),
+        status: 'pendente',
       });
-      console.error('[resgatarCNB] Erro Solana:', e);
-      throw new HttpsError('internal', 'Erro ao enviar tokens. Pontos estornados. Tente novamente.');
+
+      // Se foi Firestore (fallback), estorna imediatamente
+      if (!anchorUsed) {
+        await usuarioRef.update({
+          pontos: FieldValue.increment(quantidade),
+          saques: FieldValue.increment(-1),
+        });
+        throw new HttpsError('internal', 'Erro ao enviar tokens. Pontos estornados. Tente novamente.');
+      }
+
+      // Se foi Anchor, os pontos já estão debitados on-chain — o retry vai completar o envio
+      throw new HttpsError('internal', 'Tokens em processamento. Você receberá em instantes.');
+    }
+  }
+);
+
+// ─── Retry de resgates pendentes (SPL falhou após débito Anchor) ──────────────
+exports.processarResgatesPendentes = onSchedule(
+  { schedule: 'every 5 minutes', region: 'us-central1', secrets: [solanaPrivateKey] },
+  async () => {
+    const db = getFirestore();
+    const snap = await db.collection('resgates_pendentes')
+      .where('status', '==', 'pendente')
+      .where('tentativas', '<=', 5)
+      .limit(20)
+      .get();
+
+    if (snap.empty) return;
+
+    const { Connection, PublicKey, Transaction } = require('@solana/web3.js');
+    const {
+      getAssociatedTokenAddress,
+      createAssociatedTokenAccountInstruction,
+      createTransferInstruction,
+      getAccount,
+    } = require('@solana/spl-token');
+
+    const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
+    const projectKeypair = carregarKeypair(solanaPrivateKey.value());
+    const mintPublicKey = new PublicKey(CNB_MINT);
+
+    for (const doc of snap.docs) {
+      const { uid, walletAddress, quantidade, tentativas } = doc.data();
+      try {
+        const userPublicKey = new PublicKey(walletAddress);
+        const projectATA = await getAssociatedTokenAddress(mintPublicKey, projectKeypair.publicKey);
+        const userATA = await getAssociatedTokenAddress(mintPublicKey, userPublicKey);
+
+        const transaction = new Transaction();
+        try { await getAccount(connection, userATA); } catch {
+          transaction.add(createAssociatedTokenAccountInstruction(
+            projectKeypair.publicKey, userATA, userPublicKey, mintPublicKey,
+          ));
+        }
+        transaction.add(createTransferInstruction(
+          projectATA, userATA, projectKeypair.publicKey,
+          BigInt(quantidade) * BigInt(1_000_000),
+        ));
+        const { blockhash } = await connection.getLatestBlockhash();
+        transaction.recentBlockhash = blockhash;
+        transaction.feePayer = projectKeypair.publicKey;
+
+        const signature = await connection.sendTransaction(transaction, [projectKeypair]);
+        await connection.confirmTransaction(signature, 'confirmed');
+
+        await doc.ref.update({ status: 'confirmado', signature, resolvidoEm: FieldValue.serverTimestamp() });
+        await db.collection('resgates_cnb').add({
+          uid, walletAddress, quantidade, signature,
+          anchorUsed: doc.data().anchorUsed,
+          criadoEm: FieldValue.serverTimestamp(),
+          status: 'confirmado_retry',
+        });
+        console.log(`[Retry] Resgate pendente enviado: ${uid} | sig: ${signature}`);
+      } catch (err) {
+        await doc.ref.update({ tentativas: tentativas + 1, ultimoErro: err.message });
+        console.error(`[Retry] Falhou (tentativa ${tentativas + 1}):`, err.message);
+      }
     }
   }
 );
