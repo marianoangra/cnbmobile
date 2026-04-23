@@ -5,6 +5,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
+import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
+import { db } from '../services/firebase';
 import { getOrCreateWallet, getCNBBalance, getSOLBalance } from '../services/walletService';
 import { colors } from '../theme/colors';
 
@@ -23,6 +25,7 @@ export default function WalletScreen({ route }) {
   const [wallet, setWallet]       = useState(null);
   const [cnbBalance, setCNB]      = useState(null);
   const [solBalance, setSOL]      = useState(null);
+  const [provas, setProvas]       = useState([]);
   const [loading, setLoading]     = useState(true);
   const [refreshing, setRefresh]  = useState(false);
   const [copied, setCopied]       = useState(false);
@@ -39,6 +42,17 @@ export default function WalletScreen({ route }) {
       ]);
       setCNB(cnb);
       setSOL(sol);
+
+      // Busca últimas 10 provas on-chain do usuário
+      try {
+        const q = query(
+          collection(db, 'usuarios', uid, 'provas'),
+          orderBy('criadoEm', 'desc'),
+          limit(10),
+        );
+        const snap = await getDocs(q);
+        setProvas(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      } catch { setProvas([]); }
     } catch (e) {
       Alert.alert('Erro', 'Não foi possível carregar a carteira.');
     } finally {
@@ -119,6 +133,36 @@ export default function WalletScreen({ route }) {
           )}
         </View>
 
+        {/* Provas On-Chain */}
+        <View style={styles.card}>
+          <Text style={styles.label}>Provas de Atividade On-Chain</Text>
+
+          {provas.length === 0 ? (
+            <Text style={styles.hint}>
+              Suas sessões de carregamento aparecem aqui após serem registradas na Solana.
+            </Text>
+          ) : (
+            provas.map((p) => (
+              <TouchableOpacity
+                key={p.id}
+                style={styles.provaItem}
+                onPress={() => Linking.openURL(p.solscanUrl)}
+                activeOpacity={0.7}>
+                <View style={styles.provaLeft}>
+                  <Text style={styles.provaEmoji}>⚡</Text>
+                  <View>
+                    <Text style={styles.provaTitle}>{p.duracaoMinutos} min · {(p.pontos ?? 0).toLocaleString('pt-BR')} pts</Text>
+                    <Text style={styles.provaSig}>
+                      {p.signature ? `${p.signature.slice(0, 8)}...${p.signature.slice(-6)}` : '—'}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={styles.provaExplorer}>↗</Text>
+              </TouchableOpacity>
+            ))
+          )}
+        </View>
+
         {/* Info */}
         <View style={styles.infoCard}>
           <Text style={styles.infoTitle}>🔒 Sua chave, seu controle</Text>
@@ -169,6 +213,16 @@ const styles = StyleSheet.create({
   divider:     { width: 1, height: 40, backgroundColor: '#333' },
 
   hint: { textAlign: 'center', color: '#555', fontSize: 12, marginTop: 16 },
+
+  provaItem: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#222',
+  },
+  provaLeft:    { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  provaEmoji:   { fontSize: 20 },
+  provaTitle:   { fontSize: 14, fontWeight: '600', color: '#FFF' },
+  provaSig:     { fontSize: 11, color: '#555', marginTop: 2, fontFamily: 'monospace' },
+  provaExplorer:{ fontSize: 18, color: '#9945FF' },
 
   infoCard:  { backgroundColor: '#111', borderRadius: 16, padding: 20, borderWidth: 1, borderColor: '#222' },
   infoTitle: { color: '#FFF', fontWeight: '600', marginBottom: 10, fontSize: 15 },
