@@ -634,7 +634,7 @@ exports.registrarProvasSessao = onCall(
         criadoEm: FieldValue.serverTimestamp(),
       };
 
-      // Salva na coleção global (anônima via uidHash) + subcoleção do usuário (acessível no app)
+      // Salva na coleção global (anônima via uidHash) + subcoleção do usuário + stats globais
       await Promise.all([
         db.collection('provas_sessao').add(provaData),
         db.collection('usuarios').doc(uid).collection('provas').add({
@@ -644,6 +644,12 @@ exports.registrarProvasSessao = onCall(
           solscanUrl: `https://solscan.io/tx/${signature}`,
           criadoEm: FieldValue.serverTimestamp(),
         }),
+        db.collection('stats').doc('dashboard').set({
+          totalMinutos:  FieldValue.increment(duracaoMinutos),
+          totalSessoes:  FieldValue.increment(1),
+          totalPontos:   FieldValue.increment(pontos),
+          ultimaAtividade: FieldValue.serverTimestamp(),
+        }, { merge: true }),
       ]);
 
       console.log(`[SessionProof] ${uidHash} | ${duracaoMinutos}min | ${pontos}pts | sig: ${signature}`);
