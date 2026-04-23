@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   ScrollView, Alert, ActivityIndicator,
@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { solicitarSaque } from '../services/pontos';
 import { logSaqueSolicitado, logResgateCNB, logResgateCNBSucesso } from '../services/analytics';
+import { getWalletAddress } from '../services/walletService';
 import { colors } from '../theme/colors';
 
 const functions = getFunctions();
@@ -30,6 +31,7 @@ export default function WithdrawScreen({ route, navigation }) {
 
   // CNB
   const [wallet, setWallet] = useState('');
+  const [walletNativa, setWalletNativa] = useState(null); // endereço gerado no dispositivo
   const [quantidadeCNB, setQuantidadeCNB] = useState('');
   const [loadingCNB, setLoadingCNB] = useState(false);
 
@@ -39,6 +41,17 @@ export default function WithdrawScreen({ route, navigation }) {
   const [loadingPrivado, setLoadingPrivado] = useState(false);
 
   const pontosDisponiveis = perfil?.pontos ?? 0;
+
+  // Carrega endereço da carteira nativa (se existir) e pré-preenche o campo CNB
+  useEffect(() => {
+    if (!perfil?.uid) return;
+    getWalletAddress(perfil.uid).then(addr => {
+      if (addr) {
+        setWalletNativa(addr);
+        setWallet(addr);
+      }
+    }).catch(() => {});
+  }, [perfil?.uid]);
 
   function formatarPontos(text) {
     const digits = text.replace(/\D/g, '');
@@ -262,10 +275,28 @@ export default function WithdrawScreen({ route, navigation }) {
                 <Text style={styles.infoLineSolana}>◎ 1 ponto = 1 CNB Token</Text>
                 <Text style={styles.infoLineSolana}>🔑 Mínimo: 100.000 pontos</Text>
                 <Text style={styles.infoLineSolana}>⚡ Envio imediato na Solana</Text>
-                <Text style={styles.infoLineSolana}>📱 Use Phantom ou Solflare</Text>
+                <Text style={styles.infoLineSolana}>
+                  {walletNativa ? '📲 Sua carteira CNB já está selecionada' : '📱 Use Phantom, Solflare ou crie sua carteira no app'}
+                </Text>
               </View>
 
               <Text style={styles.fieldLabel}>Endereço da carteira Solana</Text>
+
+              {/* Badge da carteira nativa — aparece se o usuário tem carteira criada no app */}
+              {walletNativa && (
+                <TouchableOpacity
+                  style={[styles.walletNativaTag, wallet === walletNativa && styles.walletNativaTagAtiva]}
+                  onPress={() => setWallet(walletNativa)}
+                  activeOpacity={0.8}>
+                  <Text style={styles.walletNativaTagIcon}>◎</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.walletNativaTagTitle}>Minha Carteira CNB</Text>
+                    <Text style={styles.walletNativaTagAddr}>{walletNativa.slice(0, 8)}...{walletNativa.slice(-6)}</Text>
+                  </View>
+                  {wallet === walletNativa && <Text style={styles.walletNativaCheck}>✓</Text>}
+                </TouchableOpacity>
+              )}
+
               <TextInput
                 style={styles.input}
                 placeholder="Ex: 8Zrt5KwcFzmH..."
@@ -391,6 +422,17 @@ const styles = StyleSheet.create({
 
   infoCardSolana: { backgroundColor: '#0d0d20', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#9945FF', marginBottom: 20 },
   infoLineSolana: { fontSize: 14, color: '#b8a0e0', marginBottom: 6 },
+
+  walletNativaTag: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: '#13102a', borderRadius: 12, padding: 14,
+    marginBottom: 10, borderWidth: 1, borderColor: '#3a2a6a',
+  },
+  walletNativaTagAtiva: { borderColor: '#9945FF', backgroundColor: '#1a1040' },
+  walletNativaTagIcon:  { fontSize: 22, color: '#9945FF' },
+  walletNativaTagTitle: { fontSize: 13, fontWeight: '700', color: colors.white },
+  walletNativaTagAddr:  { fontSize: 11, color: '#888', marginTop: 2, fontFamily: 'monospace' },
+  walletNativaCheck:    { fontSize: 18, color: '#9945FF', fontWeight: '700' },
 
   fieldLabel: { fontSize: 13, color: colors.secondary, marginBottom: 6, marginLeft: 2 },
   input: { backgroundColor: colors.card, borderRadius: 12, padding: 16, color: colors.white, fontSize: 16, marginBottom: 16, borderWidth: 1, borderColor: colors.border },

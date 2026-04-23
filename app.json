@@ -67,7 +67,8 @@
             "useFrameworks": "static"
           }
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "extra": {
       "eas": {

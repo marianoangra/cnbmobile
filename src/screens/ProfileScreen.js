@@ -77,6 +77,10 @@ export default function ProfileScreen({ route, navigation }) {
     return () => { active = false; };
   }, [perfil?.uid]));
 
+  function handleAbrirCarteira() {
+    navigation.navigate('Wallet', { user: perfilLocal });
+  }
+
   function handleEditarPerfil() {
     navigation.navigate('EditProfile', {
       perfil: perfilLocal,
@@ -202,6 +206,18 @@ export default function ProfileScreen({ route, navigation }) {
           <TouchableOpacity style={styles.editarPerfilBtn} onPress={handleEditarPerfil} activeOpacity={0.85}>
             <Text style={styles.editarPerfilIcon}>✏️</Text>
             <Text style={styles.editarPerfilText}>Editar Perfil</Text>
+          </TouchableOpacity>
+        </Animated.View>
+
+        {/* Carteira Solana */}
+        <Animated.View style={[styles.pontosCard, b]}>
+          <TouchableOpacity style={styles.walletBtn} onPress={handleAbrirCarteira} activeOpacity={0.85}>
+            <Text style={styles.walletBtnIcon}>◎</Text>
+            <View style={styles.walletBtnTexts}>
+              <Text style={styles.walletBtnTitle}>Minha Carteira Solana</Text>
+              <Text style={styles.walletBtnSub}>Ver saldo CNB e endereço</Text>
+            </View>
+            <Text style={styles.walletBtnArrow}>›</Text>
           </TouchableOpacity>
         </Animated.View>
 
@@ -339,6 +355,18 @@ const styles = StyleSheet.create({
   },
   editarPerfilIcon: { fontSize: 14 },
   editarPerfilText: { fontSize: 13, color: colors.white, fontWeight: '600' },
+
+  walletBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: colors.card, borderRadius: 16,
+    padding: 16, width: '100%',
+    borderWidth: 1, borderColor: '#1a2a3a',
+  },
+  walletBtnIcon:  { fontSize: 28, color: '#9945FF' },
+  walletBtnTexts: { flex: 1 },
+  walletBtnTitle: { fontSize: 15, fontWeight: '700', color: colors.white },
+  walletBtnSub:   { fontSize: 12, color: colors.secondary, marginTop: 2 },
+  walletBtnArrow: { fontSize: 22, color: colors.secondary },
 
   pontosCard: { backgroundColor: colors.card, borderRadius: 20, padding: 20, marginBottom: 14, width: '100%', alignItems: 'center', borderWidth: 1, borderColor: '#1a3a1a' },
   pontosLabel: { fontSize: 13, color: colors.secondary, marginBottom: 4 },

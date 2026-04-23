@@ -37,6 +37,7 @@ import ProfileScreen from './src/screens/ProfileScreen';
 import WithdrawScreen from './src/screens/WithdrawScreen';
 import RankingDetailScreen from './src/screens/RankingDetailScreen';
 import EditProfileScreen from './src/screens/EditProfileScreen';
+import WalletScreen from './src/screens/WalletScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -110,6 +111,10 @@ function AppNavigator({ user, perfil, onAtualizar, atualizarPerfil }) {
       <Stack.Screen
         name="EditProfile" component={EditProfileScreen}
         options={{ headerShown: true, title: 'Editar Perfil', headerStyle, headerTintColor, headerBackTitle: 'Retornar' }}
+      />
+      <Stack.Screen
+        name="Wallet" component={WalletScreen}
+        options={{ headerShown: true, title: 'Minha Carteira', headerStyle, headerTintColor, headerBackTitle: 'Voltar' }}
       />
     </Stack.Navigator>
   );
