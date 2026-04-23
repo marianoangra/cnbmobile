@@ -11,6 +11,7 @@ import { colors } from '../theme/colors';
 
 const functions = getFunctions();
 const resgatarCNBFn = httpsCallable(functions, 'resgatarCNB');
+const resgatarPrivadoFn = httpsCallable(functions, 'resgatarPrivado');
 
 // Validação básica de endereço Solana (base58, 32-44 chars)
 function solanaValido(addr) {
@@ -19,7 +20,7 @@ function solanaValido(addr) {
 
 export default function WithdrawScreen({ route, navigation }) {
   const { perfil } = route.params || {};
-  const [aba, setAba] = useState('pix'); // 'pix' | 'cnb'
+  const [aba, setAba] = useState('pix'); // 'pix' | 'cnb' | 'privado'
 
   // PIX
   const [nome, setNome] = useState(perfil?.nome ?? '');
@@ -31,6 +32,11 @@ export default function WithdrawScreen({ route, navigation }) {
   const [wallet, setWallet] = useState('');
   const [quantidadeCNB, setQuantidadeCNB] = useState('');
   const [loadingCNB, setLoadingCNB] = useState(false);
+
+  // Privado (Cloak)
+  const [walletPrivado, setWalletPrivado] = useState('');
+  const [quantidadePrivado, setQuantidadePrivado] = useState('');
+  const [loadingPrivado, setLoadingPrivado] = useState(false);
 
   const pontosDisponiveis = perfil?.pontos ?? 0;
 
@@ -75,6 +81,51 @@ export default function WithdrawScreen({ route, navigation }) {
             } catch (e) {
               Alert.alert('Erro', e.message ?? 'Tente novamente.');
             } finally { setLoadingPix(false); }
+          },
+        },
+      ]
+    );
+  }
+
+  // ── Privado (Cloak) ───────────────────────────────────────────────────────
+  const BLOCO_PRIVADO = 100000;
+  const qtdPrivado = parseInt(quantidadePrivado.replace(/\D/g, ''), 10) || 0;
+  const qtdPrivadoArredondado = Math.floor(qtdPrivado / BLOCO_PRIVADO) * BLOCO_PRIVADO;
+  const solLiquido = (qtdPrivadoArredondado / BLOCO_PRIVADO) * 0.005; // ~0.005 SOL líquido por bloco
+  const podeConfirmarPrivado =
+    pontosDisponiveis >= BLOCO_PRIVADO &&
+    qtdPrivadoArredondado >= BLOCO_PRIVADO &&
+    qtdPrivadoArredondado <= pontosDisponiveis &&
+    solanaValido(walletPrivado);
+
+  async function handleResgatePrivado() {
+    if (!perfil?.uid) return Alert.alert('Erro', 'Dados do perfil não carregados.');
+    if (!solanaValido(walletPrivado)) return Alert.alert('Atenção', 'Informe um endereço Solana válido.');
+    if (qtdPrivadoArredondado < BLOCO_PRIVADO) return Alert.alert('Atenção', 'Mínimo de 100.000 pontos.');
+    if (qtdPrivadoArredondado > pontosDisponiveis) return Alert.alert('Atenção', 'Pontos insuficientes.');
+
+    Alert.alert(
+      'Confirmar Resgate Privado',
+      `Carteira: ${walletPrivado.trim().slice(0, 8)}...${walletPrivado.trim().slice(-6)}\nPontos: ${qtdPrivadoArredondado.toLocaleString('pt-BR')}\nVocê receberá: ~${solLiquido.toFixed(4)} SOL\n\nA transação será privada — sem link on-chain entre o projeto e sua carteira.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Confirmar', onPress: async () => {
+            setLoadingPrivado(true);
+            try {
+              const result = await resgatarPrivadoFn({
+                walletAddress: walletPrivado.trim(),
+                quantidade: qtdPrivadoArredondado,
+              });
+              const sig = result.data?.signature ?? '';
+              Alert.alert(
+                '🔒 SOL enviado privadamente!',
+                `~${solLiquido.toFixed(4)} SOL enviados via Cloak.\n\nAssinatura: ${sig.slice(0, 16)}...\n\nNenhum link on-chain entre o projeto e sua carteira.`,
+                [{ text: 'OK', onPress: () => navigation.goBack() }]
+              );
+            } catch (e) {
+              Alert.alert('Erro', e.message ?? 'Tente novamente.');
+            } finally { setLoadingPrivado(false); }
           },
         },
       ]
@@ -144,7 +195,13 @@ export default function WithdrawScreen({ route, navigation }) {
               style={[styles.tab, aba === 'cnb' && styles.tabAtiva]}
               onPress={() => setAba('cnb')}
               activeOpacity={0.8}>
-              <Text style={[styles.tabText, aba === 'cnb' && styles.tabTextAtiva]}>◎ CNB Token</Text>
+              <Text style={[styles.tabText, aba === 'cnb' && styles.tabTextAtiva]}>◎ CNB</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.tab, aba === 'privado' && styles.tabAtivaPrivado]}
+              onPress={() => setAba('privado')}
+              activeOpacity={0.8}>
+              <Text style={[styles.tabText, aba === 'privado' && styles.tabTextPrivado]}>🔒 Privado</Text>
             </TouchableOpacity>
           </View>
 
@@ -248,6 +305,66 @@ export default function WithdrawScreen({ route, navigation }) {
             </>
           )}
 
+          {/* ── Aba Privado (Cloak) ── */}
+          {aba === 'privado' && (
+            <>
+              <View style={styles.infoCardPrivado}>
+                <Text style={styles.infoLinePrivado}>🔒 Resgate privado via Cloak Protocol</Text>
+                <Text style={styles.infoLinePrivado}>◎ 100.000 pontos = ~0.005 SOL líquido</Text>
+                <Text style={styles.infoLinePrivado}>🛡 Sem link on-chain entre projeto e você</Text>
+                <Text style={styles.infoLinePrivado}>⚡ ZK-proof gerado automaticamente</Text>
+              </View>
+
+              <Text style={styles.fieldLabel}>Endereço da carteira Solana</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Ex: 8Zrt5KwcFzmH..."
+                placeholderTextColor={colors.secondary}
+                value={walletPrivado}
+                onChangeText={setWalletPrivado}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              {walletPrivado.length > 0 && !solanaValido(walletPrivado) && (
+                <Text style={styles.erro}>Endereço Solana inválido.</Text>
+              )}
+
+              <Text style={styles.fieldLabel}>Quantidade de pontos (múltiplos de 100.000)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Mínimo 100.000"
+                placeholderTextColor={colors.secondary}
+                value={quantidadePrivado}
+                onChangeText={v => setQuantidadePrivado(formatarPontos(v))}
+                keyboardType="numeric"
+              />
+              {qtdPrivadoArredondado > 0 && (
+                <Text style={styles.conversaoPrivado}>
+                  ≈ {solLiquido.toFixed(4)} SOL líquido (após fee do relay)
+                </Text>
+              )}
+              {qtdPrivado > 0 && qtdPrivadoArredondado < BLOCO_PRIVADO && (
+                <Text style={styles.erro}>Mínimo de 100.000 pontos.</Text>
+              )}
+              {qtdPrivadoArredondado > pontosDisponiveis && qtdPrivadoArredondado > 0 && (
+                <Text style={styles.erro}>Você não tem pontos suficientes.</Text>
+              )}
+
+              <TouchableOpacity
+                style={[styles.btnPrivado, !podeConfirmarPrivado && styles.btnDisabled]}
+                onPress={handleResgatePrivado}
+                disabled={loadingPrivado || !podeConfirmarPrivado}>
+                {loadingPrivado
+                  ? <ActivityIndicator color="#ffffff" />
+                  : <Text style={styles.btnPrivadoText}>Resgatar SOL Privado 🔒</Text>}
+              </TouchableOpacity>
+
+              <View style={styles.cloakBadge}>
+                <Text style={styles.cloakBadgeText}>Powered by Cloak Protocol · ZK Privacy on Solana</Text>
+              </View>
+            </>
+          )}
+
           <Text style={styles.aviso}>⚠️ Os pontos serão debitados da sua conta ao confirmar.</Text>
         </ScrollView>
     </SafeAreaView>
@@ -287,4 +404,15 @@ const styles = StyleSheet.create({
   btnSolanaText: { color: '#ffffff', fontWeight: 'bold', fontSize: 16 },
 
   aviso: { fontSize: 12, color: colors.secondary, textAlign: 'center', marginTop: 16, lineHeight: 18 },
+
+  // Privado (Cloak)
+  tabAtivaPrivado: { backgroundColor: '#1a0a2e' },
+  tabTextPrivado: { color: '#c084fc' },
+  infoCardPrivado: { backgroundColor: '#0f0a1e', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#7c3aed', marginBottom: 20 },
+  infoLinePrivado: { fontSize: 14, color: '#c4b5fd', marginBottom: 6 },
+  conversaoPrivado: { fontSize: 13, color: '#a78bfa', marginTop: -10, marginBottom: 12, marginLeft: 4, fontWeight: '600' },
+  btnPrivado: { backgroundColor: '#7c3aed', borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 4 },
+  btnPrivadoText: { color: '#ffffff', fontWeight: 'bold', fontSize: 16 },
+  cloakBadge: { marginTop: 16, alignItems: 'center' },
+  cloakBadgeText: { fontSize: 11, color: '#6d28d9', fontWeight: '500' },
 });

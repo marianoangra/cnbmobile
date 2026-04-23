@@ -1,6 +1,6 @@
 import './src/i18n'; // inicializa i18n antes de tudo
 import React, { useState, useEffect, useRef } from 'react';
-import { ActivityIndicator, View, Alert, Platform, Modal, Text, TouchableOpacity, StyleSheet, Linking } from 'react-native';
+import { ActivityIndicator, View, Alert, Platform, Modal, Text, TouchableOpacity, StyleSheet, Linking, AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -10,6 +10,17 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './src/services/firebase';
 import { registrarSessao, limparSessao, escutarSessao } from './src/services/session';
+import * as Notifications from 'expo-notifications';
+import { registrarTokenPush } from './src/services/notificacoes';
+
+// Exibe notificação mesmo com o app aberto (foreground)
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
 import { getPerfil, criarPerfil, registrarLoginDiario } from './src/services/pontos';
 import { getConfiguracaoApp } from './src/services/config';
 import { setUsuarioId, resetUsuarioId, logLoginDiario } from './src/services/analytics';
@@ -129,6 +140,7 @@ export default function App() {
   const [onboardingFeito, setOnboardingFeito] = useState(null); // null = carregando
   const [updateObrigatorio, setUpdateObrigatorio] = useState(false);
   const sessaoUnsubRef = useRef(null);
+  const userRef = useRef(null);
 
   useEffect(() => {
     getConfiguracaoApp().then(config => {
@@ -172,6 +184,27 @@ export default function App() {
       setPerfil({ uid: u.uid, nome: u.displayName ?? u.email ?? 'Usuário', email: u.email ?? '', pontos: 0 });
     }
   }
+
+  // Mantém ref sincronizado para o AppState listener acessar sem closure stale
+  useEffect(() => { userRef.current = user; }, [user]);
+
+  // Check-in diário ao retornar ao foreground (ex: app aberto após meia-noite)
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', async (nextState) => {
+      if (nextState !== 'active') return;
+      const u = userRef.current;
+      if (!u) return;
+      try {
+        const foiNovoDia = await registrarLoginDiario(u.uid);
+        if (foiNovoDia) {
+          logLoginDiario();
+          const atualizado = await getPerfil(u.uid);
+          if (atualizado) setPerfil(atualizado);
+        }
+      } catch { /* silencia */ }
+    });
+    return () => sub.remove();
+  }, []);
 
   async function onAtualizar() {
     if (!user) return;
@@ -233,6 +266,7 @@ export default function App() {
           setUser(u);
           setUsuarioId(u.uid);
           await carregarPerfil(u);
+          registrarTokenPush(u.uid).catch(() => {});
         } else {
           sessaoUnsubRef.current?.();
           sessaoUnsubRef.current = null;

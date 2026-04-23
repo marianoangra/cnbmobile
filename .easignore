@@ -2,3 +2,9 @@ node_modules/
 android/
 ios/Pods/
 ios/build/
+programs/cnb-program/target/
+.agents/
+.kuka/
+.qoder/
+.trae/
+.firebase/

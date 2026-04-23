@@ -9,14 +9,14 @@
     "newArchEnabled": false,
     "splash": {
       "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
+      "resizeMode": "cover",
       "backgroundColor": "#0A0F1E"
     },
     "scheme": "com.cnb.cnbappv2",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.cnb.cnbappv2",
-      "buildNumber": "158",
+      "buildNumber": "159",
       "usesAppleSignIn": true,
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
@@ -31,7 +31,7 @@
     },
     "android": {
       "package": "com.cnb.cnbappv2",
-      "versionCode": 164,
+      "versionCode": 167,
       "permissions": [
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_DATA_SYNC"
@@ -47,10 +47,19 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      "./plugins/withBackgroundActions",
       "expo-web-browser",
       "@react-native-firebase/app",
       "expo-localization",
       "expo-apple-authentication",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#00FF7F",
+          "defaultChannel": "default"
+        }
+      ],
       [
         "expo-build-properties",
         {

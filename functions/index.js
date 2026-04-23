@@ -7,6 +7,7 @@ const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 const { acumularPontosOnChain, tentarResgatarTokensOnChain } = require('./anchor-helper');
+const { resgatarPontosPrivado, PONTOS_POR_BLOCO } = require('./cloak-helper');
 
 initializeApp();
 
@@ -770,5 +771,132 @@ exports.resgatarCNB = onCall(
       console.error('[resgatarCNB] Erro Solana:', e);
       throw new HttpsError('internal', 'Erro ao enviar tokens. Pontos estornados. Tente novamente.');
     }
+  }
+);
+
+// ─── Resgate privado de pontos via Cloak (SOL shielded) ──────────────────────
+// Fluxo: Firestore debit → Cloak deposit → relay private withdrawal → usuário recebe SOL
+// Sem link on-chain entre carteira do projeto e carteira do usuário.
+// Taxa de câmbio: 100.000 pontos = 0.01 SOL (depósito mínimo Cloak).
+// Fee relay: ~0.005 SOL. Usuário recebe ~0.005 SOL líquido por 100.000 pontos.
+const MINIMO_RESGATE_PRIVADO = PONTOS_POR_BLOCO; // 100.000
+
+exports.resgatarPrivado = onCall(
+  { secrets: [solanaPrivateKey], region: 'us-central1', invoker: 'public' },
+  async (request) => {
+    if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
+
+    const uid = request.auth.uid;
+    const { walletAddress, quantidade } = request.data;
+
+    if (!walletAddress || typeof walletAddress !== 'string') {
+      throw new HttpsError('invalid-argument', 'Endereço de carteira inválido.');
+    }
+    if (!quantidade || typeof quantidade !== 'number' || quantidade < MINIMO_RESGATE_PRIVADO) {
+      throw new HttpsError('invalid-argument', `Mínimo de ${MINIMO_RESGATE_PRIVADO.toLocaleString()} pontos.`);
+    }
+    // Deve ser múltiplo do bloco mínimo (100.000)
+    if (quantidade % PONTOS_POR_BLOCO !== 0) {
+      throw new HttpsError('invalid-argument', `Quantidade deve ser múltiplo de ${PONTOS_POR_BLOCO.toLocaleString()}.`);
+    }
+
+    const { PublicKey } = require('@solana/web3.js');
+    try { new PublicKey(walletAddress); } catch {
+      throw new HttpsError('invalid-argument', 'Endereço Solana inválido.');
+    }
+
+    const db = getFirestore();
+    const usuarioRef = db.collection('usuarios').doc(uid);
+
+    // ── 1. Débito atômico no Firestore ────────────────────────────────────────
+    await db.runTransaction(async (t) => {
+      const snap = await t.get(usuarioRef);
+      if (!snap.exists) throw new HttpsError('not-found', 'Usuário não encontrado.');
+      const pontos = snap.data().pontos ?? 0;
+      if (pontos < quantidade) throw new HttpsError('failed-precondition', 'Pontos insuficientes.');
+      t.update(usuarioRef, {
+        pontos: FieldValue.increment(-quantidade),
+        saques: FieldValue.increment(1),
+      });
+    });
+
+    // ── 2. Resgate privado via Cloak ─────────────────────────────────────────
+    try {
+      const projectKeypair = carregarKeypair(solanaPrivateKey.value());
+      const result = await resgatarPontosPrivado(projectKeypair, quantidade, walletAddress);
+
+      await db.collection('resgates_privados').add({
+        uid,
+        walletAddress: 'PRIVADO', // não salvar endereço real — resgate é privado
+        quantidade,
+        amountLamports: result.amountLamports,
+        netLamports: result.netLamports,
+        depositSignature: result.depositSignature,
+        transferSignature: result.transferSignature,
+
+        criadoEm: FieldValue.serverTimestamp(),
+        status: 'confirmado',
+      });
+
+      console.log(`[resgatarPrivado] ${uid} | ${quantidade} pontos | ${result.amountLamports} lamports | sig: ${result.transferSignature}`);
+      return {
+        signature: result.transferSignature,
+        amountLamports: result.amountLamports,
+        netLamports: result.netLamports,
+      };
+
+    } catch (e) {
+      // Estorna pontos se o Cloak falhar
+      await usuarioRef.update({
+        pontos: FieldValue.increment(quantidade),
+        saques: FieldValue.increment(-1),
+      });
+      console.error('[resgatarPrivado] Erro Cloak:', e);
+      throw new HttpsError('internal', 'Erro no resgate privado. Pontos estornados.');
+    }
+  }
+);
+
+// ─── Envio de push notification para todos os usuários ───────────────────────
+// Só admins podem chamar. Tokens ficam em /push_tokens/{uid}.
+const ADMIN_UIDS = ['X619NYBpp5OqXKTBomuFTISuQGY2'];
+
+exports.enviarNotificacaoGlobal = onCall(
+  { region: 'us-central1', invoker: 'public' },
+  async (request) => {
+    if (!request.auth || !ADMIN_UIDS.includes(request.auth.uid)) {
+      throw new HttpsError('permission-denied', 'Não autorizado.');
+    }
+
+    const { titulo, corpo } = request.data;
+    if (!titulo || !corpo) throw new HttpsError('invalid-argument', 'titulo e corpo são obrigatórios.');
+
+    const db = getFirestore();
+    const snap = await db.collection('push_tokens').get();
+    const tokens = snap.docs.map(d => d.data().token).filter(Boolean);
+
+    if (tokens.length === 0) return { enviado: 0 };
+
+    // Envia em lotes de 100 (limite da API do Expo)
+    const LOTE = 100;
+    let total = 0;
+    for (let i = 0; i < tokens.length; i += LOTE) {
+      const messages = tokens.slice(i, i + LOTE).map(to => ({
+        to,
+        title: titulo,
+        body: corpo,
+        sound: 'default',
+        channelId: 'default',
+      }));
+      await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify(messages),
+      });
+      total += messages.length;
+    }
+
+    console.log(`[Push] Notificação enviada para ${total} dispositivos`);
+    return { enviado: total };
   }
 );

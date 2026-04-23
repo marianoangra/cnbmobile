@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  KeyboardAvoidingView, Platform, ScrollView, Alert, ActivityIndicator, Animated, Image,
+  Platform, ScrollView, Alert, ActivityIndicator, Animated, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
@@ -180,8 +180,11 @@ export default function LoginScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.flex}>
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.container}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          automaticallyAdjustKeyboardInsets={true}>
 
           <Animated.View style={[styles.logoArea, { opacity, transform: [{ translateY }] }]}>
             <View style={styles.logoBox}>
@@ -288,7 +291,6 @@ export default function LoginScreen({ navigation }) {
           </Animated.View>
 
         </ScrollView>
-      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
