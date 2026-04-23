@@ -8,6 +8,9 @@ skip-lint = false
 [programs.localnet]
 cnb_program = "BoVj5VrUx4zzE9JWFrneGWyePNt4DYGP2AHb9ZUxXZmo"
 
+[programs.devnet]
+cnb_program = "BoVj5VrUx4zzE9JWFrneGWyePNt4DYGP2AHb9ZUxXZmo"
+
 [provider]
 cluster = "devnet"
 wallet = "~/.config/solana/id.json"

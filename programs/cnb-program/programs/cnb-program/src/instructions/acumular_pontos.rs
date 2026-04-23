@@ -1,4 +1,6 @@
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::pubkey::Pubkey;
+use std::str::FromStr;
 use crate::{state::UserAccount, constants::*, error::CnbError};
 
 /// Acumula pontos e minutos para um usuário.
@@ -25,6 +27,9 @@ pub fn handler(
     pontos: u64,
     minutos: u32,
 ) -> Result<()> {
+    let expected = Pubkey::from_str(SERVER_AUTHORITY).unwrap();
+    require!(ctx.accounts.authority.key() == expected, CnbError::UnauthorizedAuthority);
+
     // Máximo de pontos por sessão: 1440 min * 10 pts + 24h * 50 bônus = 15.600 pts
     require!(pontos >= 1 && pontos <= 20_000, CnbError::InvalidPontosAmount);
     // Sessão de no máximo 24 horas

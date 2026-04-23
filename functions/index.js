@@ -638,7 +638,9 @@ exports.registrarProvasSessao = onCall(
 
       // Dual-write: espelha pontos/minutos no Anchor program (devnet)
       try {
-        const anchorSig = await acumularPontosOnChain(projectKeypair, uid, pontos, duracaoMinutos);
+        const userSnap = await db.collection('usuarios').doc(uid).get();
+        const referrerUid = userSnap.exists ? (userSnap.data().referidoPor ?? null) : null;
+        const anchorSig = await acumularPontosOnChain(projectKeypair, uid, pontos, duracaoMinutos, referrerUid);
         console.log(`[Anchor] acumular_pontos ok | sig: ${anchorSig}`);
       } catch (anchorErr) {
         console.warn('[Anchor] acumular_pontos falhou (não crítico):', anchorErr.message);

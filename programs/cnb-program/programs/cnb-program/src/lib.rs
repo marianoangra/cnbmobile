@@ -16,18 +16,22 @@ pub mod cnb_program {
     use super::*;
 
     /// Cria o UserAccount PDA para um novo usuário (primeira vez)
-    pub fn initialize_user(ctx: Context<InitializeUser>, uid_hash: [u8; 16]) -> Result<()> {
-        instructions::initialize::handler(ctx, uid_hash)
+    pub fn initialize_user(
+        ctx: Context<InitializeUser>,
+        uid_hash: [u8; 16],
+        referrer: Option<[u8; 16]>,
+    ) -> Result<()> {
+        instructions::initialize_handler(ctx, uid_hash, referrer)
     }
 
-    /// Acumula pontos e minutos — chamado pela Cloud Function a cada minuto de carregamento
+    /// Acumula pontos e minutos — chamado pela Cloud Function a cada sessão de carregamento
     pub fn acumular_pontos(
         ctx: Context<AcumularPontos>,
         uid_hash: [u8; 16],
         pontos: u64,
         minutos: u32,
     ) -> Result<()> {
-        instructions::acumular_pontos::handler(ctx, uid_hash, pontos, minutos)
+        instructions::acumular_handler(ctx, uid_hash, pontos, minutos)
     }
 
     /// Debita pontos atomicamente antes do SPL transfer (resgate CNB)
@@ -36,6 +40,6 @@ pub mod cnb_program {
         uid_hash: [u8; 16],
         quantidade: u64,
     ) -> Result<()> {
-        instructions::resgatar_tokens::handler(ctx, uid_hash, quantidade)
+        instructions::resgatar_handler(ctx, uid_hash, quantidade)
     }
 }

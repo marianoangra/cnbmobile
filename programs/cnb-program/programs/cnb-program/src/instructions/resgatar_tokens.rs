@@ -1,4 +1,6 @@
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::pubkey::Pubkey;
+use std::str::FromStr;
 use crate::{state::UserAccount, constants::*, error::CnbError};
 
 const MINIMO_RESGATE: u64 = 100_000;
@@ -25,6 +27,9 @@ pub fn handler(
     _uid_hash: [u8; 16],
     quantidade: u64,
 ) -> Result<()> {
+    let expected = Pubkey::from_str(SERVER_AUTHORITY).unwrap();
+    require!(ctx.accounts.authority.key() == expected, CnbError::UnauthorizedAuthority);
+
     require!(quantidade >= MINIMO_RESGATE, CnbError::BelowMinimumRedeem);
 
     let user = &mut ctx.accounts.user_account;

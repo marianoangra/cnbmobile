@@ -33,7 +33,7 @@ fn test_initialize_user() {
 
     let instruction = Instruction::new_with_bytes(
         program_id,
-        &cnb_program::instruction::InitializeUser { uid_hash }.data(),
+        &cnb_program::instruction::InitializeUser { uid_hash, referrer: None }.data(),
         cnb_program::accounts::InitializeUser {
             authority: authority.pubkey(),
             user_account: user_pda,

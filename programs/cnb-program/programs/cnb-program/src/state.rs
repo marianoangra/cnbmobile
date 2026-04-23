@@ -11,6 +11,8 @@ pub struct UserAccount {
     pub pontos: u64,
     /// Total de minutos de carregamento acumulados
     pub minutos: u32,
+    /// uid_hash do referrer (None se sem indicação)
+    pub referrer: Option<[u8; 16]>,
     /// Nível do usuário (calculado off-chain, gravado aqui como referência)
     pub nivel: u8,
     /// Bump seed do PDA
