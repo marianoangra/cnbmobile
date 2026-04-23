@@ -15,8 +15,8 @@ const { AnchorProvider, Program, BN } = require('@coral-xyz/anchor');
 const { Connection, PublicKey, SystemProgram } = require('@solana/web3.js');
 const crypto = require('crypto');
 
-// IDL gerada pelo `anchor build` — sempre sincronizada com o programa deployado
-const IDL = require('../programs/cnb-program/target/idl/cnb_program.json');
+// IDL gerada pelo `anchor build` — cópia local para deploy no Cloud Run
+const IDL = require('./cnb_program_idl.json');
 
 const PROGRAM_ID = 'BoVj5VrUx4zzE9JWFrneGWyePNt4DYGP2AHb9ZUxXZmo';
 const CLUSTER_URL = 'https://api.devnet.solana.com'; // → mainnet quando pronto

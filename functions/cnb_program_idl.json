@@ -1,0 +1,342 @@
+{
+  "address": "BoVj5VrUx4zzE9JWFrneGWyePNt4DYGP2AHb9ZUxXZmo",
+  "metadata": {
+    "name": "cnb_program",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "acumular_pontos",
+      "docs": [
+        "Acumula pontos e minutos — chamado pela Cloud Function a cada sessão de carregamento"
+      ],
+      "discriminator": [
+        48,
+        47,
+        90,
+        13,
+        87,
+        250,
+        101,
+        238
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "docs": [
+            "Authority do servidor — única permitida"
+          ],
+          "signer": true
+        },
+        {
+          "name": "user_account",
+          "docs": [
+            "PDA do usuário"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "uid_hash"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "uid_hash",
+          "type": {
+            "array": [
+              "u8",
+              16
+            ]
+          }
+        },
+        {
+          "name": "pontos",
+          "type": "u64"
+        },
+        {
+          "name": "minutos",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "initialize_user",
+      "docs": [
+        "Cria o UserAccount PDA para um novo usuário (primeira vez)"
+      ],
+      "discriminator": [
+        111,
+        17,
+        185,
+        250,
+        60,
+        122,
+        38,
+        254
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "docs": [
+            "Authority do servidor — única que pode criar contas"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "user_account",
+          "docs": [
+            "PDA do usuário — criado aqui"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "uid_hash"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "uid_hash",
+          "type": {
+            "array": [
+              "u8",
+              16
+            ]
+          }
+        },
+        {
+          "name": "referrer",
+          "type": {
+            "option": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "resgatar_tokens",
+      "docs": [
+        "Debita pontos atomicamente antes do SPL transfer (resgate CNB)"
+      ],
+      "discriminator": [
+        41,
+        101,
+        165,
+        255,
+        181,
+        227,
+        18,
+        58
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "docs": [
+            "Authority do servidor"
+          ],
+          "signer": true
+        },
+        {
+          "name": "user_account",
+          "docs": [
+            "PDA do usuário"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "uid_hash"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "uid_hash",
+          "type": {
+            "array": [
+              "u8",
+              16
+            ]
+          }
+        },
+        {
+          "name": "quantidade",
+          "type": "u64"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "UserAccount",
+      "discriminator": [
+        211,
+        33,
+        136,
+        16,
+        186,
+        110,
+        242,
+        127
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "UnauthorizedAuthority",
+      "msg": "Signer não autorizado. Apenas a authority do servidor pode chamar esta instrução."
+    },
+    {
+      "code": 6001,
+      "name": "InvalidPontosAmount",
+      "msg": "Quantidade de pontos inválida. Deve ser entre 1 e 20.000 por sessão."
+    },
+    {
+      "code": 6002,
+      "name": "InvalidMinutosAmount",
+      "msg": "Minutos inválidos. Deve ser entre 1 e 1.440 por sessão (máx 24h)."
+    },
+    {
+      "code": 6003,
+      "name": "InsufficientPontos",
+      "msg": "Pontos insuficientes para resgate."
+    },
+    {
+      "code": 6004,
+      "name": "BelowMinimumRedeem",
+      "msg": "Quantidade mínima de resgate: 100.000 pontos."
+    }
+  ],
+  "types": [
+    {
+      "name": "UserAccount",
+      "docs": [
+        "Conta on-chain por usuário CNBMobile.",
+        "PDA seeds: [\"user\", uid_hash]",
+        "uid_hash = sha256(firebase_uid).slice(0..16) — preserva privacidade na chain pública."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "uid_hash",
+            "docs": [
+              "Hash do Firebase UID (16 bytes) — identificador privado on-chain"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
+          {
+            "name": "pontos",
+            "docs": [
+              "Total de pontos acumulados"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "minutos",
+            "docs": [
+              "Total de minutos de carregamento acumulados"
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "referrer",
+            "docs": [
+              "uid_hash do referrer (None se sem indicação)"
+            ],
+            "type": {
+              "option": {
+                "array": [
+                  "u8",
+                  16
+                ]
+              }
+            }
+          },
+          {
+            "name": "nivel",
+            "docs": [
+              "Nível do usuário (calculado off-chain, gravado aqui como referência)"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "Bump seed do PDA"
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ],
+  "constants": [
+    {
+      "name": "AUTHORITY_SEED",
+      "type": "bytes",
+      "value": "[97, 117, 116, 104, 111, 114, 105, 116, 121]"
+    },
+    {
+      "name": "USER_SEED",
+      "type": "bytes",
+      "value": "[117, 115, 101, 114]"
+    }
+  ]
+}
