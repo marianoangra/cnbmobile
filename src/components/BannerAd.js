@@ -4,16 +4,6 @@ import { useTheme } from '../context/ThemeContext';
 
 const BANNERS = [
   {
-    id: 'convite',
-    icon: '👥',
-    iconBg: '#2a0a4a',
-    bg: '#120828',
-    border: '#A855F7',
-    titulo: 'Convide um amigo!',
-    sub: 'Ganhe +100 pts por cada indicação confirmada.',
-    cor: '#A855F7',
-  },
-  {
     id: 'carregar',
     icon: '⚡',
     iconBg: '#0d2a0d',
@@ -45,7 +35,7 @@ const BANNERS = [
   },
 ];
 
-const INTERVALO = 6000;
+const INTERVALO = 8000;
 
 export default function BannerAd({ onPress, active = true }) {
   const { colors } = useTheme();

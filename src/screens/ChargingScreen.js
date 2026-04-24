@@ -184,7 +184,7 @@ function createStyles(colors) {
     row: { flexDirection: 'row', gap: 12, width: '100%', marginBottom: 12 },
     half: { flex: 1 },
     card: { backgroundColor: colors.card, borderRadius: 16, padding: 14, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
-    bonusCard: { borderColor: '#1a3a1a', backgroundColor: '#0a1f0a' },
+    bonusCard: { borderColor: colors.border, backgroundColor: colors.card },
     cardLabel: { fontSize: 11, color: colors.secondary, marginBottom: 4, textAlign: 'center' },
     cardVal: { fontSize: 28, fontWeight: 'bold', color: colors.primary },
     timerText: { fontSize: 26 },

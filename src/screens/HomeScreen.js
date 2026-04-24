@@ -3,10 +3,9 @@ import { View, Text, StyleSheet, ScrollView, Animated, TouchableOpacity, Alert }
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Battery from 'expo-battery';
-import { doc, onSnapshot } from 'firebase/firestore';
-import { db } from '../services/firebase';
 import { useTheme } from '../context/ThemeContext';
 import BannerAd from '../components/BannerAd';
+import KastBanner from '../components/KastBanner';
 import Avatar from '../components/Avatar';
 
 function estaCarregandoOuCheia(state) {
@@ -78,16 +77,6 @@ export default function HomeScreen({ route, navigation }) {
     Animated.timing(progressAnim, { toValue: progresso, duration: 900, delay: 300, useNativeDriver: false }).start();
   }, [pontos]);
 
-  const [statsRede, setStatsRede] = useState(null);
-  useEffect(() => {
-    const unsub = onSnapshot(
-      doc(db, 'stats', 'dashboard'),
-      (snap) => { if (snap.exists()) setStatsRede(snap.data()); },
-      () => {},
-    );
-    return unsub;
-  }, []);
-
   const a = useEntrada(0);
   const b = useEntrada(80);
   const c = useEntrada(160);
@@ -100,9 +89,7 @@ export default function HomeScreen({ route, navigation }) {
   const podeSacar = pontos >= META;
 
   function handleBannerPress(id) {
-    if (id === 'convite') navigation.navigate('Perfil');
-    else if (id === 'whatsapp') navigation.navigate('Perfil');
-    else if (id === 'ranking') navigation.navigate('Ranking', { uid: perfil?.uid, perfil });
+    if (id === 'ranking') navigation.navigate('Ranking', { uid: perfil?.uid, perfil });
     else if (id === 'carregar') navigation.navigate('Carregar');
     else if (id === 'pix') {
       if (!user) return navigation.navigate('Login');
@@ -181,36 +168,8 @@ export default function HomeScreen({ route, navigation }) {
           </View>
         </Animated.View>
 
-        <Animated.View style={[styles.depinCard, d]}>
-          <View style={styles.depinHeader}>
-            <Text style={styles.depinTitle}>◎ Rede CNB Mobile</Text>
-            <View style={styles.depinBadge}>
-              <Text style={styles.depinBadgeText}>● Ao vivo</Text>
-            </View>
-          </View>
-          <View style={styles.depinStats}>
-            <View style={styles.depinStat}>
-              <Text style={styles.depinVal}>
-                {statsRede ? (statsRede.totalMinutos ?? 0).toLocaleString('pt-BR') : '—'}
-              </Text>
-              <Text style={styles.depinLabel}>Min. na rede</Text>
-            </View>
-            <View style={styles.depinDivider} />
-            <View style={styles.depinStat}>
-              <Text style={styles.depinVal}>
-                {statsRede ? (statsRede.totalSessoes ?? 0).toLocaleString('pt-BR') : '—'}
-              </Text>
-              <Text style={styles.depinLabel}>Sessões on-chain</Text>
-            </View>
-            <View style={styles.depinDivider} />
-            <View style={styles.depinStat}>
-              <Text style={styles.depinVal}>
-                {statsRede ? `${((statsRede.totalPontos ?? 0) / 1000000).toFixed(1)}M` : '—'}
-              </Text>
-              <Text style={styles.depinLabel}>Pontos gerados</Text>
-            </View>
-          </View>
-          <Text style={styles.depinSub}>Atividade verificada na Solana blockchain</Text>
+        <Animated.View style={[{ width: '100%', marginBottom: 16 }, d]}>
+          <KastBanner uid={perfil?.uid} />
         </Animated.View>
 
         <Animated.View style={[{ width: '100%' }, d]}>
@@ -251,10 +210,10 @@ function createStyles(colors) {
     loginBtnIcon: { fontSize: 20 },
     loginBtnLabel: { fontSize: 10, color: colors.primary, fontWeight: '600', marginTop: 3 },
 
-    mainCard: { backgroundColor: colors.card, borderRadius: 20, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: '#1a3a1a' },
+    mainCard: { backgroundColor: colors.card, borderRadius: 20, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: colors.border },
     mainCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
     mainLabel: { fontSize: 13, color: colors.secondary },
-    badge: { backgroundColor: '#0d2a0d', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: colors.primary },
+    badge: { backgroundColor: colors.card, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: colors.primary },
     badgeText: { fontSize: 11, color: colors.primary, fontWeight: '600' },
     pontos: { fontSize: 52, fontWeight: 'bold', color: colors.primary, marginBottom: 16, letterSpacing: -1 },
     progressBg: { backgroundColor: colors.border, borderRadius: 8, height: 8, marginBottom: 8, overflow: 'hidden' },
@@ -269,21 +228,6 @@ function createStyles(colors) {
     statIcon: { fontSize: 22, marginBottom: 6 },
     statVal: { fontSize: 28, fontWeight: 'bold', color: colors.primary },
     statLabel: { fontSize: 11, color: colors.secondary, marginTop: 4, textAlign: 'center' },
-
-    depinCard: {
-      backgroundColor: '#080d1a', borderRadius: 16, padding: 18,
-      marginBottom: 16, borderWidth: 1, borderColor: '#1a2a4a', width: '100%',
-    },
-    depinHeader:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-    depinTitle:    { fontSize: 15, fontWeight: '700', color: '#7eb8f7' },
-    depinBadge:    { backgroundColor: '#0a1a0a', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: '#1a4a1a' },
-    depinBadgeText:{ fontSize: 11, color: '#4ade80', fontWeight: '600' },
-    depinStats:    { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-    depinStat:     { flex: 1, alignItems: 'center' },
-    depinVal:      { fontSize: 22, fontWeight: '700', color: '#fff' },
-    depinLabel:    { fontSize: 11, color: '#4a6a8a', marginTop: 3 },
-    depinDivider:  { width: 1, height: 36, backgroundColor: '#1a2a4a' },
-    depinSub:      { fontSize: 11, color: '#2a4a6a', textAlign: 'center' },
 
     saqueBtn: { backgroundColor: colors.primary, borderRadius: 14, padding: 16, alignItems: 'center', marginBottom: 8 },
     saqueBtnDisabled: { opacity: 0.4 },

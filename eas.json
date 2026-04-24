@@ -29,7 +29,8 @@
       },
       "ios": {
         "buildConfiguration": "Release",
-        "resourceClass": "m-medium"
+        "resourceClass": "large",
+        "image": "latest"
       }
     }
   },

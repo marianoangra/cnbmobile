@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, Image } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 
 export default function Avatar({ uri, nome, size = 56, borderColor, style }) {
   const { colors } = useTheme();
   const [erro, setErro] = useState(false);
+
+  // Sempre que o URI muda (ex: upload de nova foto), tenta carregar de novo
+  useEffect(() => { setErro(false); }, [uri]);
   const inicial = (nome ?? 'U')[0].toUpperCase();
   const fontSize = size * 0.38;
   const borderRadius = size / 2;
