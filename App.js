@@ -1,6 +1,6 @@
 import './src/i18n'; // inicializa i18n antes de tudo
 import React, { useState, useEffect, useRef } from 'react';
-import { ActivityIndicator, View, Alert, Platform, Modal, Text, TouchableOpacity, StyleSheet, Linking, AppState } from 'react-native';
+import { View, Alert, Platform, Modal, Text, TouchableOpacity, StyleSheet, Linking, AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -13,7 +13,6 @@ import { registrarSessao, limparSessao, escutarSessao } from './src/services/ses
 import * as Notifications from 'expo-notifications';
 import { registrarTokenPush } from './src/services/notificacoes';
 
-// Exibe notificação mesmo com o app aberto (foreground)
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -24,10 +23,11 @@ Notifications.setNotificationHandler({
 import { getPerfil, criarPerfil, registrarLoginDiario } from './src/services/pontos';
 import { getConfiguracaoApp } from './src/services/config';
 import { setUsuarioId, resetUsuarioId, logLoginDiario } from './src/services/analytics';
-import { colors } from './src/theme/colors';
+import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import ErrorBoundary from './src/components/ErrorBoundary';
 
 import OnboardingScreen from './src/screens/OnboardingScreen';
+import SplashScreen from './src/screens/SplashScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import HomeScreen from './src/screens/HomeScreen';
@@ -49,6 +49,7 @@ function TabIcon({ emoji, focused }) {
 }
 
 function MainTabs({ user, perfil, onAtualizar, atualizarPerfil }) {
+  const { colors } = useTheme();
   return (
     <Tab.Navigator
       screenOptions={{
@@ -81,10 +82,11 @@ function MainTabs({ user, perfil, onAtualizar, atualizarPerfil }) {
   );
 }
 
-const headerStyle = { backgroundColor: colors.card };
-const headerTintColor = colors.white;
-
 function AppNavigator({ user, perfil, onAtualizar, atualizarPerfil }) {
+  const { colors } = useTheme();
+  const headerStyle = { backgroundColor: colors.card };
+  const headerTintColor = colors.white;
+
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="MainTabs">
@@ -120,9 +122,7 @@ function AppNavigator({ user, perfil, onAtualizar, atualizarPerfil }) {
   );
 }
 
-
 const ONBOARDING_KEY = '@cnb_onboarding_done';
-
 const VERSAO_ATUAL = '1.2.35';
 
 const STORE_URL = Platform.OS === 'ios'
@@ -138,14 +138,22 @@ function precisaAtualizar(atual, minima) {
   return pa < pb;
 }
 
-export default function App() {
+function AppContent() {
+  const { colors } = useTheme();
   const [user, setUser] = useState(null);
   const [perfil, setPerfil] = useState(null);
   const [pronto, setPronto] = useState(false);
-  const [onboardingFeito, setOnboardingFeito] = useState(null); // null = carregando
+  const [splashDone, setSplashDone] = useState(false);
+  const [onboardingFeito, setOnboardingFeito] = useState(null);
   const [updateObrigatorio, setUpdateObrigatorio] = useState(false);
   const sessaoUnsubRef = useRef(null);
   const userRef = useRef(null);
+
+  // Garante mínimo de 2s na splash — independente da velocidade do Firebase
+  useEffect(() => {
+    const t = setTimeout(() => setSplashDone(true), 2000);
+    return () => clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     getConfiguracaoApp().then(config => {
@@ -184,16 +192,12 @@ export default function App() {
       }).catch(() => {});
     } catch (e) {
       console.warn('Erro ao carregar perfil:', e);
-      // Fallback mínimo para o app não renderizar quebrado com perfil null.
-      // onAtualizar() vai recarregar do Firestore quando qualquer tela ganhar foco.
       setPerfil({ uid: u.uid, nome: u.displayName ?? u.email ?? 'Usuário', email: u.email ?? '', pontos: 0 });
     }
   }
 
-  // Mantém ref sincronizado para o AppState listener acessar sem closure stale
   useEffect(() => { userRef.current = user; }, [user]);
 
-  // Check-in diário ao retornar ao foreground (ex: app aberto após meia-noite)
   useEffect(() => {
     const sub = AppState.addEventListener('change', async (nextState) => {
       if (nextState !== 'active') return;
@@ -219,7 +223,6 @@ export default function App() {
     } catch { /* ignora */ }
   }
 
-  // Atualiza perfil localmente sem ir ao Firestore (evita race condition após salvar avatar/nome)
   function atualizarPerfilDireto(updates) {
     setPerfil(prev => prev ? { ...prev, ...updates } : prev);
   }
@@ -240,8 +243,6 @@ export default function App() {
 
     const timeout = setTimeout(() => {
       if (mounted && !pronto) {
-        // Não chama setUser(null) — já começa null; onAuthStateChanged define o valor correto.
-        // Só desbloqueia a tela de loading se Firebase nunca respondeu.
         setPronto(true);
       }
     }, 10000);
@@ -252,8 +253,6 @@ export default function App() {
         if (!mounted) return;
 
         if (u) {
-          // Timeout de 8s: se registrarSessao travar (Firestore lento/offline),
-          // o app não fica preso para sempre na tela de loading.
           const registrarComTimeout = Promise.race([
             registrarSessao(u.uid),
             new Promise((_, rej) => setTimeout(() => rej(new Error('sessao_timeout')), 8000)),
@@ -262,8 +261,6 @@ export default function App() {
           try {
             novoToken = await registrarComTimeout;
           } catch (e) {
-            // Se timeout ou falha de rede: continua sem token de sessão.
-            // O usuário fica logado mas sem proteção multi-device nesta sessão.
             console.warn('[Sessão] registrarSessao falhou, continuando sem token:', e.message);
             novoToken = null;
           }
@@ -301,61 +298,58 @@ export default function App() {
     };
   }, []);
 
-  if (!pronto || onboardingFeito === null) {
-    return (
-      <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color={colors.primary} size="large" />
-      </View>
-    );
+  if (!splashDone || !pronto || onboardingFeito === null) {
+    return <SplashScreen />;
   }
 
   if (!onboardingFeito) {
     return (
-      <ErrorBoundary>
-        <GestureHandlerRootView style={{ flex: 1 }}>
-          <SafeAreaProvider>
-            <OnboardingScreen onConcluir={concluirOnboarding} />
-          </SafeAreaProvider>
-        </GestureHandlerRootView>
-      </ErrorBoundary>
+      <SafeAreaProvider>
+        <OnboardingScreen onConcluir={concluirOnboarding} />
+      </SafeAreaProvider>
     );
   }
 
   return (
+    <SafeAreaProvider>
+      <Modal visible={updateObrigatorio} transparent animationType="fade" statusBarTranslucent>
+        <View style={updateStyles.overlay}>
+          <View style={updateStyles.card}>
+            <Text style={updateStyles.emoji}>🚀</Text>
+            <Text style={updateStyles.titulo}>Atualização necessária</Text>
+            <Text style={updateStyles.mensagem}>
+              Uma nova versão do CNB Mobile está disponível com melhorias importantes.
+              Atualize agora para continuar usando o app.
+            </Text>
+            <TouchableOpacity
+              style={updateStyles.btn}
+              activeOpacity={0.85}
+              onPress={() => Linking.openURL(STORE_URL)}>
+              <Text style={updateStyles.btnText}>Atualizar agora</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <NavigationContainer>
+        <AppNavigator
+          user={user}
+          perfil={perfil}
+          onAtualizar={onAtualizar}
+          atualizarPerfil={atualizarPerfilDireto}
+        />
+      </NavigationContainer>
+    </SafeAreaProvider>
+  );
+}
+
+export default function App() {
+  return (
     <ErrorBoundary>
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <SafeAreaProvider>
-
-          {/* Modal de atualização obrigatória — bloqueia tudo */}
-          <Modal visible={updateObrigatorio} transparent animationType="fade" statusBarTranslucent>
-            <View style={updateStyles.overlay}>
-              <View style={updateStyles.card}>
-                <Text style={updateStyles.emoji}>🚀</Text>
-                <Text style={updateStyles.titulo}>Atualização necessária</Text>
-                <Text style={updateStyles.mensagem}>
-                  Uma nova versão do CNB Mobile está disponível com melhorias importantes.
-                  Atualize agora para continuar usando o app.
-                </Text>
-                <TouchableOpacity
-                  style={updateStyles.btn}
-                  activeOpacity={0.85}
-                  onPress={() => Linking.openURL(STORE_URL)}>
-                  <Text style={updateStyles.btnText}>Atualizar agora</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </Modal>
-
-          <NavigationContainer>
-            <AppNavigator
-              user={user}
-              perfil={perfil}
-              onAtualizar={onAtualizar}
-              atualizarPerfil={atualizarPerfilDireto}
-            />
-          </NavigationContainer>
-
-        </SafeAreaProvider>
+        <ThemeProvider>
+          <AppContent />
+        </ThemeProvider>
       </GestureHandlerRootView>
     </ErrorBoundary>
   );

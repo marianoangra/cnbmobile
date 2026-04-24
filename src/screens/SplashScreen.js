@@ -1,9 +1,12 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors } from '../theme/colors';
+import { useTheme } from '../context/ThemeContext';
 
-export default function SplashScreen({ navigation }) {
+export default function SplashScreen() {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   const logoScale = useRef(new Animated.Value(0.3)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
   const subOpacity = useRef(new Animated.Value(0)).current;
@@ -22,9 +25,6 @@ export default function SplashScreen({ navigation }) {
         Animated.timing(glowOpacity, { toValue: 1, duration: 600, useNativeDriver: true }),
       ]),
     ]).start();
-
-    const t = setTimeout(() => navigation.replace('Login'), 2600);
-    return () => clearTimeout(t);
   }, []);
 
   return (
@@ -46,30 +46,32 @@ export default function SplashScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', gap: 16 },
-  glowCircle: {
-    position: 'absolute',
-    width: 260,
-    height: 260,
-    borderRadius: 130,
-    backgroundColor: colors.primary,
-    opacity: 0.06,
-  },
-  logoBox: {
-    width: 120,
-    height: 120,
-    borderRadius: 32,
-    backgroundColor: colors.card,
-    borderWidth: 2,
-    borderColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-    gap: 2,
-  },
-  logoBolt: { fontSize: 32, lineHeight: 38 },
-  logo: { fontSize: 28, fontWeight: 'bold', color: colors.primary, letterSpacing: 3 },
-  sub: { fontSize: 16, color: colors.secondary, letterSpacing: 10, marginBottom: 8 },
-  tagline: { fontSize: 13, color: colors.primary, opacity: 0.7, letterSpacing: 2 },
-});
+function createStyles(colors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', gap: 16 },
+    glowCircle: {
+      position: 'absolute',
+      width: 260,
+      height: 260,
+      borderRadius: 130,
+      backgroundColor: colors.primary,
+      opacity: 0.06,
+    },
+    logoBox: {
+      width: 120,
+      height: 120,
+      borderRadius: 32,
+      backgroundColor: colors.card,
+      borderWidth: 2,
+      borderColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 8,
+      gap: 2,
+    },
+    logoBolt: { fontSize: 32, lineHeight: 38 },
+    logo: { fontSize: 28, fontWeight: 'bold', color: colors.primary, letterSpacing: 3 },
+    sub: { fontSize: 16, color: colors.secondary, letterSpacing: 10, marginBottom: 8 },
+    tagline: { fontSize: 13, color: colors.primary, opacity: 0.7, letterSpacing: 2 },
+  });
+}

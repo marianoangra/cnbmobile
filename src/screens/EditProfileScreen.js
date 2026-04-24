@@ -1,16 +1,18 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput,
   Alert, ActivityIndicator, Animated, ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
-import { colors } from '../theme/colors';
+import { useTheme } from '../context/ThemeContext';
 import Avatar from '../components/Avatar';
 import { atualizarNome, uploadAvatar } from '../services/pontos';
 
 export default function EditProfileScreen({ route, navigation }) {
   const { perfil, onSalvar } = route.params || {};
+  const { colors, isDark, toggleTheme } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [nome, setNome] = useState(perfil?.nome ?? '');
   const [avatarURL, setAvatarURL] = useState(perfil?.avatarURL ?? null);
@@ -109,6 +111,27 @@ export default function EditProfileScreen({ route, navigation }) {
             <Text style={styles.campoHint}>{nome.trim().length}/40 caracteres</Text>
           </View>
 
+          {/* Aparência */}
+          <View style={styles.campo}>
+            <Text style={styles.campoLabel}>Aparência</Text>
+            <View style={styles.themeRow}>
+              <TouchableOpacity
+                style={[styles.themeBtn, isDark && styles.themeBtnAtivo]}
+                onPress={() => !isDark && toggleTheme()}
+                activeOpacity={0.8}>
+                <Text style={styles.themeBtnIcon}>🌙</Text>
+                <Text style={[styles.themeBtnText, isDark && styles.themeBtnTextAtivo]}>Dark</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.themeBtn, !isDark && styles.themeBtnAtivo]}
+                onPress={() => isDark && toggleTheme()}
+                activeOpacity={0.8}>
+                <Text style={styles.themeBtnIcon}>☀️</Text>
+                <Text style={[styles.themeBtnText, !isDark && styles.themeBtnTextAtivo]}>Light</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
           {/* Botão salvar */}
           <TouchableOpacity
             style={[styles.btnSalvar, !alterado && styles.btnSalvarInativo]}
@@ -130,38 +153,51 @@ export default function EditProfileScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
-  container: { flexGrow: 1, padding: 24 },
-  content: { alignItems: 'center' },
+function createStyles(colors) {
+  return StyleSheet.create({
+    safe: { flex: 1, backgroundColor: colors.background },
+    container: { flexGrow: 1, padding: 24 },
+    content: { alignItems: 'center' },
 
-  avatarSection: { alignItems: 'center', marginBottom: 36, marginTop: 8 },
-  avatarTouchable: { alignItems: 'center', marginBottom: 6 },
-  avatarCameraBtn: {
-    position: 'absolute', bottom: 4, right: 4,
-    backgroundColor: colors.primary,
-    borderRadius: 18, width: 34, height: 34,
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: colors.background,
-  },
-  avatarCameraIcon: { fontSize: 15 },
-  avatarHint: { fontSize: 12, color: colors.secondary },
+    avatarSection: { alignItems: 'center', marginBottom: 36, marginTop: 8 },
+    avatarTouchable: { alignItems: 'center', marginBottom: 6 },
+    avatarCameraBtn: {
+      position: 'absolute', bottom: 4, right: 4,
+      backgroundColor: colors.primary,
+      borderRadius: 18, width: 34, height: 34,
+      alignItems: 'center', justifyContent: 'center',
+      borderWidth: 2, borderColor: colors.background,
+    },
+    avatarCameraIcon: { fontSize: 15 },
+    avatarHint: { fontSize: 12, color: colors.secondary },
 
-  campo: { width: '100%', marginBottom: 24 },
-  campoLabel: { fontSize: 13, color: colors.secondary, marginBottom: 8, fontWeight: '600' },
-  input: {
-    backgroundColor: colors.card, borderRadius: 14, padding: 16,
-    color: colors.white, fontSize: 17, borderWidth: 1, borderColor: colors.border,
-  },
-  campoHint: { fontSize: 11, color: colors.border, marginTop: 6, textAlign: 'right' },
+    campo: { width: '100%', marginBottom: 24 },
+    campoLabel: { fontSize: 13, color: colors.secondary, marginBottom: 8, fontWeight: '600' },
+    input: {
+      backgroundColor: colors.card, borderRadius: 14, padding: 16,
+      color: colors.white, fontSize: 17, borderWidth: 1, borderColor: colors.border,
+    },
+    campoHint: { fontSize: 11, color: colors.border, marginTop: 6, textAlign: 'right' },
 
-  btnSalvar: {
-    width: '100%', backgroundColor: colors.primary,
-    borderRadius: 14, padding: 16, alignItems: 'center', marginBottom: 12,
-  },
-  btnSalvarInativo: { opacity: 0.45 },
-  btnSalvarText: { color: colors.background, fontWeight: 'bold', fontSize: 16 },
+    themeRow: { flexDirection: 'row', gap: 10, marginTop: 4 },
+    themeBtn: {
+      flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+      gap: 6, backgroundColor: colors.card, borderRadius: 12, paddingVertical: 14,
+      borderWidth: 1.5, borderColor: colors.border,
+    },
+    themeBtnAtivo: { borderColor: colors.primary, backgroundColor: colors.background },
+    themeBtnIcon: { fontSize: 18 },
+    themeBtnText: { fontSize: 14, fontWeight: '600', color: colors.secondary },
+    themeBtnTextAtivo: { color: colors.primary },
 
-  btnCancelar: { padding: 12 },
-  btnCancelarText: { color: colors.secondary, fontSize: 15 },
-});
+    btnSalvar: {
+      width: '100%', backgroundColor: colors.primary,
+      borderRadius: 14, padding: 16, alignItems: 'center', marginBottom: 12,
+    },
+    btnSalvarInativo: { opacity: 0.45 },
+    btnSalvarText: { color: colors.background, fontWeight: 'bold', fontSize: 16 },
+
+    btnCancelar: { padding: 12 },
+    btnCancelarText: { color: colors.secondary, fontSize: 15 },
+  });
+}

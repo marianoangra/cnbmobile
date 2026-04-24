@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ActivityIndicator,
   Alert, Linking, ScrollView, RefreshControl,
@@ -8,7 +8,7 @@ import * as Clipboard from 'expo-clipboard';
 import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { getOrCreateWallet, getCNBBalance, getSOLBalance } from '../services/walletService';
-import { colors } from '../theme/colors';
+import { useTheme } from '../context/ThemeContext';
 
 const EXPLORER = (addr) =>
   `https://explorer.solana.com/address/${addr}`;
@@ -19,19 +19,23 @@ function shorten(addr) {
 }
 
 export default function WalletScreen({ route }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { user } = route.params || {};
   const uid = user?.uid;
 
-  const [wallet, setWallet]       = useState(null);
-  const [cnbBalance, setCNB]      = useState(null);
-  const [solBalance, setSOL]      = useState(null);
-  const [provas, setProvas]       = useState([]);
-  const [loading, setLoading]     = useState(true);
-  const [refreshing, setRefresh]  = useState(false);
-  const [copied, setCopied]       = useState(false);
+  const [wallet, setWallet]      = useState(null);
+  const [cnbBalance, setCNB]     = useState(null);
+  const [solBalance, setSOL]     = useState(null);
+  const [provas, setProvas]      = useState([]);
+  const [loading, setLoading]    = useState(true);
+  const [refreshing, setRefresh] = useState(false);
+  const [copied, setCopied]      = useState(false);
+  const [error, setError]        = useState(false);
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefresh(true);
+    setError(false);
     try {
       const { publicKey, isNew } = await getOrCreateWallet(uid);
       setWallet(publicKey);
@@ -43,7 +47,6 @@ export default function WalletScreen({ route }) {
       setCNB(cnb);
       setSOL(sol);
 
-      // Busca últimas 10 provas on-chain do usuário
       try {
         const q = query(
           collection(db, 'usuarios', uid, 'provas'),
@@ -55,6 +58,7 @@ export default function WalletScreen({ route }) {
       } catch { setProvas([]); }
     } catch (e) {
       Alert.alert('Erro', 'Não foi possível carregar a carteira.');
+      setError(true);
     } finally {
       setLoading(false);
       setRefresh(false);
@@ -82,17 +86,29 @@ export default function WalletScreen({ route }) {
     );
   }
 
+  if (error) {
+    return (
+      <SafeAreaView style={styles.center}>
+        <Text style={{ fontSize: 32, marginBottom: 12 }}>😕</Text>
+        <Text style={styles.loadingText}>Não foi possível carregar a carteira.</Text>
+        <TouchableOpacity
+          onPress={() => { setLoading(true); load(); }}
+          style={{ marginTop: 16, backgroundColor: colors.primary, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 }}>
+          <Text style={{ color: colors.background, fontWeight: 'bold' }}>Tentar novamente</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
         contentContainerStyle={styles.scroll}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary} />}
       >
-        {/* Header */}
         <Text style={styles.title}>Minha Carteira CNB</Text>
         <Text style={styles.subtitle}>Carteira Solana gerada no seu dispositivo</Text>
 
-        {/* Endereço */}
         <View style={styles.card}>
           <Text style={styles.label}>Endereço Solana</Text>
           <Text style={styles.address}>{shorten(wallet)}</Text>
@@ -106,7 +122,6 @@ export default function WalletScreen({ route }) {
           </View>
         </View>
 
-        {/* Saldos */}
         <View style={styles.card}>
           <Text style={styles.label}>Saldos</Text>
 
@@ -133,7 +148,6 @@ export default function WalletScreen({ route }) {
           )}
         </View>
 
-        {/* Provas On-Chain */}
         <View style={styles.card}>
           <Text style={styles.label}>Provas de Atividade On-Chain</Text>
 
@@ -163,7 +177,6 @@ export default function WalletScreen({ route }) {
           )}
         </View>
 
-        {/* Info */}
         <View style={styles.infoCard}>
           <Text style={styles.infoTitle}>🔒 Sua chave, seu controle</Text>
           <Text style={styles.infoText}>
@@ -179,52 +192,56 @@ export default function WalletScreen({ route }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background ?? '#0D0D0D' },
-  center:    { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background ?? '#0D0D0D' },
-  scroll:    { padding: 20, paddingBottom: 40 },
+function createStyles(colors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    center:    { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background },
+    scroll:    { padding: 20, paddingBottom: 40 },
 
-  title:     { fontSize: 22, fontWeight: '700', color: '#FFF', marginBottom: 4 },
-  subtitle:  { fontSize: 13, color: '#888', marginBottom: 24 },
-  loadingText: { color: '#888', marginTop: 12, fontSize: 14 },
+    title:       { fontSize: 22, fontWeight: '700', color: colors.white, marginBottom: 4 },
+    subtitle:    { fontSize: 13, color: colors.secondary, marginBottom: 24 },
+    loadingText: { color: colors.secondary, marginTop: 12, fontSize: 14 },
 
-  card: {
-    backgroundColor: '#1A1A1A',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-  },
-  label:   { fontSize: 12, color: '#888', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.8 },
-  address: { fontSize: 18, color: '#FFF', fontWeight: '600', marginBottom: 16, fontFamily: 'monospace' },
+    card: {
+      backgroundColor: colors.card,
+      borderRadius: 16,
+      padding: 20,
+      marginBottom: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    label:   { fontSize: 12, color: colors.secondary, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.8 },
+    address: { fontSize: 18, color: colors.white, fontWeight: '600', marginBottom: 16, fontFamily: 'monospace' },
 
-  row: { flexDirection: 'row', gap: 10 },
-  btn: {
-    flex: 1, backgroundColor: colors.primary ?? '#9945FF',
-    borderRadius: 10, paddingVertical: 10, alignItems: 'center',
-  },
-  btnText:          { color: '#FFF', fontWeight: '600', fontSize: 13 },
-  btnSecondary:     { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.primary ?? '#9945FF' },
-  btnSecondaryText: { color: colors.primary ?? '#9945FF', fontWeight: '600', fontSize: 13 },
+    row: { flexDirection: 'row', gap: 10 },
+    btn: {
+      flex: 1, backgroundColor: colors.primary,
+      borderRadius: 10, paddingVertical: 10, alignItems: 'center',
+    },
+    btnText:          { color: colors.background, fontWeight: '600', fontSize: 13 },
+    btnSecondary:     { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.primary },
+    btnSecondaryText: { color: colors.primary, fontWeight: '600', fontSize: 13 },
 
-  balanceRow:  { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
-  balanceItem: { flex: 1, alignItems: 'center' },
-  balanceValue:{ fontSize: 28, fontWeight: '700', color: '#FFF' },
-  balanceCoin: { fontSize: 12, color: '#888', marginTop: 2 },
-  divider:     { width: 1, height: 40, backgroundColor: '#333' },
+    balanceRow:  { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
+    balanceItem: { flex: 1, alignItems: 'center' },
+    balanceValue:{ fontSize: 28, fontWeight: '700', color: colors.white },
+    balanceCoin: { fontSize: 12, color: colors.secondary, marginTop: 2 },
+    divider:     { width: 1, height: 40, backgroundColor: colors.border },
 
-  hint: { textAlign: 'center', color: '#555', fontSize: 12, marginTop: 16 },
+    hint: { textAlign: 'center', color: colors.secondary, fontSize: 12, marginTop: 16 },
 
-  provaItem: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#222',
-  },
-  provaLeft:    { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  provaEmoji:   { fontSize: 20 },
-  provaTitle:   { fontSize: 14, fontWeight: '600', color: '#FFF' },
-  provaSig:     { fontSize: 11, color: '#555', marginTop: 2, fontFamily: 'monospace' },
-  provaExplorer:{ fontSize: 18, color: '#9945FF' },
+    provaItem: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border,
+    },
+    provaLeft:    { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    provaEmoji:   { fontSize: 20 },
+    provaTitle:   { fontSize: 14, fontWeight: '600', color: colors.white },
+    provaSig:     { fontSize: 11, color: colors.secondary, marginTop: 2, fontFamily: 'monospace' },
+    provaExplorer:{ fontSize: 18, color: colors.primary },
 
-  infoCard:  { backgroundColor: '#111', borderRadius: 16, padding: 20, borderWidth: 1, borderColor: '#222' },
-  infoTitle: { color: '#FFF', fontWeight: '600', marginBottom: 10, fontSize: 15 },
-  infoText:  { color: '#666', fontSize: 13, lineHeight: 20, marginBottom: 6 },
-});
+    infoCard:  { backgroundColor: colors.card, borderRadius: 16, padding: 20, borderWidth: 1, borderColor: colors.border },
+    infoTitle: { color: colors.white, fontWeight: '600', marginBottom: 10, fontSize: 15 },
+    infoText:  { color: colors.secondary, fontSize: 13, lineHeight: 20, marginBottom: 6 },
+  });
+}

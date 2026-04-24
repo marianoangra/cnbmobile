@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   ScrollView, Alert, ActivityIndicator,
@@ -8,41 +8,38 @@ import { getFunctions, httpsCallable } from 'firebase/functions';
 import { solicitarSaque } from '../services/pontos';
 import { logSaqueSolicitado, logResgateCNB, logResgateCNBSucesso } from '../services/analytics';
 import { getWalletAddress } from '../services/walletService';
-import { colors } from '../theme/colors';
+import { useTheme } from '../context/ThemeContext';
 
 const functions = getFunctions();
 const resgatarCNBFn = httpsCallable(functions, 'resgatarCNB');
 const resgatarPrivadoFn = httpsCallable(functions, 'resgatarPrivado');
 
-// Validação básica de endereço Solana (base58, 32-44 chars)
 function solanaValido(addr) {
   return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(addr.trim());
 }
 
 export default function WithdrawScreen({ route, navigation }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { perfil } = route.params || {};
-  const [aba, setAba] = useState('pix'); // 'pix' | 'cnb' | 'privado'
+  const [aba, setAba] = useState('pix');
 
-  // PIX
   const [nome, setNome] = useState(perfil?.nome ?? '');
   const [pix, setPix] = useState('');
   const [quantidade, setQuantidade] = useState('');
   const [loadingPix, setLoadingPix] = useState(false);
 
-  // CNB
   const [wallet, setWallet] = useState('');
-  const [walletNativa, setWalletNativa] = useState(null); // endereço gerado no dispositivo
+  const [walletNativa, setWalletNativa] = useState(null);
   const [quantidadeCNB, setQuantidadeCNB] = useState('');
   const [loadingCNB, setLoadingCNB] = useState(false);
 
-  // Privado (Cloak)
   const [walletPrivado, setWalletPrivado] = useState('');
   const [quantidadePrivado, setQuantidadePrivado] = useState('');
   const [loadingPrivado, setLoadingPrivado] = useState(false);
 
   const pontosDisponiveis = perfil?.pontos ?? 0;
 
-  // Carrega endereço da carteira nativa (se existir) e pré-preenche o campo CNB
   useEffect(() => {
     if (!perfil?.uid) return;
     getWalletAddress(perfil.uid).then(addr => {
@@ -58,7 +55,6 @@ export default function WithdrawScreen({ route, navigation }) {
     return digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
   }
 
-  // ── PIX ───────────────────────────────────────────────────────────────────
   const qtdPix = parseInt(quantidade.replace(/\D/g, ''), 10) || 0;
 
   function pixValido(chave) {
@@ -100,11 +96,10 @@ export default function WithdrawScreen({ route, navigation }) {
     );
   }
 
-  // ── Privado (Cloak) ───────────────────────────────────────────────────────
   const BLOCO_PRIVADO = 100000;
   const qtdPrivado = parseInt(quantidadePrivado.replace(/\D/g, ''), 10) || 0;
   const qtdPrivadoArredondado = Math.floor(qtdPrivado / BLOCO_PRIVADO) * BLOCO_PRIVADO;
-  const solLiquido = (qtdPrivadoArredondado / BLOCO_PRIVADO) * 0.005; // ~0.005 SOL líquido por bloco
+  const solLiquido = (qtdPrivadoArredondado / BLOCO_PRIVADO) * 0.005;
   const podeConfirmarPrivado =
     pontosDisponiveis >= BLOCO_PRIVADO &&
     qtdPrivadoArredondado >= BLOCO_PRIVADO &&
@@ -145,7 +140,6 @@ export default function WithdrawScreen({ route, navigation }) {
     );
   }
 
-  // ── CNB Token ─────────────────────────────────────────────────────────────
   const qtdCNB = parseInt(quantidadeCNB.replace(/\D/g, ''), 10) || 0;
   const podeConfirmarCNB = pontosDisponiveis >= 100000 && qtdCNB >= 100000 && qtdCNB <= pontosDisponiveis && solanaValido(wallet);
 
@@ -163,8 +157,8 @@ export default function WithdrawScreen({ route, navigation }) {
         {
           text: 'Confirmar', onPress: async () => {
             setLoadingCNB(true);
-            logResgateCNB(qtdCNB, wallet.trim());
             try {
+              logResgateCNB(qtdCNB, wallet.trim());
               const result = await resgatarCNBFn({ walletAddress: wallet.trim(), quantidade: qtdCNB });
               const sig = result.data?.signature ?? '';
               logResgateCNBSucesso(qtdCNB, sig);
@@ -190,13 +184,11 @@ export default function WithdrawScreen({ route, navigation }) {
           automaticallyAdjustKeyboardInsets={true}>
           <Text style={styles.title}>Resgatar</Text>
 
-          {/* Saldo */}
           <View style={styles.card}>
             <Text style={styles.label}>Seus pontos disponíveis</Text>
             <Text style={styles.pontos}>{pontosDisponiveis.toLocaleString('pt-BR')}</Text>
           </View>
 
-          {/* Abas */}
           <View style={styles.tabs}>
             <TouchableOpacity
               style={[styles.tab, aba === 'pix' && styles.tabAtiva]}
@@ -218,7 +210,6 @@ export default function WithdrawScreen({ route, navigation }) {
             </TouchableOpacity>
           </View>
 
-          {/* ── Aba PIX ── */}
           {aba === 'pix' && (
             <>
               <View style={styles.infoCard}>
@@ -268,7 +259,6 @@ export default function WithdrawScreen({ route, navigation }) {
             </>
           )}
 
-          {/* ── Aba CNB Token ── */}
           {aba === 'cnb' && (
             <>
               <View style={styles.infoCardSolana}>
@@ -282,7 +272,6 @@ export default function WithdrawScreen({ route, navigation }) {
 
               <Text style={styles.fieldLabel}>Endereço da carteira Solana</Text>
 
-              {/* Badge da carteira nativa — aparece se o usuário tem carteira criada no app */}
               {walletNativa && (
                 <TouchableOpacity
                   style={[styles.walletNativaTag, wallet === walletNativa && styles.walletNativaTagAtiva]}
@@ -336,7 +325,6 @@ export default function WithdrawScreen({ route, navigation }) {
             </>
           )}
 
-          {/* ── Aba Privado (Cloak) ── */}
           {aba === 'privado' && (
             <>
               <View style={styles.infoCardPrivado}>
@@ -402,59 +390,60 @@ export default function WithdrawScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: colors.background },
-  container: { flexGrow: 1, padding: 24 },
-  title: { fontSize: 24, fontWeight: 'bold', color: colors.white, marginBottom: 20 },
+function createStyles(colors) {
+  return StyleSheet.create({
+    flex: { flex: 1, backgroundColor: colors.background },
+    container: { flexGrow: 1, padding: 24 },
+    title: { fontSize: 24, fontWeight: 'bold', color: colors.white, marginBottom: 20 },
 
-  card: { backgroundColor: colors.card, borderRadius: 16, padding: 20, marginBottom: 16 },
-  label: { fontSize: 13, color: colors.secondary },
-  pontos: { fontSize: 36, fontWeight: 'bold', color: colors.primary, marginTop: 4 },
+    card: { backgroundColor: colors.card, borderRadius: 16, padding: 20, marginBottom: 16 },
+    label: { fontSize: 13, color: colors.secondary },
+    pontos: { fontSize: 36, fontWeight: 'bold', color: colors.primary, marginTop: 4 },
 
-  tabs: { flexDirection: 'row', backgroundColor: colors.card, borderRadius: 12, padding: 4, marginBottom: 20 },
-  tab: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 10 },
-  tabAtiva: { backgroundColor: colors.background },
-  tabText: { fontSize: 14, fontWeight: '600', color: colors.secondary },
-  tabTextAtiva: { color: colors.white },
+    tabs: { flexDirection: 'row', backgroundColor: colors.card, borderRadius: 12, padding: 4, marginBottom: 20 },
+    tab: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 10 },
+    tabAtiva: { backgroundColor: colors.background },
+    tabText: { fontSize: 14, fontWeight: '600', color: colors.secondary },
+    tabTextAtiva: { color: colors.white },
 
-  infoCard: { backgroundColor: '#0d1f0d', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: colors.primary, marginBottom: 20 },
-  infoLine: { fontSize: 14, color: colors.secondary, marginBottom: 6 },
+    infoCard: { backgroundColor: '#0d1f0d', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: colors.primary, marginBottom: 20 },
+    infoLine: { fontSize: 14, color: colors.secondary, marginBottom: 6 },
 
-  infoCardSolana: { backgroundColor: '#0d0d20', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#9945FF', marginBottom: 20 },
-  infoLineSolana: { fontSize: 14, color: '#b8a0e0', marginBottom: 6 },
+    infoCardSolana: { backgroundColor: '#0d0d20', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#9945FF', marginBottom: 20 },
+    infoLineSolana: { fontSize: 14, color: '#b8a0e0', marginBottom: 6 },
 
-  walletNativaTag: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: '#13102a', borderRadius: 12, padding: 14,
-    marginBottom: 10, borderWidth: 1, borderColor: '#3a2a6a',
-  },
-  walletNativaTagAtiva: { borderColor: '#9945FF', backgroundColor: '#1a1040' },
-  walletNativaTagIcon:  { fontSize: 22, color: '#9945FF' },
-  walletNativaTagTitle: { fontSize: 13, fontWeight: '700', color: colors.white },
-  walletNativaTagAddr:  { fontSize: 11, color: '#888', marginTop: 2, fontFamily: 'monospace' },
-  walletNativaCheck:    { fontSize: 18, color: '#9945FF', fontWeight: '700' },
+    walletNativaTag: {
+      flexDirection: 'row', alignItems: 'center', gap: 10,
+      backgroundColor: '#13102a', borderRadius: 12, padding: 14,
+      marginBottom: 10, borderWidth: 1, borderColor: '#3a2a6a',
+    },
+    walletNativaTagAtiva: { borderColor: '#9945FF', backgroundColor: '#1a1040' },
+    walletNativaTagIcon:  { fontSize: 22, color: '#9945FF' },
+    walletNativaTagTitle: { fontSize: 13, fontWeight: '700', color: colors.white },
+    walletNativaTagAddr:  { fontSize: 11, color: '#888', marginTop: 2, fontFamily: 'monospace' },
+    walletNativaCheck:    { fontSize: 18, color: '#9945FF', fontWeight: '700' },
 
-  fieldLabel: { fontSize: 13, color: colors.secondary, marginBottom: 6, marginLeft: 2 },
-  input: { backgroundColor: colors.card, borderRadius: 12, padding: 16, color: colors.white, fontSize: 16, marginBottom: 16, borderWidth: 1, borderColor: colors.border },
-  erro: { fontSize: 12, color: '#ff4d4d', marginTop: -10, marginBottom: 12, marginLeft: 4 },
-  conversao: { fontSize: 13, color: '#9945FF', marginTop: -10, marginBottom: 12, marginLeft: 4, fontWeight: '600' },
+    fieldLabel: { fontSize: 13, color: colors.secondary, marginBottom: 6, marginLeft: 2 },
+    input: { backgroundColor: colors.card, borderRadius: 12, padding: 16, color: colors.white, fontSize: 16, marginBottom: 16, borderWidth: 1, borderColor: colors.border },
+    erro: { fontSize: 12, color: '#ff4d4d', marginTop: -10, marginBottom: 12, marginLeft: 4 },
+    conversao: { fontSize: 13, color: '#9945FF', marginTop: -10, marginBottom: 12, marginLeft: 4, fontWeight: '600' },
 
-  btn: { backgroundColor: colors.primary, borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 4 },
-  btnSolana: { backgroundColor: '#9945FF', borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 4 },
-  btnDisabled: { opacity: 0.4 },
-  btnText: { color: colors.background, fontWeight: 'bold', fontSize: 16 },
-  btnSolanaText: { color: '#ffffff', fontWeight: 'bold', fontSize: 16 },
+    btn: { backgroundColor: colors.primary, borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 4 },
+    btnSolana: { backgroundColor: '#9945FF', borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 4 },
+    btnDisabled: { opacity: 0.4 },
+    btnText: { color: colors.background, fontWeight: 'bold', fontSize: 16 },
+    btnSolanaText: { color: '#ffffff', fontWeight: 'bold', fontSize: 16 },
 
-  aviso: { fontSize: 12, color: colors.secondary, textAlign: 'center', marginTop: 16, lineHeight: 18 },
+    aviso: { fontSize: 12, color: colors.secondary, textAlign: 'center', marginTop: 16, lineHeight: 18 },
 
-  // Privado (Cloak)
-  tabAtivaPrivado: { backgroundColor: '#1a0a2e' },
-  tabTextPrivado: { color: '#c084fc' },
-  infoCardPrivado: { backgroundColor: '#0f0a1e', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#7c3aed', marginBottom: 20 },
-  infoLinePrivado: { fontSize: 14, color: '#c4b5fd', marginBottom: 6 },
-  conversaoPrivado: { fontSize: 13, color: '#a78bfa', marginTop: -10, marginBottom: 12, marginLeft: 4, fontWeight: '600' },
-  btnPrivado: { backgroundColor: '#7c3aed', borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 4 },
-  btnPrivadoText: { color: '#ffffff', fontWeight: 'bold', fontSize: 16 },
-  cloakBadge: { marginTop: 16, alignItems: 'center' },
-  cloakBadgeText: { fontSize: 11, color: '#6d28d9', fontWeight: '500' },
-});
+    tabAtivaPrivado: { backgroundColor: '#1a0a2e' },
+    tabTextPrivado: { color: '#c084fc' },
+    infoCardPrivado: { backgroundColor: '#0f0a1e', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#7c3aed', marginBottom: 20 },
+    infoLinePrivado: { fontSize: 14, color: '#c4b5fd', marginBottom: 6 },
+    conversaoPrivado: { fontSize: 13, color: '#a78bfa', marginTop: -10, marginBottom: 12, marginLeft: 4, fontWeight: '600' },
+    btnPrivado: { backgroundColor: '#7c3aed', borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 4 },
+    btnPrivadoText: { color: '#ffffff', fontWeight: 'bold', fontSize: 16 },
+    cloakBadge: { marginTop: 16, alignItems: 'center' },
+    cloakBadgeText: { fontSize: 11, color: '#6d28d9', fontWeight: '500' },
+  });
+}

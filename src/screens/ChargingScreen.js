@@ -1,7 +1,7 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, Animated, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors } from '../theme/colors';
+import { useTheme } from '../context/ThemeContext';
 import { useCarregamento } from '../hooks/useCarregamento';
 
 function formatarTempo(segundos) {
@@ -11,9 +11,10 @@ function formatarTempo(segundos) {
 }
 
 export default function ChargingScreen({ route, navigation }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { user, uid, onAtualizar } = route.params || {};
 
-  // Hook sempre chamado (regras dos hooks) — sem uid, não faz nada
   const { carregando, pontosGanhos, segundosRestantes } = useCarregamento(uid, onAtualizar);
 
   const pulse = useRef(new Animated.Value(1)).current;
@@ -51,7 +52,6 @@ export default function ChargingScreen({ route, navigation }) {
     return () => { pulseAnim.stop(); glowAnim.stop(); };
   }, [carregando]);
 
-  // Overlay de login quando não autenticado
   if (!user) {
     return (
       <SafeAreaView style={styles.safe} edges={['top']}>
@@ -145,62 +145,62 @@ export default function ChargingScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
-  container: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', padding: 20 },
+function createStyles(colors) {
+  return StyleSheet.create({
+    safe: { flex: 1, backgroundColor: colors.background },
+    container: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', padding: 20 },
 
-  // Login gate
-  loginGate: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
-  loginGateCircle: {
-    width: 130, height: 130, borderRadius: 65,
-    backgroundColor: colors.card,
-    borderWidth: 2.5, borderColor: colors.border,
-    alignItems: 'center', justifyContent: 'center',
-    marginBottom: 32,
-  },
-  loginGateIcon: { fontSize: 52 },
-  loginGateTitle: { fontSize: 22, fontWeight: 'bold', color: colors.white, textAlign: 'center', marginBottom: 12 },
-  loginGateSub: { fontSize: 15, color: colors.secondary, textAlign: 'center', lineHeight: 22, marginBottom: 36 },
-  loginGateBtn: {
-    backgroundColor: colors.primary, borderRadius: 16,
-    paddingVertical: 16, paddingHorizontal: 48,
-    width: '100%', alignItems: 'center',
-  },
-  loginGateBtnText: { color: colors.background, fontWeight: 'bold', fontSize: 17 },
+    loginGate: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
+    loginGateCircle: {
+      width: 130, height: 130, borderRadius: 65,
+      backgroundColor: colors.card,
+      borderWidth: 2.5, borderColor: colors.border,
+      alignItems: 'center', justifyContent: 'center',
+      marginBottom: 32,
+    },
+    loginGateIcon: { fontSize: 52 },
+    loginGateTitle: { fontSize: 22, fontWeight: 'bold', color: colors.white, textAlign: 'center', marginBottom: 12 },
+    loginGateSub: { fontSize: 15, color: colors.secondary, textAlign: 'center', lineHeight: 22, marginBottom: 36 },
+    loginGateBtn: {
+      backgroundColor: colors.primary, borderRadius: 16,
+      paddingVertical: 16, paddingHorizontal: 48,
+      width: '100%', alignItems: 'center',
+    },
+    loginGateBtnText: { color: colors.background, fontWeight: 'bold', fontSize: 17 },
 
-  // Charging UI
-  circleArea: { alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
-  glowRing: { position: 'absolute', width: 180, height: 180, borderRadius: 90, backgroundColor: colors.primary },
-  circle: {
-    width: 130, height: 130, borderRadius: 65,
-    backgroundColor: colors.card,
-    borderWidth: 2.5, borderColor: colors.primary,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  icon: { fontSize: 52 },
+    circleArea: { alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
+    glowRing: { position: 'absolute', width: 180, height: 180, borderRadius: 90, backgroundColor: colors.primary },
+    circle: {
+      width: 130, height: 130, borderRadius: 65,
+      backgroundColor: colors.card,
+      borderWidth: 2.5, borderColor: colors.primary,
+      alignItems: 'center', justifyContent: 'center',
+    },
+    icon: { fontSize: 52 },
 
-  status: { fontSize: 26, fontWeight: 'bold', color: colors.white, marginBottom: 6 },
-  sub: { fontSize: 14, color: colors.secondary, textAlign: 'center', marginBottom: 20, lineHeight: 20 },
+    status: { fontSize: 26, fontWeight: 'bold', color: colors.white, marginBottom: 6 },
+    sub: { fontSize: 14, color: colors.secondary, textAlign: 'center', marginBottom: 20, lineHeight: 20 },
 
-  row: { flexDirection: 'row', gap: 12, width: '100%', marginBottom: 12 },
-  half: { flex: 1 },
-  card: { backgroundColor: colors.card, borderRadius: 16, padding: 14, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
-  bonusCard: { borderColor: '#1a3a1a', backgroundColor: '#0a1f0a' },
-  cardLabel: { fontSize: 11, color: colors.secondary, marginBottom: 4, textAlign: 'center' },
-  cardVal: { fontSize: 28, fontWeight: 'bold', color: colors.primary },
-  timerText: { fontSize: 26 },
-  cardSub: { fontSize: 11, color: colors.secondary, marginTop: 2 },
+    row: { flexDirection: 'row', gap: 12, width: '100%', marginBottom: 12 },
+    half: { flex: 1 },
+    card: { backgroundColor: colors.card, borderRadius: 16, padding: 14, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
+    bonusCard: { borderColor: '#1a3a1a', backgroundColor: '#0a1f0a' },
+    cardLabel: { fontSize: 11, color: colors.secondary, marginBottom: 4, textAlign: 'center' },
+    cardVal: { fontSize: 28, fontWeight: 'bold', color: colors.primary },
+    timerText: { fontSize: 26 },
+    cardSub: { fontSize: 11, color: colors.secondary, marginTop: 2 },
 
-  progressCard: { backgroundColor: colors.card, borderRadius: 14, padding: 14, width: '100%', marginBottom: 12, borderWidth: 1, borderColor: colors.border },
-  progressHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  progressLabel: { fontSize: 13, color: colors.secondary },
-  progressPct: { fontSize: 13, color: colors.primary, fontWeight: 'bold' },
-  progressBg: { backgroundColor: colors.border, borderRadius: 6, height: 6, overflow: 'hidden' },
-  progressFill: { backgroundColor: colors.primary, height: 6, borderRadius: 6 },
+    progressCard: { backgroundColor: colors.card, borderRadius: 14, padding: 14, width: '100%', marginBottom: 12, borderWidth: 1, borderColor: colors.border },
+    progressHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+    progressLabel: { fontSize: 13, color: colors.secondary },
+    progressPct: { fontSize: 13, color: colors.primary, fontWeight: 'bold' },
+    progressBg: { backgroundColor: colors.border, borderRadius: 6, height: 6, overflow: 'hidden' },
+    progressFill: { backgroundColor: colors.primary, height: 6, borderRadius: 6 },
 
-  infoCard: { backgroundColor: colors.card, borderRadius: 16, padding: 16, width: '100%', borderWidth: 1, borderColor: colors.border },
-  infoTitle: { fontSize: 14, fontWeight: 'bold', color: colors.white, marginBottom: 12 },
-  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
-  infoIcon: { fontSize: 18, width: 24, textAlign: 'center' },
-  infoText: { fontSize: 14, color: colors.secondary },
-});
+    infoCard: { backgroundColor: colors.card, borderRadius: 16, padding: 16, width: '100%', borderWidth: 1, borderColor: colors.border },
+    infoTitle: { fontSize: 14, fontWeight: 'bold', color: colors.white, marginBottom: 12 },
+    infoRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
+    infoIcon: { fontSize: 18, width: 24, textAlign: 'center' },
+    infoText: { fontSize: 14, color: colors.secondary },
+  });
+}

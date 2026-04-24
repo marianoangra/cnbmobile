@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { View, Text, Image } from 'react-native';
-import { colors } from '../theme/colors';
+import { useTheme } from '../context/ThemeContext';
 
 export default function Avatar({ uri, nome, size = 56, borderColor, style }) {
+  const { colors } = useTheme();
   const [erro, setErro] = useState(false);
   const inicial = (nome ?? 'U')[0].toUpperCase();
   const fontSize = size * 0.38;

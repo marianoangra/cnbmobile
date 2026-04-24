@@ -5,16 +5,16 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import { colors } from '../theme/colors';
+import { useTheme } from '../context/ThemeContext';
 
 const SLIDE_META = [
-  { id: '1', emoji: '⚡', corFundo: '#0d2a0d', corBorda: colors.primary },
+  { id: '1', emoji: '⚡', corFundo: '#0d2a0d', corBorda: '#39FF6A' },
   { id: '2', emoji: '🔌', corFundo: '#0a1a2a', corBorda: '#3A8DFF' },
   { id: '3', emoji: '💰', corFundo: '#2a1000', corBorda: '#F5A623' },
   { id: '4', emoji: '👥', corFundo: '#12082a', corBorda: '#A855F7' },
 ];
 
-function Dot({ active, corAtiva }) {
+function Dot({ active, corAtiva, colors }) {
   const animWidth = useRef(new Animated.Value(active ? 24 : 8)).current;
   const animOpacity = useRef(new Animated.Value(active ? 1 : 0.4)).current;
 
@@ -34,6 +34,7 @@ function Dot({ active, corAtiva }) {
 }
 
 export default function OnboardingScreen({ onConcluir }) {
+  const { colors } = useTheme();
   const { t } = useTranslation();
   const { width } = useWindowDimensions();
   const [indice, setIndice] = useState(0);
@@ -72,18 +73,16 @@ export default function OnboardingScreen({ onConcluir }) {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
 
-      {/* Pular */}
       <View style={styles.topBar}>
         {!isUltimo && (
           <TouchableOpacity onPress={onConcluir} activeOpacity={0.7} style={styles.pularBtn}>
-            <Text style={styles.pularText}>{t('onboarding.skip')}</Text>
+            <Text style={[styles.pularText, { color: colors.secondary }]}>{t('onboarding.skip')}</Text>
           </TouchableOpacity>
         )}
       </View>
 
-      {/* FlatList oculta (só para manter referência) */}
       <FlatList
         ref={listRef}
         data={slides}
@@ -96,7 +95,6 @@ export default function OnboardingScreen({ onConcluir }) {
         renderItem={() => <View style={{ width }} />}
       />
 
-      {/* Conteúdo animado */}
       <Animated.View style={[
         styles.slideContent,
         { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
@@ -106,18 +104,16 @@ export default function OnboardingScreen({ onConcluir }) {
             ? <Image source={require('../../assets/icon.png')} style={styles.iconImg} />
             : <Text style={styles.emoji}>{slide.emoji}</Text>}
         </View>
-        <Text style={styles.titulo}>{slide.title}</Text>
-        <Text style={styles.desc}>{slide.desc}</Text>
+        <Text style={[styles.titulo, { color: colors.white }]}>{slide.title}</Text>
+        <Text style={[styles.desc, { color: colors.secondary }]}>{slide.desc}</Text>
       </Animated.View>
 
-      {/* Dots */}
       <View style={styles.dotsRow}>
         {slides.map((s, i) => (
-          <Dot key={s.id} active={i === indice} corAtiva={slide.corBorda} />
+          <Dot key={s.id} active={i === indice} corAtiva={slide.corBorda} colors={colors} />
         ))}
       </View>
 
-      {/* Botões */}
       <View style={styles.footer}>
         <TouchableOpacity
           style={[styles.btnAvancar, {
@@ -133,7 +129,7 @@ export default function OnboardingScreen({ onConcluir }) {
 
         {isUltimo && (
           <TouchableOpacity onPress={onConcluir} style={styles.jaTemContaBtn} activeOpacity={0.7}>
-            <Text style={styles.jaTemContaText}>{t('onboarding.hasAccount')}</Text>
+            <Text style={[styles.jaTemContaText, { color: colors.secondary }]}>{t('onboarding.hasAccount')}</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -143,10 +139,10 @@ export default function OnboardingScreen({ onConcluir }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1 },
   topBar: { height: 52, justifyContent: 'center', alignItems: 'flex-end', paddingHorizontal: 20 },
   pularBtn: { padding: 8 },
-  pularText: { fontSize: 14, color: colors.secondary },
+  pularText: { fontSize: 14 },
 
   slideContent: {
     flex: 1, alignItems: 'center', justifyContent: 'center',
@@ -160,11 +156,11 @@ const styles = StyleSheet.create({
   emoji: { fontSize: 68 },
   iconImg: { width: 110, height: 110, borderRadius: 24 },
   titulo: {
-    fontSize: 30, fontWeight: 'bold', color: colors.white,
+    fontSize: 30, fontWeight: 'bold',
     textAlign: 'center', marginBottom: 16, lineHeight: 38,
   },
   desc: {
-    fontSize: 16, color: colors.secondary,
+    fontSize: 16,
     textAlign: 'center', lineHeight: 24,
   },
 
@@ -178,5 +174,5 @@ const styles = StyleSheet.create({
   },
   btnAvancarText: { fontSize: 17, fontWeight: 'bold' },
   jaTemContaBtn: { padding: 14 },
-  jaTemContaText: { fontSize: 14, color: colors.secondary },
+  jaTemContaText: { fontSize: 14 },
 });

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   Platform, ScrollView, Alert, ActivityIndicator, Animated, Image,
@@ -21,11 +21,13 @@ import {
   googleLoginDisponivel,
   appleLoginDisponivel,
 } from '../services/authSocial';
-import { colors } from '../theme/colors';
+import { useTheme } from '../context/ThemeContext';
 
 WebBrowser.maybeCompleteAuthSession();
 
 export default function LoginScreen({ navigation }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
@@ -295,91 +297,93 @@ export default function LoginScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: colors.background },
-  container: { flexGrow: 1, justifyContent: 'center', padding: 24 },
-  logoArea: { alignItems: 'center', marginBottom: 36 },
-  logoBox: {
-    width: 80, height: 80, borderRadius: 22,
-    backgroundColor: colors.card, borderWidth: 2, borderColor: colors.primary,
-    alignItems: 'center', justifyContent: 'center', marginBottom: 10, gap: 1,
-  },
-  logoBolt: { fontSize: 22, lineHeight: 26 },
-  logoText: { fontSize: 18, fontWeight: 'bold', color: colors.primary, letterSpacing: 2 },
-  logoSub: { fontSize: 12, color: colors.secondary, letterSpacing: 8 },
-  form: {},
-  title: { fontSize: 28, fontWeight: 'bold', color: colors.white, marginBottom: 4 },
-  subtitle: { fontSize: 15, color: colors.secondary, marginBottom: 28 },
-  input: {
-    backgroundColor: colors.card, borderRadius: 14, padding: 16,
-    color: colors.white, fontSize: 16, marginBottom: 14,
-    borderWidth: 1, borderColor: colors.border,
-  },
-  btn: {
-    backgroundColor: colors.primary, borderRadius: 14,
-    padding: 16, alignItems: 'center', marginBottom: 16,
-  },
-  btnText: { color: colors.background, fontWeight: 'bold', fontSize: 16 },
-  forgotBtn: { alignItems: 'flex-end', marginBottom: 4, marginTop: -8 },
-  forgotText: { color: colors.secondary, fontSize: 13 },
-  link: { color: colors.secondary, textAlign: 'center', fontSize: 14 },
-  linkDest: { color: colors.primary, fontWeight: '600' },
-  divider: { flexDirection: 'row', alignItems: 'center', marginVertical: 24 },
-  dividerLine: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
-  dividerText: {
-    color: colors.secondary,
-    fontSize: 11,
-    marginHorizontal: 14,
-    letterSpacing: 2,
-    fontWeight: '600',
-  },
-  socialButtons: {
-    gap: 12,
-    marginBottom: 4,
-  },
-  socialBtnWrapper: {
-    height: 52,
-    borderRadius: 14,
-    position: 'relative',
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 2,
-  },
-  appleBtnNative: {
-    width: '100%',
-    height: '100%',
-  },
-  socialBtnOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255, 255, 255, 0.92)',
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  socialBtnDisabled: {
-    opacity: 0.55,
-  },
-  btnGoogle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    height: 52,
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 2,
-  },
-  btnGoogleIcon: { width: 20, height: 20, resizeMode: 'contain', marginRight: 12 },
-  btnGoogleText: {
-    color: '#1F1F1F',
-    fontSize: 15,
-    fontWeight: '600',
-    letterSpacing: 0.2,
-  },
-});
+function createStyles(colors) {
+  return StyleSheet.create({
+    flex: { flex: 1, backgroundColor: colors.background },
+    container: { flexGrow: 1, justifyContent: 'center', padding: 24 },
+    logoArea: { alignItems: 'center', marginBottom: 36 },
+    logoBox: {
+      width: 80, height: 80, borderRadius: 22,
+      backgroundColor: colors.card, borderWidth: 2, borderColor: colors.primary,
+      alignItems: 'center', justifyContent: 'center', marginBottom: 10, gap: 1,
+    },
+    logoBolt: { fontSize: 22, lineHeight: 26 },
+    logoText: { fontSize: 18, fontWeight: 'bold', color: colors.primary, letterSpacing: 2 },
+    logoSub: { fontSize: 12, color: colors.secondary, letterSpacing: 8 },
+    form: {},
+    title: { fontSize: 28, fontWeight: 'bold', color: colors.white, marginBottom: 4 },
+    subtitle: { fontSize: 15, color: colors.secondary, marginBottom: 28 },
+    input: {
+      backgroundColor: colors.card, borderRadius: 14, padding: 16,
+      color: colors.white, fontSize: 16, marginBottom: 14,
+      borderWidth: 1, borderColor: colors.border,
+    },
+    btn: {
+      backgroundColor: colors.primary, borderRadius: 14,
+      padding: 16, alignItems: 'center', marginBottom: 16,
+    },
+    btnText: { color: colors.background, fontWeight: 'bold', fontSize: 16 },
+    forgotBtn: { alignItems: 'flex-end', marginBottom: 4, marginTop: -8 },
+    forgotText: { color: colors.secondary, fontSize: 13 },
+    link: { color: colors.secondary, textAlign: 'center', fontSize: 14 },
+    linkDest: { color: colors.primary, fontWeight: '600' },
+    divider: { flexDirection: 'row', alignItems: 'center', marginVertical: 24 },
+    dividerLine: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
+    dividerText: {
+      color: colors.secondary,
+      fontSize: 11,
+      marginHorizontal: 14,
+      letterSpacing: 2,
+      fontWeight: '600',
+    },
+    socialButtons: {
+      gap: 12,
+      marginBottom: 4,
+    },
+    socialBtnWrapper: {
+      height: 52,
+      borderRadius: 14,
+      position: 'relative',
+      shadowColor: '#000',
+      shadowOpacity: 0.15,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 3 },
+      elevation: 2,
+    },
+    appleBtnNative: {
+      width: '100%',
+      height: '100%',
+    },
+    socialBtnOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(255, 255, 255, 0.92)',
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    socialBtnDisabled: {
+      opacity: 0.55,
+    },
+    btnGoogle: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: '#FFFFFF',
+      borderRadius: 14,
+      paddingHorizontal: 16,
+      height: 52,
+      shadowColor: '#000',
+      shadowOpacity: 0.15,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 3 },
+      elevation: 2,
+    },
+    btnGoogleIcon: { width: 20, height: 20, resizeMode: 'contain', marginRight: 12 },
+    btnGoogleText: {
+      color: '#1F1F1F',
+      fontSize: 15,
+      fontWeight: '600',
+      letterSpacing: 0.2,
+    },
+  });
+}

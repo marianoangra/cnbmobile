@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, ScrollView, Alert, ActivityIndicator, Animated,
@@ -10,9 +10,11 @@ import { auth } from '../services/firebase';
 import { criarPerfil } from '../services/pontos';
 import { lerReferrerInstalacao } from '../services/installReferrer';
 import { logCadastro, logIndicacaoUsada } from '../services/analytics';
-import { colors } from '../theme/colors';
+import { useTheme } from '../context/ThemeContext';
 
 export default function RegisterScreen({ navigation }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { t } = useTranslation();
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
@@ -49,7 +51,6 @@ export default function RegisterScreen({ navigation }) {
         logIndicacaoUsada();
         Alert.alert(t('register.referralSuccess'), t('register.referralSuccessMsg'));
       }
-      // Volta para o app (pula a tela de Login que pode estar abaixo)
       navigation.navigate('MainTabs');
     } catch (e) {
       if (e.code === 'auth/email-already-in-use') Alert.alert(t('common.error'), t('register.errorEmailInUse'));
@@ -115,21 +116,23 @@ export default function RegisterScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: colors.background },
-  container: { flexGrow: 1, justifyContent: 'center', padding: 24 },
-  logoArea: { alignItems: 'center', marginBottom: 28 },
-  logoBox: { width: 72, height: 72, borderRadius: 20, backgroundColor: colors.card, borderWidth: 2, borderColor: colors.primary, alignItems: 'center', justifyContent: 'center', gap: 1 },
-  logoBolt: { fontSize: 20, lineHeight: 24 },
-  logoText: { fontSize: 16, fontWeight: 'bold', color: colors.primary, letterSpacing: 2 },
-  title: { fontSize: 28, fontWeight: 'bold', color: colors.white, marginBottom: 4 },
-  subtitle: { fontSize: 15, color: colors.secondary, marginBottom: 24 },
-  input: { backgroundColor: colors.card, borderRadius: 14, padding: 16, color: colors.white, fontSize: 16, marginBottom: 12, borderWidth: 1, borderColor: colors.border },
-  indicacaoBox: { marginBottom: 4 },
-  indicacaoLabel: { fontSize: 13, color: colors.primary, fontWeight: '600', marginBottom: 6 },
-  indicacaoInput: { borderColor: '#1a3a1a', backgroundColor: '#0a1a0a' },
-  btn: { backgroundColor: colors.primary, borderRadius: 14, padding: 16, alignItems: 'center', marginTop: 8, marginBottom: 16 },
-  btnText: { color: colors.background, fontWeight: 'bold', fontSize: 16 },
-  link: { color: colors.secondary, textAlign: 'center', fontSize: 14 },
-  linkDest: { color: colors.primary, fontWeight: '600' },
-});
+function createStyles(colors) {
+  return StyleSheet.create({
+    flex: { flex: 1, backgroundColor: colors.background },
+    container: { flexGrow: 1, justifyContent: 'center', padding: 24 },
+    logoArea: { alignItems: 'center', marginBottom: 28 },
+    logoBox: { width: 72, height: 72, borderRadius: 20, backgroundColor: colors.card, borderWidth: 2, borderColor: colors.primary, alignItems: 'center', justifyContent: 'center', gap: 1 },
+    logoBolt: { fontSize: 20, lineHeight: 24 },
+    logoText: { fontSize: 16, fontWeight: 'bold', color: colors.primary, letterSpacing: 2 },
+    title: { fontSize: 28, fontWeight: 'bold', color: colors.white, marginBottom: 4 },
+    subtitle: { fontSize: 15, color: colors.secondary, marginBottom: 24 },
+    input: { backgroundColor: colors.card, borderRadius: 14, padding: 16, color: colors.white, fontSize: 16, marginBottom: 12, borderWidth: 1, borderColor: colors.border },
+    indicacaoBox: { marginBottom: 4 },
+    indicacaoLabel: { fontSize: 13, color: colors.primary, fontWeight: '600', marginBottom: 6 },
+    indicacaoInput: { borderColor: '#1a3a1a', backgroundColor: '#0a1a0a' },
+    btn: { backgroundColor: colors.primary, borderRadius: 14, padding: 16, alignItems: 'center', marginTop: 8, marginBottom: 16 },
+    btnText: { color: colors.background, fontWeight: 'bold', fontSize: 16 },
+    link: { color: colors.secondary, textAlign: 'center', fontSize: 14 },
+    linkDest: { color: colors.primary, fontWeight: '600' },
+  });
+}

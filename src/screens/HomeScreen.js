@@ -1,11 +1,11 @@
-import React, { useEffect, useRef, useCallback, useState } from 'react';
+import React, { useEffect, useRef, useCallback, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Animated, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Battery from 'expo-battery';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { colors } from '../theme/colors';
+import { useTheme } from '../context/ThemeContext';
 import BannerAd from '../components/BannerAd';
 import Avatar from '../components/Avatar';
 
@@ -52,6 +52,8 @@ function saudacao() {
 }
 
 export default function HomeScreen({ route, navigation }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { user, perfil, onAtualizar } = route.params || {};
   const onAtualizarRef = useRef(onAtualizar);
   useEffect(() => { onAtualizarRef.current = onAtualizar; }, [onAtualizar]);
@@ -76,7 +78,6 @@ export default function HomeScreen({ route, navigation }) {
     Animated.timing(progressAnim, { toValue: progresso, duration: 900, delay: 300, useNativeDriver: false }).start();
   }, [pontos]);
 
-  // Stats globais da rede — atualizam em tempo real
   const [statsRede, setStatsRede] = useState(null);
   useEffect(() => {
     const unsub = onSnapshot(
@@ -119,7 +120,6 @@ export default function HomeScreen({ route, navigation }) {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
-        {/* Cabeçalho */}
         <Animated.View style={[styles.header, a]}>
           <View style={styles.headerLeft}>
             <Text style={styles.saudacao}>{saudacao()},</Text>
@@ -138,12 +138,10 @@ export default function HomeScreen({ route, navigation }) {
           )}
         </Animated.View>
 
-        {/* Banner promocional */}
         <Animated.View style={[{ marginBottom: 16 }, b]}>
           <BannerAd onPress={handleBannerPress} active={focused} />
         </Animated.View>
 
-        {/* Card de pontos */}
         <Animated.View style={[styles.mainCard, b]}>
           <View style={styles.mainCardTop}>
             <Text style={styles.mainLabel}>Seus Pontos</Text>
@@ -170,7 +168,6 @@ export default function HomeScreen({ route, navigation }) {
           </View>
         </Animated.View>
 
-        {/* Stats */}
         <Animated.View style={[styles.row, c]}>
           <View style={[styles.statCard, styles.half]}>
             <Text style={styles.statIcon}>⏱</Text>
@@ -184,7 +181,6 @@ export default function HomeScreen({ route, navigation }) {
           </View>
         </Animated.View>
 
-        {/* Dashboard DePIN — rede global */}
         <Animated.View style={[styles.depinCard, d]}>
           <View style={styles.depinHeader}>
             <Text style={styles.depinTitle}>◎ Rede CNB Mobile</Text>
@@ -217,7 +213,6 @@ export default function HomeScreen({ route, navigation }) {
           <Text style={styles.depinSub}>Atividade verificada na Solana blockchain</Text>
         </Animated.View>
 
-        {/* Botão Saque */}
         <Animated.View style={[{ width: '100%' }, d]}>
           <TouchableOpacity
             style={[styles.saqueBtn, user && !podeSacar && styles.saqueBtnDisabled, !user && styles.saqueBtnGuest]}
@@ -235,63 +230,65 @@ export default function HomeScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
-  container: { flex: 1, backgroundColor: colors.background },
-  content: { padding: 20, paddingBottom: 32 },
+function createStyles(colors) {
+  return StyleSheet.create({
+    safe: { flex: 1, backgroundColor: colors.background },
+    container: { flex: 1, backgroundColor: colors.background },
+    content: { padding: 20, paddingBottom: 32 },
 
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  headerLeft: {},
-  saudacao: { fontSize: 14, color: colors.secondary },
-  nome: { fontSize: 24, fontWeight: 'bold', color: colors.white },
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+    headerLeft: {},
+    saudacao: { fontSize: 14, color: colors.secondary },
+    nome: { fontSize: 24, fontWeight: 'bold', color: colors.white },
 
-  loginBtn: { alignItems: 'center' },
-  loginBtnCircle: {
-    width: 46, height: 46, borderRadius: 23,
-    backgroundColor: colors.card,
-    borderWidth: 2, borderColor: colors.border,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  loginBtnIcon: { fontSize: 20 },
-  loginBtnLabel: { fontSize: 10, color: colors.primary, fontWeight: '600', marginTop: 3 },
+    loginBtn: { alignItems: 'center' },
+    loginBtnCircle: {
+      width: 46, height: 46, borderRadius: 23,
+      backgroundColor: colors.card,
+      borderWidth: 2, borderColor: colors.border,
+      alignItems: 'center', justifyContent: 'center',
+    },
+    loginBtnIcon: { fontSize: 20 },
+    loginBtnLabel: { fontSize: 10, color: colors.primary, fontWeight: '600', marginTop: 3 },
 
-  mainCard: { backgroundColor: colors.card, borderRadius: 20, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: '#1a3a1a' },
-  mainCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
-  mainLabel: { fontSize: 13, color: colors.secondary },
-  badge: { backgroundColor: '#0d2a0d', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: colors.primary },
-  badgeText: { fontSize: 11, color: colors.primary, fontWeight: '600' },
-  pontos: { fontSize: 52, fontWeight: 'bold', color: colors.primary, marginBottom: 16, letterSpacing: -1 },
-  progressBg: { backgroundColor: colors.border, borderRadius: 8, height: 8, marginBottom: 8, overflow: 'hidden' },
-  progressFill: { backgroundColor: colors.primary, height: 8, borderRadius: 8 },
-  progressInfo: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  progressLabel: { fontSize: 12, color: colors.secondary, flex: 1 },
-  progressPct: { fontSize: 12, color: colors.primary, fontWeight: 'bold' },
+    mainCard: { backgroundColor: colors.card, borderRadius: 20, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: '#1a3a1a' },
+    mainCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+    mainLabel: { fontSize: 13, color: colors.secondary },
+    badge: { backgroundColor: '#0d2a0d', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: colors.primary },
+    badgeText: { fontSize: 11, color: colors.primary, fontWeight: '600' },
+    pontos: { fontSize: 52, fontWeight: 'bold', color: colors.primary, marginBottom: 16, letterSpacing: -1 },
+    progressBg: { backgroundColor: colors.border, borderRadius: 8, height: 8, marginBottom: 8, overflow: 'hidden' },
+    progressFill: { backgroundColor: colors.primary, height: 8, borderRadius: 8 },
+    progressInfo: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    progressLabel: { fontSize: 12, color: colors.secondary, flex: 1 },
+    progressPct: { fontSize: 12, color: colors.primary, fontWeight: 'bold' },
 
-  row: { flexDirection: 'row', gap: 12, marginBottom: 16 },
-  half: { flex: 1 },
-  statCard: { backgroundColor: colors.card, borderRadius: 16, padding: 16, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
-  statIcon: { fontSize: 22, marginBottom: 6 },
-  statVal: { fontSize: 28, fontWeight: 'bold', color: colors.primary },
-  statLabel: { fontSize: 11, color: colors.secondary, marginTop: 4, textAlign: 'center' },
+    row: { flexDirection: 'row', gap: 12, marginBottom: 16 },
+    half: { flex: 1 },
+    statCard: { backgroundColor: colors.card, borderRadius: 16, padding: 16, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
+    statIcon: { fontSize: 22, marginBottom: 6 },
+    statVal: { fontSize: 28, fontWeight: 'bold', color: colors.primary },
+    statLabel: { fontSize: 11, color: colors.secondary, marginTop: 4, textAlign: 'center' },
 
-  depinCard: {
-    backgroundColor: '#080d1a', borderRadius: 16, padding: 18,
-    marginBottom: 16, borderWidth: 1, borderColor: '#1a2a4a', width: '100%',
-  },
-  depinHeader:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  depinTitle:    { fontSize: 15, fontWeight: '700', color: '#7eb8f7' },
-  depinBadge:    { backgroundColor: '#0a1a0a', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: '#1a4a1a' },
-  depinBadgeText:{ fontSize: 11, color: '#4ade80', fontWeight: '600' },
-  depinStats:    { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  depinStat:     { flex: 1, alignItems: 'center' },
-  depinVal:      { fontSize: 22, fontWeight: '700', color: '#fff' },
-  depinLabel:    { fontSize: 11, color: '#4a6a8a', marginTop: 3 },
-  depinDivider:  { width: 1, height: 36, backgroundColor: '#1a2a4a' },
-  depinSub:      { fontSize: 11, color: '#2a4a6a', textAlign: 'center' },
+    depinCard: {
+      backgroundColor: '#080d1a', borderRadius: 16, padding: 18,
+      marginBottom: 16, borderWidth: 1, borderColor: '#1a2a4a', width: '100%',
+    },
+    depinHeader:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+    depinTitle:    { fontSize: 15, fontWeight: '700', color: '#7eb8f7' },
+    depinBadge:    { backgroundColor: '#0a1a0a', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: '#1a4a1a' },
+    depinBadgeText:{ fontSize: 11, color: '#4ade80', fontWeight: '600' },
+    depinStats:    { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+    depinStat:     { flex: 1, alignItems: 'center' },
+    depinVal:      { fontSize: 22, fontWeight: '700', color: '#fff' },
+    depinLabel:    { fontSize: 11, color: '#4a6a8a', marginTop: 3 },
+    depinDivider:  { width: 1, height: 36, backgroundColor: '#1a2a4a' },
+    depinSub:      { fontSize: 11, color: '#2a4a6a', textAlign: 'center' },
 
-  saqueBtn: { backgroundColor: colors.primary, borderRadius: 14, padding: 16, alignItems: 'center', marginBottom: 8 },
-  saqueBtnDisabled: { opacity: 0.4 },
-  saqueBtnGuest: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.primary },
-  saqueBtnText: { color: colors.background, fontWeight: 'bold', fontSize: 16 },
-  saqueInfo: { fontSize: 11, color: colors.secondary, textAlign: 'center', marginBottom: 16 },
-});
+    saqueBtn: { backgroundColor: colors.primary, borderRadius: 14, padding: 16, alignItems: 'center', marginBottom: 8 },
+    saqueBtnDisabled: { opacity: 0.4 },
+    saqueBtnGuest: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.primary },
+    saqueBtnText: { color: colors.background, fontWeight: 'bold', fontSize: 16 },
+    saqueInfo: { fontSize: 11, color: colors.secondary, textAlign: 'center', marginBottom: 16 },
+  });
+}

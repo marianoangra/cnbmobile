@@ -1,14 +1,18 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { View, Text, FlatList, StyleSheet, RefreshControl, ActivityIndicator, TouchableOpacity, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getRanking, getRankingIndicacoes, getPosicaoRanking } from '../services/pontos';
-import { colors } from '../theme/colors';
+import { useTheme } from '../context/ThemeContext';
 import Avatar from '../components/Avatar';
 
 const medalhas = { 1: '🥇', 2: '🥈', 3: '🥉' };
 const medalhasBg = { 1: '#2a2000', 2: '#1c1c24', 3: '#201208' };
 
+const ITEM_HEIGHT = 74;
+
 function RankingItem({ item, uid, index, modo }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const opacity = useRef(new Animated.Value(0)).current;
   const translateX = useRef(new Animated.Value(30)).current;
 
@@ -47,6 +51,8 @@ function RankingItem({ item, uid, index, modo }) {
 }
 
 function TabToggle({ modo, onChange }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.tabContainer}>
       <TouchableOpacity
@@ -68,6 +74,8 @@ function TabToggle({ modo, onChange }) {
 }
 
 export default function RankingScreen({ route }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { uid } = route.params || {};
   const [modo, setModo] = useState('global');
   const [ranking, setRanking] = useState([]);
@@ -100,7 +108,6 @@ export default function RankingScreen({ route }) {
   useEffect(() => { carregar(); }, [carregar]);
 
   const dadosAtivos = modo === 'global' ? ranking : rankingIndicacoes;
-
   const minhaEntradaInd = rankingIndicacoes.find(u => u.uid === uid);
 
   if (loading) return (
@@ -160,6 +167,7 @@ export default function RankingScreen({ route }) {
             )}
           </View>
         }
+        getItemLayout={(_, index) => ({ length: ITEM_HEIGHT, offset: ITEM_HEIGHT * index, index })}
         renderItem={({ item, index }) => (
           <RankingItem item={item} uid={uid} index={index} modo={modo} />
         )}
@@ -168,59 +176,61 @@ export default function RankingScreen({ route }) {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
-  list: { flex: 1, backgroundColor: colors.background },
-  content: { padding: 16, paddingBottom: 32 },
-  center: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' },
-  header: { marginBottom: 16 },
+function createStyles(colors) {
+  return StyleSheet.create({
+    safe: { flex: 1, backgroundColor: colors.background },
+    list: { flex: 1, backgroundColor: colors.background },
+    content: { padding: 16, paddingBottom: 32 },
+    center: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' },
+    header: { marginBottom: 16 },
 
-  tabContainer: {
-    flexDirection: 'row',
-    backgroundColor: colors.card,
-    borderRadius: 14,
-    padding: 4,
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderRadius: 11,
-  },
-  tabAtivo: {
-    backgroundColor: colors.primary,
-  },
-  tabText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.secondary,
-  },
-  tabTextAtivo: {
-    color: colors.background,
-  },
+    tabContainer: {
+      flexDirection: 'row',
+      backgroundColor: colors.card,
+      borderRadius: 14,
+      padding: 4,
+      marginBottom: 14,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    tab: {
+      flex: 1,
+      paddingVertical: 10,
+      alignItems: 'center',
+      borderRadius: 11,
+    },
+    tabAtivo: {
+      backgroundColor: colors.primary,
+    },
+    tabText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.secondary,
+    },
+    tabTextAtivo: {
+      color: colors.background,
+    },
 
-  minhaPosCard: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: colors.card, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 10,
-    borderWidth: 1.5, borderColor: colors.primary, marginTop: 2,
-  },
-  minhaPosLabel: { fontSize: 11, color: colors.secondary, marginBottom: 2 },
-  minhaPosNum: { fontSize: 22, fontWeight: 'bold', color: colors.primary },
-  minhaPosPts: { fontSize: 13, color: colors.secondary },
+    minhaPosCard: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      backgroundColor: colors.card, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 10,
+      borderWidth: 1.5, borderColor: colors.primary, marginTop: 2,
+    },
+    minhaPosLabel: { fontSize: 11, color: colors.secondary, marginBottom: 2 },
+    minhaPosNum: { fontSize: 22, fontWeight: 'bold', color: colors.primary },
+    minhaPosPts: { fontSize: 13, color: colors.secondary },
 
-  vazio: { alignItems: 'center', paddingVertical: 40 },
-  vazioCopy: { color: colors.secondary, fontSize: 14, marginBottom: 4 },
+    vazio: { alignItems: 'center', paddingVertical: 40 },
+    vazioCopy: { color: colors.secondary, fontSize: 14, marginBottom: 4 },
 
-  item: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.card, borderRadius: 14, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: colors.border, gap: 10 },
-  itemMe: { borderColor: colors.primary, borderWidth: 1.5 },
-  posBox: { width: 36, alignItems: 'center' },
-  pos: { fontSize: 20, color: colors.white },
-  posTop: { fontSize: 26 },
-  info: { flex: 1 },
-  nome: { fontSize: 15, fontWeight: '600', color: colors.white },
-  nomeMe: { color: colors.primary },
-  pts: { fontSize: 13, color: colors.secondary, marginTop: 2 },
-});
+    item: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.card, borderRadius: 14, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: colors.border, gap: 10 },
+    itemMe: { borderColor: colors.primary, borderWidth: 1.5 },
+    posBox: { width: 36, alignItems: 'center' },
+    pos: { fontSize: 20, color: colors.white },
+    posTop: { fontSize: 26 },
+    info: { flex: 1 },
+    nome: { fontSize: 15, fontWeight: '600', color: colors.white },
+    nomeMe: { color: colors.primary },
+    pts: { fontSize: 13, color: colors.secondary, marginTop: 2 },
+  });
+}

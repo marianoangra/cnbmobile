@@ -132,6 +132,19 @@ export async function uploadAvatar(uid, uri) {
 
   if (!downloadToken) throw new Error('Não foi possível obter o link da foto. Tente novamente.');
 
+  // Define Cache-Control público de 1 ano para que o iOS/Android cacheiem a imagem em disco
+  await fetch(
+    `https://firebasestorage.googleapis.com/v0/b/${STORAGE_BUCKET}/o/${encodeURIComponent(filePath)}`,
+    {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ cacheControl: 'public, max-age=31536000' }),
+    }
+  ).catch(() => {}); // falha silenciosa — não impede o upload de concluir
+
   const url =
     `https://firebasestorage.googleapis.com/v0/b/${STORAGE_BUCKET}/o/` +
     `${encodeURIComponent(filePath)}?alt=media&token=${downloadToken}`;

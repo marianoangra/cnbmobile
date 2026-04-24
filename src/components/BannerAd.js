@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { TouchableOpacity, Text, StyleSheet, View, Animated } from 'react-native';
-import { colors } from '../theme/colors';
+import { useTheme } from '../context/ThemeContext';
 
 const BANNERS = [
   {
@@ -18,10 +18,10 @@ const BANNERS = [
     icon: '⚡',
     iconBg: '#0d2a0d',
     bg: '#071507',
-    border: colors.primary,
+    border: '#39FF6A',
     titulo: 'Coloque para carregar!',
     sub: '+10 pts por minuto. Bônus de +50 pts a cada hora.',
-    cor: colors.primary,
+    cor: '#39FF6A',
   },
   {
     id: 'pix',
@@ -48,6 +48,7 @@ const BANNERS = [
 const INTERVALO = 6000;
 
 export default function BannerAd({ onPress, active = true }) {
+  const { colors } = useTheme();
   const [indice, setIndice] = useState(0);
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -55,11 +56,13 @@ export default function BannerAd({ onPress, active = true }) {
 
   useEffect(() => {
     if (!active) return;
+    let cancelado = false;
     const timer = setInterval(() => {
       Animated.parallel([
         Animated.timing(fadeAnim, { toValue: 0, duration: 250, useNativeDriver: true }),
         Animated.timing(slideAnim, { toValue: -12, duration: 250, useNativeDriver: true }),
-      ]).start(() => {
+      ]).start(({ finished }) => {
+        if (!finished || cancelado) return;
         setIndice(prev => (prev + 1) % BANNERS.length);
         slideAnim.setValue(12);
         Animated.parallel([
@@ -69,7 +72,10 @@ export default function BannerAd({ onPress, active = true }) {
       });
     }, INTERVALO);
 
-    return () => clearInterval(timer);
+    return () => {
+      cancelado = true;
+      clearInterval(timer);
+    };
   }, [active]);
 
   const banner = BANNERS[indice];
@@ -96,7 +102,7 @@ export default function BannerAd({ onPress, active = true }) {
           </View>
           <View style={styles.textArea}>
             <Text style={[styles.titulo, { color: banner.cor }]}>{banner.titulo}</Text>
-            <Text style={styles.sub}>{banner.sub}</Text>
+            <Text style={[styles.sub, { color: colors.secondary }]}>{banner.sub}</Text>
           </View>
         </Animated.View>
 
@@ -137,7 +143,7 @@ const styles = StyleSheet.create({
   icon: { fontSize: 22 },
   textArea: { flex: 1 },
   titulo: { fontWeight: 'bold', fontSize: 15 },
-  sub: { color: colors.secondary, fontSize: 12, marginTop: 2, lineHeight: 16 },
+  sub: { fontSize: 12, marginTop: 2, lineHeight: 16 },
   dots: {
     flexDirection: 'row',
     gap: 5,

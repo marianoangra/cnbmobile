@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity, Alert,
@@ -10,10 +10,9 @@ import { signOut } from 'firebase/auth';
 import { auth } from '../services/firebase';
 import { limparSessao } from '../services/session';
 import { getSaques, excluirConta, getAfiliados, processarIndicacao } from '../services/pontos';
-import { colors } from '../theme/colors';
+import { useTheme } from '../context/ThemeContext';
 import Avatar from '../components/Avatar';
 
-const statusColor = { pendente: '#F5A623', aprovado: colors.primary, rejeitado: colors.danger };
 const statusLabel = { pendente: '⏳ Pendente', aprovado: '✅ Aprovado', rejeitado: '❌ Rejeitado' };
 
 function useEntrada(delay = 0) {
@@ -29,6 +28,10 @@ function useEntrada(delay = 0) {
 }
 
 export default function ProfileScreen({ route, navigation }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const statusColor = { pendente: '#F5A623', aprovado: colors.primary, rejeitado: colors.danger };
+
   const { user, perfil, onAtualizar, atualizarPerfil } = route.params || {};
   const [saques, setSaques] = useState([]);
   const [loadingSaques, setLoadingSaques] = useState(true);
@@ -45,7 +48,6 @@ export default function ProfileScreen({ route, navigation }) {
   const c = useEntrada(180);
   const d = useEntrada(260);
 
-
   useEffect(() => {
     if (!perfil?.uid) return;
     const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 10000));
@@ -55,7 +57,6 @@ export default function ProfileScreen({ route, navigation }) {
       .finally(() => setLoadingSaques(false));
   }, [perfil?.uid]);
 
-  // Sempre que a aba for focada: refaz fetch do perfil e dos afiliados (com cache de 5 min)
   useFocusEffect(useCallback(() => {
     if (!perfil?.uid) return;
     let active = true;
@@ -85,10 +86,7 @@ export default function ProfileScreen({ route, navigation }) {
     navigation.navigate('EditProfile', {
       perfil: perfilLocal,
       onSalvar: (updates) => {
-        // Atualiza App.js diretamente (sem refetch Firestore) — evita race condition
-        // A HomeScreen e demais telas recebem o perfil atualizado via prop
         atualizarPerfil?.(updates);
-        // Atualiza estado local imediatamente (antes do re-render via prop)
         setPerfilLocal(prev => ({ ...prev, ...updates }));
       },
     });
@@ -101,7 +99,7 @@ export default function ProfileScreen({ route, navigation }) {
     try {
       await processarIndicacao(perfil.uid, codigo);
       setCodigoParaAplicar('');
-      afiliadosCacheRef.current = { data: null, ts: 0 }; // invalida cache
+      afiliadosCacheRef.current = { data: null, ts: 0 };
       Alert.alert('✅ Código aplicado!', 'Você foi indicado com sucesso. O indicador recebeu +100 pts.');
     } catch (e) {
       Alert.alert('Erro', e.message ?? 'Código inválido ou já utilizado.');
@@ -193,7 +191,6 @@ export default function ProfileScreen({ route, navigation }) {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
-        {/* Avatar + nome + botão editar */}
         <Animated.View style={[styles.avatarSection, a]}>
           <View style={styles.avatarTouchable}>
             <View style={styles.avatarRing}>
@@ -209,7 +206,6 @@ export default function ProfileScreen({ route, navigation }) {
           </TouchableOpacity>
         </Animated.View>
 
-        {/* Carteira Solana */}
         <Animated.View style={[styles.pontosCard, b]}>
           <TouchableOpacity style={styles.walletBtn} onPress={handleAbrirCarteira} activeOpacity={0.85}>
             <Text style={styles.walletBtnIcon}>◎</Text>
@@ -221,14 +217,12 @@ export default function ProfileScreen({ route, navigation }) {
           </TouchableOpacity>
         </Animated.View>
 
-        {/* Pontos */}
         <Animated.View style={[styles.pontosCard, b]}>
           <Text style={styles.pontosLabel}>Pontos totais</Text>
           <Text style={styles.pontos}>{(perfilLocal?.pontos ?? 0).toLocaleString('pt-BR')}</Text>
           {(perfilLocal?.pontos ?? 0) >= 100000 && <Text style={styles.podeSacarBadge}>🎉 Disponível para saque!</Text>}
         </Animated.View>
 
-        {/* Afiliados */}
         <Animated.View style={[styles.afiliadoCard, c]}>
           <View style={styles.afiliadoHeader}>
             <Text style={styles.afiliadoTitle}>👥 Programa de Indicação</Text>
@@ -254,7 +248,6 @@ export default function ProfileScreen({ route, navigation }) {
             <Text style={styles.compartilharBtnText}>🚀 Compartilhar código</Text>
           </TouchableOpacity>
 
-          {/* Aplicar código de indicação — só aparece para quem ainda não foi indicado */}
           {!perfilLocal?.referidoPor && (
             <View style={styles.aplicarBox}>
               <Text style={styles.aplicarLabel}>🎁 Tem um código de referência?</Text>
@@ -282,7 +275,6 @@ export default function ProfileScreen({ route, navigation }) {
           )}
         </Animated.View>
 
-        {/* Histórico saques */}
         <Animated.View style={[{ width: '100%' }, d]}>
           <Text style={styles.sectionTitle}>Histórico de Saques</Text>
 
@@ -324,110 +316,103 @@ export default function ProfileScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
-  container: { flex: 1, backgroundColor: colors.background },
-  content: { padding: 20, alignItems: 'center', paddingBottom: 40 },
+function createStyles(colors) {
+  return StyleSheet.create({
+    safe: { flex: 1, backgroundColor: colors.background },
+    container: { flex: 1, backgroundColor: colors.background },
+    content: { padding: 20, alignItems: 'center', paddingBottom: 40 },
 
-  avatarSection: { alignItems: 'center', marginBottom: 24, width: '100%' },
-  avatarTouchable: { alignItems: 'center', marginBottom: 12 },
-  avatarRing: {
-    width: 96, height: 96, borderRadius: 48,
-    borderWidth: 2.5, borderColor: colors.primary,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  avatarCameraBtn: {
-    position: 'absolute', bottom: 0, right: 0,
-    backgroundColor: colors.primary,
-    borderRadius: 16, width: 30, height: 30,
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: colors.background,
-  },
-  avatarCameraIcon: { fontSize: 13 },
-  nome: { fontSize: 22, fontWeight: 'bold', color: colors.white, marginBottom: 4 },
-  email: { fontSize: 13, color: colors.secondary, marginBottom: 14 },
+    avatarSection: { alignItems: 'center', marginBottom: 24, width: '100%' },
+    avatarTouchable: { alignItems: 'center', marginBottom: 12 },
+    avatarRing: {
+      width: 96, height: 96, borderRadius: 48,
+      borderWidth: 2.5, borderColor: colors.primary,
+      alignItems: 'center', justifyContent: 'center',
+    },
+    nome: { fontSize: 22, fontWeight: 'bold', color: colors.white, marginBottom: 4 },
+    email: { fontSize: 13, color: colors.secondary, marginBottom: 14 },
 
-  editarPerfilBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: colors.card, borderRadius: 20,
-    paddingHorizontal: 16, paddingVertical: 8,
-    borderWidth: 1, borderColor: colors.border,
-  },
-  editarPerfilIcon: { fontSize: 14 },
-  editarPerfilText: { fontSize: 13, color: colors.white, fontWeight: '600' },
+    editarPerfilBtn: {
+      flexDirection: 'row', alignItems: 'center', gap: 6,
+      backgroundColor: colors.card, borderRadius: 20,
+      paddingHorizontal: 16, paddingVertical: 8,
+      borderWidth: 1, borderColor: colors.border,
+    },
+    editarPerfilIcon: { fontSize: 14 },
+    editarPerfilText: { fontSize: 13, color: colors.white, fontWeight: '600' },
 
-  walletBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: colors.card, borderRadius: 16,
-    padding: 16, width: '100%',
-    borderWidth: 1, borderColor: '#1a2a3a',
-  },
-  walletBtnIcon:  { fontSize: 28, color: '#9945FF' },
-  walletBtnTexts: { flex: 1 },
-  walletBtnTitle: { fontSize: 15, fontWeight: '700', color: colors.white },
-  walletBtnSub:   { fontSize: 12, color: colors.secondary, marginTop: 2 },
-  walletBtnArrow: { fontSize: 22, color: colors.secondary },
+    walletBtn: {
+      flexDirection: 'row', alignItems: 'center', gap: 12,
+      backgroundColor: colors.card, borderRadius: 16,
+      padding: 16, width: '100%',
+      borderWidth: 1, borderColor: '#1a2a3a',
+    },
+    walletBtnIcon:  { fontSize: 28, color: '#9945FF' },
+    walletBtnTexts: { flex: 1 },
+    walletBtnTitle: { fontSize: 15, fontWeight: '700', color: colors.white },
+    walletBtnSub:   { fontSize: 12, color: colors.secondary, marginTop: 2 },
+    walletBtnArrow: { fontSize: 22, color: colors.secondary },
 
-  pontosCard: { backgroundColor: colors.card, borderRadius: 20, padding: 20, marginBottom: 14, width: '100%', alignItems: 'center', borderWidth: 1, borderColor: '#1a3a1a' },
-  pontosLabel: { fontSize: 13, color: colors.secondary, marginBottom: 4 },
-  pontos: { fontSize: 44, fontWeight: 'bold', color: colors.primary },
-  podeSacarBadge: { fontSize: 13, color: colors.primary, marginTop: 8, fontWeight: '600' },
+    pontosCard: { backgroundColor: colors.card, borderRadius: 20, padding: 20, marginBottom: 14, width: '100%', alignItems: 'center', borderWidth: 1, borderColor: '#1a3a1a' },
+    pontosLabel: { fontSize: 13, color: colors.secondary, marginBottom: 4 },
+    pontos: { fontSize: 44, fontWeight: 'bold', color: colors.primary },
+    podeSacarBadge: { fontSize: 13, color: colors.primary, marginTop: 8, fontWeight: '600' },
 
-  afiliadoCard: { backgroundColor: colors.card, borderRadius: 18, padding: 18, marginBottom: 24, width: '100%', borderWidth: 1, borderColor: '#1a3a1a' },
-  afiliadoHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  afiliadoTitle: { fontSize: 15, fontWeight: 'bold', color: colors.white },
-  afiliadoBadge: { backgroundColor: '#0d2a0d', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: colors.primary },
-  afiliadoBadgeText: { fontSize: 11, color: colors.primary, fontWeight: '600' },
-  afiliadoSub: { fontSize: 13, color: colors.secondary, marginBottom: 14, lineHeight: 18 },
-  destaque: { color: colors.primary, fontWeight: 'bold' },
-  codigoRow: { flexDirection: 'row', gap: 10, marginBottom: 12, alignItems: 'center' },
-  codigoBox: { flex: 1, backgroundColor: '#0a1a0a', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: colors.primary },
-  codigoLabel: { fontSize: 10, color: colors.secondary, marginBottom: 2 },
-  codigoCodigo: { fontSize: 22, fontWeight: 'bold', color: colors.primary, letterSpacing: 3 },
-  copiarBtn: { backgroundColor: colors.card, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: colors.border },
-  copiarBtnText: { fontSize: 13, color: colors.white },
-  compartilharBtn: { backgroundColor: '#0d2a0d', borderRadius: 12, padding: 14, alignItems: 'center', borderWidth: 1, borderColor: colors.primary },
-  compartilharBtnText: { color: colors.primary, fontWeight: 'bold', fontSize: 14 },
+    afiliadoCard: { backgroundColor: colors.card, borderRadius: 18, padding: 18, marginBottom: 24, width: '100%', borderWidth: 1, borderColor: '#1a3a1a' },
+    afiliadoHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+    afiliadoTitle: { fontSize: 15, fontWeight: 'bold', color: colors.white },
+    afiliadoBadge: { backgroundColor: '#0d2a0d', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: colors.primary },
+    afiliadoBadgeText: { fontSize: 11, color: colors.primary, fontWeight: '600' },
+    afiliadoSub: { fontSize: 13, color: colors.secondary, marginBottom: 14, lineHeight: 18 },
+    destaque: { color: colors.primary, fontWeight: 'bold' },
+    codigoRow: { flexDirection: 'row', gap: 10, marginBottom: 12, alignItems: 'center' },
+    codigoBox: { flex: 1, backgroundColor: '#0a1a0a', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: colors.primary },
+    codigoLabel: { fontSize: 10, color: colors.secondary, marginBottom: 2 },
+    codigoCodigo: { fontSize: 22, fontWeight: 'bold', color: colors.primary, letterSpacing: 3 },
+    copiarBtn: { backgroundColor: colors.card, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: colors.border },
+    copiarBtnText: { fontSize: 13, color: colors.white },
+    compartilharBtn: { backgroundColor: '#0d2a0d', borderRadius: 12, padding: 14, alignItems: 'center', borderWidth: 1, borderColor: colors.primary },
+    compartilharBtnText: { color: colors.primary, fontWeight: 'bold', fontSize: 14 },
 
-  aplicarBox: { marginTop: 14, borderTopWidth: 1, borderTopColor: '#1a2a1a', paddingTop: 14 },
-  aplicarLabel: { fontSize: 13, color: colors.secondary, marginBottom: 8, fontWeight: '600' },
-  aplicarRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
-  aplicarInput: { flex: 1, backgroundColor: '#0a1a0a', borderRadius: 10, padding: 12, color: colors.white, fontSize: 15, borderWidth: 1, borderColor: colors.border, letterSpacing: 2 },
-  aplicarBtn: { backgroundColor: colors.primary, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 12 },
-  aplicarBtnText: { color: colors.background, fontWeight: 'bold', fontSize: 14 },
+    aplicarBox: { marginTop: 14, borderTopWidth: 1, borderTopColor: '#1a2a1a', paddingTop: 14 },
+    aplicarLabel: { fontSize: 13, color: colors.secondary, marginBottom: 8, fontWeight: '600' },
+    aplicarRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+    aplicarInput: { flex: 1, backgroundColor: '#0a1a0a', borderRadius: 10, padding: 12, color: colors.white, fontSize: 15, borderWidth: 1, borderColor: colors.border, letterSpacing: 2 },
+    aplicarBtn: { backgroundColor: colors.primary, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 12 },
+    aplicarBtnText: { color: colors.background, fontWeight: 'bold', fontSize: 14 },
 
-  sectionTitle: { fontSize: 17, fontWeight: 'bold', color: colors.white, marginBottom: 12, alignSelf: 'flex-start' },
-  emptyCard: { backgroundColor: colors.card, borderRadius: 14, padding: 24, width: '100%', alignItems: 'center', marginBottom: 16 },
-  emptyIcon: { fontSize: 28, marginBottom: 8 },
-  emptyText: { color: colors.secondary, fontSize: 14 },
-  saqueItem: { flexDirection: 'row', backgroundColor: colors.card, borderRadius: 12, padding: 14, marginBottom: 8, width: '100%', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: colors.border },
-  saqueInfo: { flex: 1, marginRight: 12 },
-  saqueData: { fontSize: 12, color: colors.secondary },
-  saquePix: { fontSize: 14, color: colors.white, marginTop: 2 },
-  saqueRight: { alignItems: 'flex-end' },
-  saquePts: { fontSize: 14, fontWeight: 'bold', color: colors.danger },
-  saqueStatus: { fontSize: 12, marginTop: 4 },
+    sectionTitle: { fontSize: 17, fontWeight: 'bold', color: colors.white, marginBottom: 12, alignSelf: 'flex-start' },
+    emptyCard: { backgroundColor: colors.card, borderRadius: 14, padding: 24, width: '100%', alignItems: 'center', marginBottom: 16 },
+    emptyIcon: { fontSize: 28, marginBottom: 8 },
+    emptyText: { color: colors.secondary, fontSize: 14 },
+    saqueItem: { flexDirection: 'row', backgroundColor: colors.card, borderRadius: 12, padding: 14, marginBottom: 8, width: '100%', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: colors.border },
+    saqueInfo: { flex: 1, marginRight: 12 },
+    saqueData: { fontSize: 12, color: colors.secondary },
+    saquePix: { fontSize: 14, color: colors.white, marginTop: 2 },
+    saqueRight: { alignItems: 'flex-end' },
+    saquePts: { fontSize: 14, fontWeight: 'bold', color: colors.danger },
+    saqueStatus: { fontSize: 12, marginTop: 4 },
 
-  logoutBtn: { borderWidth: 1, borderColor: colors.danger, borderRadius: 14, padding: 16, alignItems: 'center', width: '100%', marginTop: 8, marginBottom: 8 },
-  logoutBtnText: { color: colors.danger, fontWeight: 'bold', fontSize: 15 },
-  excluirBtn: { padding: 12, alignItems: 'center', width: '100%' },
-  excluirBtnText: { color: colors.secondary, fontSize: 13 },
+    logoutBtn: { borderWidth: 1, borderColor: colors.danger, borderRadius: 14, padding: 16, alignItems: 'center', width: '100%', marginTop: 8, marginBottom: 8 },
+    logoutBtnText: { color: colors.danger, fontWeight: 'bold', fontSize: 15 },
+    excluirBtn: { padding: 12, alignItems: 'center', width: '100%' },
+    excluirBtnText: { color: colors.secondary, fontSize: 13 },
 
-  // Login gate
-  loginGate: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
-  loginGateAvatar: {
-    width: 100, height: 100, borderRadius: 50,
-    backgroundColor: colors.card,
-    borderWidth: 2, borderColor: colors.border,
-    alignItems: 'center', justifyContent: 'center',
-    marginBottom: 28,
-  },
-  loginGateIcon: { fontSize: 44 },
-  loginGateTitle: { fontSize: 20, fontWeight: 'bold', color: colors.white, textAlign: 'center', marginBottom: 10 },
-  loginGateSub: { fontSize: 14, color: colors.secondary, textAlign: 'center', lineHeight: 21, marginBottom: 32 },
-  loginGateBtn: {
-    backgroundColor: colors.primary, borderRadius: 16,
-    paddingVertical: 16, width: '100%', alignItems: 'center',
-  },
-  loginGateBtnText: { color: colors.background, fontWeight: 'bold', fontSize: 16 },
-});
+    loginGate: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
+    loginGateAvatar: {
+      width: 100, height: 100, borderRadius: 50,
+      backgroundColor: colors.card,
+      borderWidth: 2, borderColor: colors.border,
+      alignItems: 'center', justifyContent: 'center',
+      marginBottom: 28,
+    },
+    loginGateIcon: { fontSize: 44 },
+    loginGateTitle: { fontSize: 20, fontWeight: 'bold', color: colors.white, textAlign: 'center', marginBottom: 10 },
+    loginGateSub: { fontSize: 14, color: colors.secondary, textAlign: 'center', lineHeight: 21, marginBottom: 32 },
+    loginGateBtn: {
+      backgroundColor: colors.primary, borderRadius: 16,
+      paddingVertical: 16, width: '100%', alignItems: 'center',
+    },
+    loginGateBtnText: { color: colors.background, fontWeight: 'bold', fontSize: 16 },
+  });
+}
