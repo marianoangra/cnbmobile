@@ -42,3 +42,12 @@ credentials.json
 # generated native folders
 /ios
 /android
+
+# ferramentas locais
+.agents/
+.claude/
+.firebase/
+.kuka/
+.qoder/
+.trae/
+skills-lock.json
