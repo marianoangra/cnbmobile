@@ -42,7 +42,8 @@ module.exports = function withIOSFixes(config) {
 
       let podfile = fs.readFileSync(podfilePath, 'utf8');
 
-      if (podfile.includes(FIX_MARKER)) return config;
+      // Pula se já tem use_modular_headers! (fix já aplicado) ou se está no contexto antigo
+      if (podfile.includes('use_modular_headers!')) return config;
 
       // 1. Inserir use_modular_headers! antes do target 'CNBMobile' do
       podfile = podfile.replace(
