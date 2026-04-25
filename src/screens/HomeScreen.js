@@ -31,6 +31,33 @@ function saudacao() {
   return 'Boa noite';
 }
 
+const FRASES_MOTIVACIONAIS = [
+  'Vamos somar pontos hoje?',
+  'Quero acumular mais pontos!',
+  'Vou ver uma missão interessante hoje.',
+  'Cada carregada vale mais um passo.',
+  'Sua energia move o ranking.',
+  'Hora de subir na classificação!',
+  'Que tal uma nova missão agora?',
+  'Carregar é ganhar — bora lá!',
+  'Mais um dia, mais pontos no bolso.',
+  'Você está a um carregamento do topo.',
+  'O ranking te espera. Vamos nessa?',
+  'Seus pontos estão chamando!',
+  'Hoje é um bom dia pra carregar.',
+  'Missões disponíveis — não perca!',
+  'Pequenos passos, grandes pontos.',
+  'Carregue e suba no ranking.',
+  'Bora acumular e conquistar!',
+  'Cada kWh conta. Vamos carregar?',
+  'Seu saldo cresce a cada missão.',
+  'A liderança está ao seu alcance!',
+];
+
+function fraseDoDia() {
+  return FRASES_MOTIVACIONAIS[Math.floor(Math.random() * FRASES_MOTIVACIONAIS.length)];
+}
+
 // ─── Hooks ────────────────────────────────────────────────────────────────────
 function useEntrada(delayMs = 0) {
   const opacity    = useSharedValue(0);
@@ -302,6 +329,8 @@ export default function HomeScreen({ route, navigation }) {
   const onAtualizarRef = useRef(onAtualizar);
   useEffect(() => { onAtualizarRef.current = onAtualizar; }, [onAtualizar]);
 
+  const [frase] = useState(fraseDoDia);
+
   const [focused, setFocused] = useState(true);
   useFocusEffect(useCallback(() => {
     setFocused(true);
@@ -391,7 +420,7 @@ export default function HomeScreen({ route, navigation }) {
                   {saudacao()}, {nome}!
                 </Text>
                 <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>
-                  Vamos somar pontos hoje?
+                  {frase}
                 </Text>
               </View>
             </View>
