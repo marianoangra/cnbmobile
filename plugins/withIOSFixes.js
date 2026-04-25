@@ -1,10 +1,10 @@
 /**
  * Config plugin para corrigir incompatibilidades de build iOS com New Architecture.
  *
- * Usa EXATAMENTE o mesmo regex dos builds 2/3 (que passaram o pod install).
- * Adiciona:
- *   - installer.pods_project.build_configurations (project-level fix)
- *   - installer.aggregate_targets (main app xcodeproj fix, com rescue)
+ * Sem use_frameworks! :linkage => :static, os pods Swift do Firebase (FirebaseStorage,
+ * FirebaseCoreInternal) não conseguem importar pods ObjC sem module maps.
+ * A solução é use_modular_headers! globalmente — gera module maps para todos os pods
+ * sem criar framework module context (que causava FIRApp* undefined).
  */
 const { withDangerousMod } = require('@expo/config-plugins');
 const fs = require('fs');
@@ -12,10 +12,15 @@ const path = require('path');
 
 const FIX_MARKER = 'CNB_IOS_FIXES_APPLIED';
 
-const FIX_BLOCK = `    # [CNB_IOS_FIXES_APPLIED] Fixes de compatibilidade com New Architecture
+// Inserido ANTES do target 'CNBMobile' do
+const MODULAR_HEADERS_BLOCK = `# [CNB_IOS_FIXES_APPLIED] use_modular_headers! para Firebase Swift pods
+use_modular_headers!
+
+`;
+
+const POST_INSTALL_BLOCK = `    # [CNB_IOS_FIXES_APPLIED] Fixes de compatibilidade com New Architecture
     installer.pods_project.targets.each do |target|
       target.build_configurations.each do |cfg|
-        cfg.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
         extra_flags = %w[-Wno-implicit-int -Wno-implicit-function-declaration -Wno-deprecated-declarations]
         existing = cfg.build_settings['OTHER_CFLAGS']
         if existing.is_a?(Array)
@@ -25,22 +30,6 @@ const FIX_BLOCK = `    # [CNB_IOS_FIXES_APPLIED] Fixes de compatibilidade com Ne
           cfg.build_settings['OTHER_CFLAGS'] = "#{base} #{extra_flags.join(' ')}"
         end
       end
-    end
-    installer.pods_project.build_configurations.each do |cfg|
-      cfg.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
-    end
-    begin
-      installer.aggregate_targets.each do |agg|
-        next unless agg.user_project
-        agg.user_project.targets.each do |t|
-          t.build_configurations.each do |cfg|
-            cfg.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
-          end
-        end
-        agg.user_project.save
-      end
-    rescue => e
-      puts "CNB: user_project fix skipped - #{e.message}"
     end
 `;
 
@@ -55,10 +44,16 @@ module.exports = function withIOSFixes(config) {
 
       if (podfile.includes(FIX_MARKER)) return config;
 
-      // Regex idêntico ao dos builds 2/3 (comprovadamente funciona no pod install)
+      // 1. Inserir use_modular_headers! antes do target 'CNBMobile' do
+      podfile = podfile.replace(
+        /^(target 'CNBMobile' do)/m,
+        `${MODULAR_HEADERS_BLOCK}$1`,
+      );
+
+      // 2. Inserir post_install fixes antes do "  end\nend" final
       podfile = podfile.replace(
         /(\s+\)\s*\n)(  end\nend\s*)$/,
-        `$1${FIX_BLOCK}$2`,
+        `$1${POST_INSTALL_BLOCK}$2`,
       );
 
       fs.writeFileSync(podfilePath, podfile);
