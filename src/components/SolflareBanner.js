@@ -2,7 +2,7 @@ import React, { useRef } from 'react';
 import { Animated, TouchableOpacity, Image, View, useWindowDimensions, Linking, Alert } from 'react-native';
 
 const SOLFLARE_URL = 'https://solflare.com';
-const BANNER_H = 127;
+const BANNER_H = 180;
 
 export default function SolflareBanner() {
   const scale = useRef(new Animated.Value(1)).current;
