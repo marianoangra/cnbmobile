@@ -16,13 +16,13 @@ const FIX_BLOCK = `    # [CNB_IOS_FIXES_APPLIED] Fixes de compatibilidade com Ne
     installer.pods_project.targets.each do |target|
       target.build_configurations.each do |cfg|
         cfg.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
-        cfg.build_settings['GCC_C_LANGUAGE_STANDARD'] = 'gnu99'
+        extra_flags = %w[-Wno-implicit-int -Wno-implicit-function-declaration -Wno-deprecated-declarations]
         existing = cfg.build_settings['OTHER_CFLAGS']
         if existing.is_a?(Array)
-          cfg.build_settings['OTHER_CFLAGS'] = (existing + ['-Wno-implicit-int', '-Wno-deprecated-declarations']).uniq
+          cfg.build_settings['OTHER_CFLAGS'] = (existing + extra_flags).uniq
         else
           base = existing || '$(inherited)'
-          cfg.build_settings['OTHER_CFLAGS'] = "#{base} -Wno-implicit-int -Wno-deprecated-declarations"
+          cfg.build_settings['OTHER_CFLAGS'] = "#{base} #{extra_flags.join(' ')}"
         end
       end
     end
