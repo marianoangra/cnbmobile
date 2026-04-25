@@ -25,7 +25,12 @@ use_frameworks! :linkage => :static
 const POST_INSTALL_BLOCK = `    # [CNB_IOS_FIXES_APPLIED] Suprime warnings de C legado que quebram compilação
     installer.pods_project.targets.each do |target|
       target.build_configurations.each do |cfg|
-        extra_flags = %w[-Wno-implicit-int -Wno-implicit-function-declaration -Wno-deprecated-declarations]
+        extra_flags = %w[
+          -Wno-implicit-int
+          -Wno-implicit-function-declaration
+          -Wno-deprecated-declarations
+          -Wno-non-modular-include-in-framework-module
+        ]
         existing = cfg.build_settings['OTHER_CFLAGS']
         if existing.is_a?(Array)
           cfg.build_settings['OTHER_CFLAGS'] = (existing + extra_flags).uniq
