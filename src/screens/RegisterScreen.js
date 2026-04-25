@@ -11,6 +11,7 @@ import { criarPerfil } from '../services/pontos';
 import { lerReferrerInstalacao } from '../services/installReferrer';
 import { logCadastro, logIndicacaoUsada } from '../services/analytics';
 import { useTheme } from '../context/ThemeContext';
+import { Zap } from 'lucide-react-native';
 
 export default function RegisterScreen({ navigation }) {
   const { colors } = useTheme();
@@ -69,7 +70,7 @@ export default function RegisterScreen({ navigation }) {
 
             <View style={styles.logoArea}>
               <View style={styles.logoBox}>
-                <Text style={styles.logoBolt}>⚡</Text>
+                <Zap size={22} color={colors.primary} strokeWidth={2.5} />
                 <Text style={styles.logoText}>CNB</Text>
               </View>
             </View>
@@ -87,7 +88,7 @@ export default function RegisterScreen({ navigation }) {
               value={confirmar} onChangeText={setConfirmar} secureTextEntry />
 
             <View style={styles.indicacaoBox}>
-              <Text style={styles.indicacaoLabel}>🎁 {t('register.referralCode')}</Text>
+              <Text style={styles.indicacaoLabel}>{t('register.referralCode')}</Text>
               <TextInput
                 style={[styles.input, styles.indicacaoInput]}
                 placeholder={t('register.referralPlaceholder')}
@@ -122,7 +123,6 @@ function createStyles(colors) {
     container: { flexGrow: 1, justifyContent: 'center', padding: 24 },
     logoArea: { alignItems: 'center', marginBottom: 28 },
     logoBox: { width: 72, height: 72, borderRadius: 20, backgroundColor: colors.card, borderWidth: 2, borderColor: colors.primary, alignItems: 'center', justifyContent: 'center', gap: 1 },
-    logoBolt: { fontSize: 20, lineHeight: 24 },
     logoText: { fontSize: 16, fontWeight: 'bold', color: colors.primary, letterSpacing: 2 },
     title: { fontSize: 28, fontWeight: 'bold', color: colors.white, marginBottom: 4 },
     subtitle: { fontSize: 15, color: colors.secondary, marginBottom: 24 },

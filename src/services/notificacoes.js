@@ -1,16 +1,40 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
-import { Platform } from 'react-native';
+import { Platform, Linking } from 'react-native';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from './firebase';
 
-const PROJECT_ID = '92b79039-a34d-43b2-b749-140b565e5a4c';
+const PROJECT_ID        = '92b79039-a34d-43b2-b749-140b565e5a4c';
+const ID_LEMBRETE_CARGA = 'lembrete-carregar-hoje';
 
+// ─── Permissão ───────────────────────────────────────────────────────────────
+
+/**
+ * Retorna true se as notificações push estão autorizadas no dispositivo.
+ */
+export async function notificacoesAtivas() {
+  const { status } = await Notifications.getPermissionsAsync();
+  return status === 'granted';
+}
+
+/**
+ * Abre as configurações do sistema para o usuário habilitar notificações manualmente.
+ * Chamado quando a permissão foi negada e não pode ser solicitada novamente.
+ */
+export function abrirConfiguracoesSistema() {
+  Linking.openSettings();
+}
+
+// ─── Token push ───────────────────────────────────────────────────────────────
+
+/**
+ * Solicita permissão, registra o Expo Push Token e salva no Firestore.
+ * Chamado automaticamente no login (App.js).
+ */
 export async function registrarTokenPush(uid) {
-  if (!Device.isDevice) return; // não funciona em simulador
+  if (!Device.isDevice) return;
 
-  // Android precisa de canal de notificação
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('default', {
       name: 'Geral',
@@ -34,4 +58,43 @@ export async function registrarTokenPush(uid) {
     platform: Platform.OS,
     atualizadoEm: new Date().toISOString(),
   }, { merge: true });
+
+  // Agenda lembrete local ao registrar
+  await agendarLembreteCarregamento();
+}
+
+// ─── Lembretes locais ────────────────────────────────────────────────────────
+
+/**
+ * Agenda uma notificação local diária às 20h lembrando o usuário de carregar.
+ * Idempotente — cancela qualquer lembrete anterior antes de agendar.
+ */
+export async function agendarLembreteCarregamento() {
+  const ativa = await notificacoesAtivas();
+  if (!ativa) return;
+
+  // Cancela instância anterior para evitar duplicatas
+  await Notifications.cancelScheduledNotificationAsync(ID_LEMBRETE_CARGA).catch(() => {});
+
+  await Notifications.scheduleNotificationAsync({
+    identifier: ID_LEMBRETE_CARGA,
+    content: {
+      title: 'CNB Mobile',
+      body: 'Você ainda não carregou hoje. Conecte o carregador e ganhe pontos!',
+      data: { tela: 'Carregar' },
+    },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.DAILY,
+      hour: 20,
+      minute: 0,
+    },
+  });
+}
+
+/**
+ * Cancela todos os lembretes locais agendados pelo app.
+ * Chamado quando o usuário desativa notificações manualmente.
+ */
+export async function cancelarLembretes() {
+  await Notifications.cancelAllScheduledNotificationsAsync();
 }

@@ -5,10 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { iniciarForegroundService, pararForegroundService, servicoRodando, SESSAO_KEY } from '../services/backgroundService';
 import { logInicioCarregamento, logFimCarregamento, logSessaoOnChain } from '../services/analytics';
-
-function calcularPontosTotal(minutos) {
-  return minutos * 10 + Math.floor(minutos / 60) * 50;
-}
+import { calcularPontosTotal } from '../services/pontos';
 
 function estaCarregando(state) {
   return state === Battery.BatteryState.CHARGING || state === Battery.BatteryState.FULL;
@@ -48,7 +45,7 @@ export function useCarregamento(uid, onPontosAdicionados) {
     if (countdownRef.current) return;
     setSegundosRestantes(3600 - (minutosRef.current % 60) * 60);
     countdownRef.current = setInterval(() => {
-      setSegundosRestantes(prev => prev <= 1 ? 3600 : prev - 1);
+      setSegundosRestantes(prev => prev <= 0 ? 3600 : prev - 1);
     }, 1000);
   }, []);
 

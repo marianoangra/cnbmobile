@@ -9,7 +9,7 @@ import Animated, {
   useSharedValue, useAnimatedStyle,
   withTiming, withDelay, Easing,
 } from 'react-native-reanimated';
-import { Trophy, Users, Flame, Crown } from 'lucide-react-native';
+import { Trophy, Users, Flame, Crown, AlertCircle } from 'lucide-react-native';
 import { getRanking, getRankingIndicacoes, getPosicaoRanking } from '../services/pontos';
 import Avatar from '../components/Avatar';
 
@@ -152,7 +152,9 @@ function RankingItem({ item, uid, index, modo }) {
             color: item.posicao <= 3 ? PRIMARY : 'rgba(255,255,255,0.4)',
             fontWeight: '700',
           }}>
-            {item.posicao <= 3 ? ['🥇','🥈','🥉'][item.posicao - 1] : item.posicao}
+            {item.posicao <= 3
+              ? <Text style={{ fontSize: 14, fontWeight: '800', color: ['#FFD700','#C0C0C0','#CD7F32'][item.posicao - 1] }}>{item.posicao}</Text>
+              : item.posicao}
           </Text>
         </View>
 
@@ -238,7 +240,7 @@ export default function RankingScreen({ route }) {
     <LinearGradient colors={['#0b1310', '#0a0f0d', '#000000']} locations={[0, 0.5, 1]} style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
-          <Text style={{ fontSize: 32, marginBottom: 12 }}>😕</Text>
+          <AlertCircle size={32} color="rgba(255,255,255,0.3)" style={{ marginBottom: 12 }} />
           <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 15, marginBottom: 20 }}>
             Falha ao carregar o ranking
           </Text>

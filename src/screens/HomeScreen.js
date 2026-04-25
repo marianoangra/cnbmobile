@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useCallback, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Alert,
-  ActivityIndicator,
+  ActivityIndicator, RefreshControl, Modal, Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -14,10 +14,15 @@ import Svg, { Defs, RadialGradient, Stop, Rect } from 'react-native-svg';
 import * as Battery from 'expo-battery';
 import {
   Bell, ArrowUpRight, ArrowDownLeft,
-  QrCode, Lock, Wallet, Activity, BarChart3,
+  QrCode, Wallet, Activity, BarChart3, Zap, Database,
 } from 'lucide-react-native';
 import Avatar from '../components/Avatar';
-import DePINLiveCard from '../components/DePINLiveCard';
+import { diaKey, diaKeyDe } from '../utils/date';
+import {
+  notificacoesAtivas, agendarLembreteCarregamento,
+  cancelarLembretes, abrirConfiguracoesSistema,
+} from '../services/notificacoes';
+
 import BannerCarousel from '../components/BannerCarousel';
 import { getSaques } from '../services/pontos';
 
@@ -36,28 +41,30 @@ function saudacao() {
 const FRASES_MOTIVACIONAIS = [
   'Vamos somar pontos hoje?',
   'Quero acumular mais pontos!',
-  'Vou ver uma missão interessante hoje.',
-  'Cada carregada vale mais um passo.',
-  'Sua energia move o ranking.',
+  'Vou ver uma missão interessante hoje',
+  'Cada carregada vale mais um passo',
+  'Sua energia move o ranking',
   'Hora de subir na classificação!',
   'Que tal uma nova missão agora?',
   'Carregar é ganhar — bora lá!',
-  'Mais um dia, mais pontos no bolso.',
-  'Você está a um carregamento do topo.',
+  'Mais um dia, mais pontos no bolso',
+  'Você está a um carregamento do topo',
   'O ranking te espera. Vamos nessa?',
   'Seus pontos estão chamando!',
-  'Hoje é um bom dia pra carregar.',
+  'Hoje é um bom dia pra carregar',
   'Missões disponíveis — não perca!',
-  'Pequenos passos, grandes pontos.',
-  'Carregue e suba no ranking.',
+  'Pequenos passos, grandes pontos',
+  'Carregue e suba no ranking',
   'Bora acumular e conquistar!',
   'Cada kWh conta. Vamos carregar?',
-  'Seu saldo cresce a cada missão.',
+  'Seu saldo cresce a cada missão',
   'A liderança está ao seu alcance!',
 ];
 
 function fraseDoDia() {
-  return FRASES_MOTIVACIONAIS[Math.floor(Math.random() * FRASES_MOTIVACIONAIS.length)];
+  const d = new Date();
+  const seed = d.getFullYear() * 1000 + Math.floor((d - new Date(d.getFullYear(), 0, 0)) / 86400000);
+  return FRASES_MOTIVACIONAIS[seed % FRASES_MOTIVACIONAIS.length];
 }
 
 // ─── Hooks ────────────────────────────────────────────────────────────────────
@@ -97,16 +104,13 @@ function useCarregando() {
 
 // ─── Dados estáticos (Figma) ──────────────────────────────────────────────────
 const ATALHOS = [
-  { Icon: Wallet,    label: 'Wallet', id: 'wallet' },
-  { Icon: Activity,  label: 'DePIN',  id: 'depin'  },
+  { Icon: Wallet,    label: 'Wallet',  id: 'wallet' },
+  { Icon: Activity,  label: 'DePIN',   id: 'depin'  },
   { Icon: QrCode,    label: 'Comprar', id: 'pix'    },
-  { Icon: BarChart3, label: 'Ranking', id: 'stats'  },
+  { Icon: Database,  label: 'Dados',   id: 'dados'  },
 ];
 
 // Constrói lista de atividades reais a partir de saques + atividadeDias do perfil
-function diaKey(d) {
-  return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
-}
 
 async function buscarAtividades(uid, atividadeDias) {
   const items = [];
@@ -133,7 +137,7 @@ async function buscarAtividades(uid, atividadeDias) {
   for (let i = 0; i < 7; i++) {
     const d = new Date(hoje);
     d.setDate(hoje.getDate() - i);
-    const pts = atividadeDias?.[diaKey(d)] ?? 0;
+    const pts = atividadeDias?.[diaKeyDe(d)] ?? 0;
     if (pts > 0) {
       const labelDia = i === 0 ? 'Hoje' : i === 1 ? 'Ontem' : d.toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit' });
       items.push({
@@ -156,6 +160,11 @@ async function buscarAtividades(uid, atividadeDias) {
 
 function AvatarHeader({ user, perfil }) {
   const inicial = (perfil?.nome ?? 'U').charAt(0).toUpperCase();
+
+  if (user && perfil?.avatarURL) {
+    return <Avatar uri={perfil.avatarURL} nome={perfil.nome} size={40} borderColor={PRIMARY} />;
+  }
+
   return (
     <LinearGradient
       colors={['#a6ff3d', '#2ecc71']}
@@ -163,16 +172,12 @@ function AvatarHeader({ user, perfil }) {
       end={{ x: 1, y: 1 }}
       style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' }}
     >
-      {user && perfil?.avatarURL ? (
-        <Avatar uri={perfil.avatarURL} nome={perfil.nome} size={40} />
-      ) : (
-        <Text style={{ color: '#000', fontWeight: '700', fontSize: 16 }}>{inicial}</Text>
-      )}
+      <Text style={{ color: '#000', fontWeight: '700', fontSize: 16 }}>{inicial}</Text>
     </LinearGradient>
   );
 }
 
-function CardPontos({ pontos, progresso, faltam, user, estaCarregando, onSaque, onPix, barStyle, pontosHoje, pontosOntem }) {
+function CardPontos({ pontos, progresso, faltam, user, estaCarregando, onSaque, onPix, barStyle, pontosHoje }) {
   const pct = Math.round(progresso * 100);
   return (
     <LinearGradient
@@ -212,32 +217,25 @@ function CardPontos({ pontos, progresso, faltam, user, estaCarregando, onSaque, 
       {/* Topo: label + badge */}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
         <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>Seus pontos</Text>
-        {user && estaCarregando ? (
+        {estaCarregando ? (
           <View style={{
             flexDirection: 'row', alignItems: 'center', gap: 4,
             backgroundColor: 'rgba(198,255,74,0.1)',
             paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99,
           }}>
-            <Text style={{ fontSize: 10, color: PRIMARY, fontWeight: '600' }}>⚡ Ativo</Text>
+            <Zap size={10} color={PRIMARY} strokeWidth={2.5} />
+            <Text style={{ fontSize: 10, color: PRIMARY, fontWeight: '600' }}>Ativo</Text>
           </View>
-        ) : pontosHoje > 0 ? (
+        ) : user ? (
           <View style={{
-            flexDirection: 'row', alignItems: 'center', gap: 3,
-            backgroundColor: 'rgba(198,255,74,0.1)',
-            paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99,
-          }}>
-            <ArrowDownLeft size={11} color={PRIMARY} />
-            <Text style={{ fontSize: 10, color: PRIMARY }}>+{pontosHoje.toLocaleString('pt-BR')} hoje</Text>
-          </View>
-        ) : (
-          <View style={{
-            flexDirection: 'row', alignItems: 'center', gap: 3,
+            flexDirection: 'row', alignItems: 'center', gap: 2,
             backgroundColor: 'rgba(255,255,255,0.07)',
             paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99,
           }}>
-            <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>Meta: 100k pts</Text>
+            <Text style={{ fontSize: 10, color: PRIMARY, fontWeight: '700' }}>{pct}%</Text>
+            <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}> da meta</Text>
           </View>
-        )}
+        ) : null}
       </View>
 
       {/* Valor de pontos */}
@@ -269,7 +267,7 @@ function CardPontos({ pontos, progresso, faltam, user, estaCarregando, onSaque, 
             ? 'Entre para acumular pontos'
             : faltam > 0
               ? `Faltam ${faltam.toLocaleString('pt-BR')} pts para saque`
-              : '🎉 Você pode sacar agora!'}
+              : 'Meta atingida — disponível para saque'}
         </Text>
         {user && (
           <Text style={{ fontSize: 10, color: PRIMARY, fontWeight: '600' }}>{pct}%</Text>
@@ -302,8 +300,8 @@ function CardPontos({ pontos, progresso, faltam, user, estaCarregando, onSaque, 
             flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
           }}
         >
-          <Lock size={14} color="rgba(255,255,255,0.8)" />
-          <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 12 }}>Privado</Text>
+          <Wallet size={14} color="rgba(255,255,255,0.8)" />
+          <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 12 }}>CNB Privado</Text>
         </TouchableOpacity>
       </View>
     </LinearGradient>
@@ -334,14 +332,11 @@ function Atalhos({ onPress }) {
   );
 }
 
-function Atividades({ onVerTudo, atividades, loading }) {
+function Atividades({ atividades, loading }) {
   return (
     <View>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>Atividades</Text>
-        <TouchableOpacity onPress={onVerTudo} activeOpacity={0.7}>
-          <Text style={{ fontSize: 10, color: PRIMARY }}>Ver tudo</Text>
-        </TouchableOpacity>
+        <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>Atividades recentes</Text>
       </View>
 
       {loading ? (
@@ -402,8 +397,47 @@ export default function HomeScreen({ route, navigation }) {
   const [frase] = useState(fraseDoDia);
   const [atividades, setAtividades]           = useState([]);
   const [loadingAtividades, setLoadingAtiv]   = useState(false);
+  const [refreshing, setRefreshing]           = useState(false);
 
   const [focused, setFocused] = useState(true);
+  const [modalNotif, setModalNotif]           = useState(false);
+  const [notifAtiva, setNotifAtiva]           = useState(false);
+  const [loadingNotif, setLoadingNotif]       = useState(false);
+
+  // Verifica status de notificações ao abrir o modal
+  async function abrirModalNotif() {
+    const ativa = await notificacoesAtivas();
+    setNotifAtiva(ativa);
+    setModalNotif(true);
+  }
+
+  async function handleToggleNotif(valor) {
+    setLoadingNotif(true);
+    try {
+      if (valor) {
+        const { status } = await import('expo-notifications')
+          .then(n => n.requestPermissionsAsync());
+        if (status === 'granted') {
+          await agendarLembreteCarregamento();
+          setNotifAtiva(true);
+        } else {
+          Alert.alert(
+            'Permissão negada',
+            'Abra as configurações do sistema para habilitar notificações.',
+            [
+              { text: 'Cancelar', style: 'cancel' },
+              { text: 'Abrir configurações', onPress: abrirConfiguracoesSistema },
+            ]
+          );
+        }
+      } else {
+        await cancelarLembretes();
+        setNotifAtiva(false);
+      }
+    } finally {
+      setLoadingNotif(false);
+    }
+  }
   useFocusEffect(useCallback(() => {
     setFocused(true);
     if (user) onAtualizarRef.current?.();
@@ -428,10 +462,8 @@ export default function HomeScreen({ route, navigation }) {
   const estaCarregando = useCarregando();
 
   // Badge dinâmico: pontos ganhos hoje vs ontem
-  const _hoje  = new Date();
-  const _ontem = new Date(_hoje); _ontem.setDate(_hoje.getDate() - 1);
-  const pontosHoje  = perfil?.atividadeDias?.[diaKey(_hoje)]  ?? 0;
-  const pontosOntem = perfil?.atividadeDias?.[diaKey(_ontem)] ?? 0;
+  const _hoje = new Date();
+  const pontosHoje = perfil?.atividadeDias?.[diaKeyDe(_hoje)] ?? 0;
 
   // Barra de progresso animada
   const barWidth = useSharedValue(0);
@@ -456,6 +488,12 @@ export default function HomeScreen({ route, navigation }) {
     navigation.navigate('Withdraw', { perfil });
   }
 
+  async function handleRefresh() {
+    setRefreshing(true);
+    await onAtualizarRef.current?.();
+    setRefreshing(false);
+  }
+
   function handlePrivado() {
     if (!user) return navigation.navigate('Login');
     navigation.navigate('Withdraw', { perfil, initialAba: 'privado' });
@@ -463,9 +501,9 @@ export default function HomeScreen({ route, navigation }) {
 
   function handleAtalho(id) {
     if (id === 'pix')    return navigation.navigate('BuyTokens');
-    if (id === 'stats')  return navigation.navigate('Ranking', { uid: perfil?.uid, perfil });
     if (id === 'depin')  return navigation.navigate('DePINInfo');
     if (id === 'wallet') return navigation.navigate('Wallet', { user: perfil });
+    if (id === 'dados')  return navigation.navigate('Dados');
   }
 
   return (
@@ -474,11 +512,84 @@ export default function HomeScreen({ route, navigation }) {
       locations={[0, 0.5, 1]}
       style={{ flex: 1 }}
     >
+      {/* ── Modal de notificações ── */}
+      <Modal visible={modalNotif} animationType="slide" transparent onRequestClose={() => setModalNotif(false)}>
+        <TouchableOpacity
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' }}
+          activeOpacity={1}
+          onPress={() => setModalNotif(false)}
+        >
+          <TouchableOpacity activeOpacity={1}>
+            <View style={{
+              backgroundColor: '#0d1a0d',
+              borderTopLeftRadius: 24, borderTopRightRadius: 24,
+              padding: 24, paddingBottom: 40,
+              borderWidth: 1, borderColor: 'rgba(198,255,74,0.12)',
+            }}>
+              <Text style={{ fontSize: 18, fontWeight: '700', color: '#fff', marginBottom: 4 }}>
+                Notificações
+              </Text>
+              <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginBottom: 24 }}>
+                Gerencie os alertas do CNB Mobile
+              </Text>
+
+              {/* Toggle lembrete diário */}
+              <View style={{
+                flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                backgroundColor: 'rgba(255,255,255,0.04)',
+                borderRadius: 14, padding: 16, marginBottom: 10,
+                borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
+              }}>
+                <View style={{ flex: 1, marginRight: 12 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: '#fff', marginBottom: 2 }}>
+                    Lembrete diário de carregamento
+                  </Text>
+                  <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>
+                    Aviso às 20h se você ainda não carregou hoje
+                  </Text>
+                </View>
+                {loadingNotif
+                  ? <ActivityIndicator size="small" color={PRIMARY} />
+                  : <Switch
+                      value={notifAtiva}
+                      onValueChange={handleToggleNotif}
+                      trackColor={{ false: 'rgba(255,255,255,0.15)', true: 'rgba(198,255,74,0.5)' }}
+                      thumbColor={notifAtiva ? PRIMARY : '#fff'}
+                    />
+                }
+              </View>
+
+              {/* Linha informativa: alertas de pontos e missões */}
+              <View style={{
+                backgroundColor: 'rgba(255,255,255,0.04)',
+                borderRadius: 14, padding: 16,
+                borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
+              }}>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: '#fff', marginBottom: 2 }}>
+                  Alertas de pontos e missões
+                </Text>
+                <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>
+                  Enviados pelo servidor quando você completa uma missão ou recebe um bônus
+                </Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 120 }}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={PRIMARY}
+              colors={[PRIMARY]}
+            />
+          }
         >
 
           {/* ── Header ── */}
@@ -500,21 +611,17 @@ export default function HomeScreen({ route, navigation }) {
 
             <TouchableOpacity
               activeOpacity={0.7}
-              onPress={() => Alert.alert('Notificações', 'Em breve você receberá alertas de pontos e missões.')}
+              onPress={abrirModalNotif}
               style={{
                 width: 36, height: 36, borderRadius: 18,
                 backgroundColor: 'rgba(255,255,255,0.05)',
-                borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
+                borderWidth: 1, borderColor: notifAtiva
+                  ? 'rgba(198,255,74,0.35)'
+                  : 'rgba(255,255,255,0.10)',
                 alignItems: 'center', justifyContent: 'center',
               }}
             >
-              <Bell size={16} color="rgba(255,255,255,0.8)" />
-              {/* Dot indicador */}
-              <View style={{
-                position: 'absolute', top: 7, right: 7,
-                width: 6, height: 6, borderRadius: 3,
-                backgroundColor: PRIMARY,
-              }} />
+              <Bell size={16} color={notifAtiva ? PRIMARY : 'rgba(255,255,255,0.8)'} />
             </TouchableOpacity>
           </Animated.View>
 
@@ -530,7 +637,6 @@ export default function HomeScreen({ route, navigation }) {
               onPix={handlePrivado}
               barStyle={barStyle}
               pontosHoje={pontosHoje}
-              pontosOntem={pontosOntem}
             />
           </Animated.View>
 
@@ -539,10 +645,7 @@ export default function HomeScreen({ route, navigation }) {
             <Atalhos onPress={handleAtalho} />
           </Animated.View>
 
-          {/* ── Rede DePIN ao vivo ── */}
-          <Animated.View style={[{ marginBottom: 16 }, a2]}>
-            <DePINLiveCard />
-          </Animated.View>
+
 
           {/* ── Banners (carousel) ── */}
           <Animated.View style={[{ marginBottom: 20 }, a3]}>
@@ -555,7 +658,6 @@ export default function HomeScreen({ route, navigation }) {
           {/* ── Atividades ── */}
           <Animated.View style={a4}>
             <Atividades
-              onVerTudo={() => navigation.navigate('Ranking', { uid: perfil?.uid, perfil })}
               atividades={atividades}
               loading={loadingAtividades}
             />

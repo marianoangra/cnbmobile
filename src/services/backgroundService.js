@@ -1,6 +1,6 @@
 import * as Battery from 'expo-battery';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { adicionarMinutoComBonus } from './pontos';
+import { adicionarMinutoComBonus, calcularPontosTotal } from './pontos';
 
 export const SESSAO_KEY = 'cnb_sessao_carregamento';
 
@@ -40,29 +40,39 @@ function estaCarregando(state) {
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Tenta executar fn uma vez; se falhar, aguarda atraso e tenta mais uma vez.
-async function comRetentativa(fn, atraso = 3000) {
-  try {
-    return await fn();
-  } catch {
-    await sleep(atraso);
-    return await fn(); // lança se falhar novamente
-  }
-}
-
 async function tarefaCarregamento(taskData) {
   const { uid } = taskData;
   let minutos = 0;
+  let pendingMinutes = 0; // minutos não confirmados no Firestore (ex: ficou offline)
 
   try {
     const raw = await AsyncStorage.getItem(SESSAO_KEY);
     if (raw) {
       const sessao = JSON.parse(raw);
-      if (sessao.uid === uid) minutos = sessao.minutosAcumulados ?? 0;
+      if (sessao.uid === uid) {
+        minutos = sessao.minutosAcumulados ?? 0;
+        pendingMinutes = sessao.pendingMinutes ?? 0;
+      }
     }
   } catch {}
 
-  await AsyncStorage.setItem(SESSAO_KEY, JSON.stringify({ uid, minutosAcumulados: minutos })).catch(() => {});
+  // Reconcilia minutos pendentes de sessão anterior interrompida offline
+  if (pendingMinutes > 0) {
+    let flushed = 0;
+    while (flushed < pendingMinutes) {
+      try {
+        const bonusConcedido = await adicionarMinutoComBonus(uid);
+        if (bonusConcedido) console.log(`[BackgroundService] Bônus de hora (reconciliação) concedido!`);
+        flushed++;
+      } catch {
+        break; // Ainda offline — tenta no próximo ciclo
+      }
+    }
+    pendingMinutes -= flushed;
+    if (flushed > 0) console.log(`[BackgroundService] Reconciliados ${flushed} min pendentes.`);
+  }
+
+  await AsyncStorage.setItem(SESSAO_KEY, JSON.stringify({ uid, minutosAcumulados: minutos, pendingMinutes })).catch(() => {});
 
   while (estaRodando()) {
     await sleep(60000);
@@ -77,23 +87,31 @@ async function tarefaCarregamento(taskData) {
     } catch {}
 
     minutos++;
+    pendingMinutes++;
+
+    // Tenta aplicar todos os minutos pendentes (incluindo o atual)
+    let flushed = 0;
+    while (flushed < pendingMinutes) {
+      try {
+        const bonusConcedido = await adicionarMinutoComBonus(uid);
+        if (bonusConcedido) console.log(`[BackgroundService] Bônus de hora concedido! (min ${minutos})`);
+        flushed++;
+      } catch {
+        console.warn(`[BackgroundService] Offline — ${pendingMinutes - flushed} min pendentes`);
+        break;
+      }
+    }
+    pendingMinutes -= flushed;
 
     try {
-      const bonusConcedido = await comRetentativa(() => adicionarMinutoComBonus(uid));
-      if (bonusConcedido) console.log(`[BackgroundService] Bônus de hora concedido! (min ${minutos})`);
-    } catch (e) {
-      console.warn(`[BackgroundService] Falha ao gravar min ${minutos}:`, e?.message);
-    }
-    try {
-      await AsyncStorage.setItem(SESSAO_KEY, JSON.stringify({ uid, minutosAcumulados: minutos }));
+      await AsyncStorage.setItem(SESSAO_KEY, JSON.stringify({ uid, minutosAcumulados: minutos, pendingMinutes }));
     } catch (e) {
       console.warn('[BackgroundService] Falha ao salvar sessão no AsyncStorage:', e?.message);
     }
 
-    const ptsTotais = minutos * 10 + Math.floor(minutos / 60) * 50;
     try {
       await BackgroundService.updateNotification({
-        taskDesc: `⚡ ${minutos} min carregando · +${ptsTotais.toLocaleString('pt-BR')} pts`,
+        taskDesc: `⚡ ${minutos} min carregando · +${calcularPontosTotal(minutos).toLocaleString('pt-BR')} pts`,
       });
     } catch {}
   }
@@ -108,8 +126,8 @@ const OPCOES_BASE = {
   taskIcon: { name: 'ic_launcher', type: 'mipmap' },
   color: '#00FF7F',
   linkingURI: 'com.cnb.cnbappv2://',
-  // Android 14+ (API 34+) exige foregroundServiceType em runtime E no AndroidManifest.
-  // connectedDevice: serviço ativo enquanto dispositivo USB/carregador está conectado.
+  // Android 14+ (API 34+) exige que o tipo declarado aqui coincida com o do AndroidManifest.
+  // O plugin withBackgroundActions declara dataSync — deve ser igual aqui.
   foregroundServiceType: ['dataSync'],
 };
 

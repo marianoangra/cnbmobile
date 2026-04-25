@@ -2,8 +2,9 @@ import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import Avatar from '../components/Avatar';
+import { Clock, ArrowUpRight, AlertCircle } from 'lucide-react-native';
 
-const medalhas = { 1: '🥇', 2: '🥈', 3: '🥉' };
+const medalhasCor = { 1: '#FFD700', 2: '#C0C0C0', 3: '#CD7F32' };
 
 export default function RankingDetailScreen({ route }) {
   const { colors } = useTheme();
@@ -14,7 +15,7 @@ export default function RankingDetailScreen({ route }) {
     return (
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <View style={{ paddingTop: 80, alignItems: 'center' }}>
-          <Text style={{ fontSize: 32, marginBottom: 12 }}>😕</Text>
+          <AlertCircle size={32} color={colors.secondary} style={{ marginBottom: 12 }} />
           <Text style={{ color: colors.secondary, textAlign: 'center' }}>Dados não disponíveis.</Text>
         </View>
       </ScrollView>
@@ -25,7 +26,9 @@ export default function RankingDetailScreen({ route }) {
     <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       <View style={styles.avatarRow}>
         <Avatar uri={item?.avatarURL} nome={item?.nome} size={90} borderColor={isMe ? colors.primary : colors.border} />
-        <Text style={styles.posicao}>{medalhas[item?.posicao] ?? `#${item?.posicao}`}</Text>
+        <Text style={[styles.posicao, { color: medalhasCor[item?.posicao] ?? colors.primary }]}>
+          {item?.posicao <= 3 ? item?.posicao : `#${item?.posicao}`}
+        </Text>
       </View>
 
       <Text style={styles.nome}>{item?.nome}{isMe ? ' (você)' : ''}</Text>
@@ -37,12 +40,12 @@ export default function RankingDetailScreen({ route }) {
 
       <View style={styles.row}>
         <View style={[styles.card, styles.half]}>
-          <Text style={styles.statIcon}>⏱</Text>
+          <Clock size={20} color={colors.secondary} style={{ marginBottom: 6 }} />
           <Text style={styles.statVal}>{item?.minutos ?? 0}</Text>
           <Text style={styles.statLabel}>Min. carregando</Text>
         </View>
         <View style={[styles.card, styles.half]}>
-          <Text style={styles.statIcon}>💸</Text>
+          <ArrowUpRight size={20} color={colors.secondary} style={{ marginBottom: 6 }} />
           <Text style={styles.statVal}>{item?.saques ?? 0}</Text>
           <Text style={styles.statLabel}>Saques</Text>
         </View>
@@ -50,7 +53,9 @@ export default function RankingDetailScreen({ route }) {
 
       <View style={styles.rankCard}>
         <Text style={styles.rankLabel}>Posição global</Text>
-        <Text style={styles.rankPos}>{medalhas[item?.posicao] ?? `#${item?.posicao}`}</Text>
+        <Text style={[styles.rankPos, { color: medalhasCor[item?.posicao] ?? colors.primary }]}>
+          {item?.posicao <= 3 ? item?.posicao : `#${item?.posicao}`}
+        </Text>
         <Text style={styles.rankSub}>Ranking CNB Mobile</Text>
       </View>
     </ScrollView>
@@ -70,7 +75,6 @@ function createStyles(colors) {
     row: { flexDirection: 'row', gap: 12, width: '100%', marginBottom: 14 },
     half: { flex: 1 },
     card: { backgroundColor: colors.card, borderRadius: 16, padding: 16, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
-    statIcon: { fontSize: 20, marginBottom: 6 },
     statVal: { fontSize: 26, fontWeight: 'bold', color: colors.primary },
     statLabel: { fontSize: 12, color: colors.secondary, marginTop: 4, textAlign: 'center' },
     rankCard: { backgroundColor: '#0d1f0d', borderRadius: 16, padding: 20, width: '100%', alignItems: 'center', borderWidth: 1, borderColor: colors.primary },

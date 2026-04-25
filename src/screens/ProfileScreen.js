@@ -20,7 +20,7 @@ import { registrarTokenPush } from '../services/notificacoes';
 import Avatar from '../components/Avatar';
 import {
   Wallet, Share2, Copy, LogOut,
-  ChevronRight, Shield, Bell, Settings, Award, User,
+  ChevronRight, Shield, Bell, Settings, Award, User, Users, Database, Inbox,
 } from 'lucide-react-native';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -126,7 +126,7 @@ export default function ProfileScreen({ route, navigation }) {
 
   const [saques, setSaques]               = useState([]);
   const [loadingSaques, setLoadingSaques] = useState(true);
-  const [afiliados, setAfiliados]         = useState({ codigo: '', total: 0 });
+  const [afiliados, setAfiliados]         = useState({ codigo: '', total: 0, ativas: 0, bonus5k: false, bonus10k: false });
   const [perfilLocal, setPerfilLocal]     = useState(perfil);
   const [minhaPos, setMinhaPos]           = useState(null);
   const [codigoParaAplicar, setCodigo]    = useState('');
@@ -247,9 +247,9 @@ export default function ProfileScreen({ route, navigation }) {
     try {
       await Share.share({
         message:
-          `⚡ Transforme o carregamento do seu celular em dinheiro real!\n\n` +
-          `Baixe o CNB Mobile gratuitamente:\n${link}\n\n` +
-          `O código de indicação já vem preenchido automaticamente ao instalar pelo link! 🎁`,
+          `Transforme o carregamento do seu celular em recompensas reais com o CNB Mobile.\n\n` +
+          `Baixe gratuitamente:\n${link}\n\n` +
+          `O código de indicação já vem preenchido ao instalar pelo link.`,
       });
     } catch { }
   }
@@ -442,8 +442,10 @@ export default function ProfileScreen({ route, navigation }) {
                 onPress: () => navigation.navigate('Withdraw', { perfil: perfilLocal, initialAba: 'privado' }) },
               { Icon: Bell,     title: 'Notificações',     sub: notifAtivas ? 'Ativadas' : 'Desativadas',
                 onPress: handleNotificacoes },
-              { Icon: Settings, title: 'Preferências',     sub: 'Editar perfil, tema',
+              { Icon: Settings,  title: 'Preferências',     sub: 'Editar perfil, tema',
                 onPress: handleEditarPerfil },
+              { Icon: Database, title: 'Dados',             sub: 'Gerencie seus consentimentos',
+                onPress: () => navigation.navigate('Dados') },
             ].map(({ Icon, title, sub, onPress }) => (
               <TouchableOpacity
                 key={title}
@@ -478,19 +480,84 @@ export default function ProfileScreen({ route, navigation }) {
             borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
             borderRadius: 16, padding: 16, marginBottom: 20,
           }, a2]}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+
+            {/* Header */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
               <Text style={{ fontSize: 14, fontWeight: '600', color: '#fff' }}>Programa de Indicação</Text>
               <View style={{
                 backgroundColor: 'rgba(198,255,74,0.1)',
                 borderRadius: 99, paddingHorizontal: 8, paddingVertical: 3,
                 borderWidth: 1, borderColor: 'rgba(198,255,74,0.25)',
               }}>
-                <Text style={{ fontSize: 10, color: PRIMARY, fontWeight: '600' }}>{afiliados.total} indicados</Text>
+                <Text style={{ fontSize: 10, color: PRIMARY, fontWeight: '600' }}>{afiliados.total} cadastros</Text>
               </View>
             </View>
 
-            <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', lineHeight: 18, marginBottom: 14 }}>
-              Indique amigos e ganhe <Text style={{ color: PRIMARY, fontWeight: '600' }}>+100 pts</Text> por cada cadastro!
+            {/* Ativos vs total */}
+            <View style={{
+              flexDirection: 'row', alignItems: 'center', gap: 10,
+              backgroundColor: 'rgba(255,255,255,0.04)',
+              borderRadius: 10, padding: 10, marginBottom: 16,
+            }}>
+              <Users size={15} color={PRIMARY} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 12, color: '#fff', fontWeight: '500' }}>
+                  {afiliados.ativas} de {afiliados.total} indicados já ativaram
+                </Text>
+                <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
+                  Ativo = carregou o celular por 3+ minutos
+                </Text>
+              </View>
+            </View>
+
+            {/* Milestones */}
+            <Text style={{
+              fontSize: 10, color: 'rgba(255,255,255,0.45)',
+              letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10,
+            }}>
+              Bônus por indicados ativos
+            </Text>
+
+            {/* 5 ativos → 50k pts */}
+            <View style={{ marginBottom: 12 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                <Text style={{ fontSize: 12, color: afiliados.bonus5k ? PRIMARY : '#fff' }}>
+                  5 ativos — +50.000 pts
+                </Text>
+                <Text style={{ fontSize: 11, fontWeight: '600', color: afiliados.bonus5k ? PRIMARY : 'rgba(255,255,255,0.4)' }}>
+                  {afiliados.bonus5k ? 'Recebido' : `${Math.min(afiliados.ativas, 5)}/5`}
+                </Text>
+              </View>
+              <View style={{ backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 99, height: 5, overflow: 'hidden' }}>
+                <View style={{
+                  width: `${Math.min((afiliados.ativas / 5) * 100, 100)}%`,
+                  height: 5, borderRadius: 99,
+                  backgroundColor: afiliados.bonus5k ? PRIMARY : 'rgba(198,255,74,0.45)',
+                }} />
+              </View>
+            </View>
+
+            {/* 10 ativos → 100k pts */}
+            <View style={{ marginBottom: 16 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                <Text style={{ fontSize: 12, color: afiliados.bonus10k ? PRIMARY : '#fff' }}>
+                  10 ativos — +100.000 pts
+                </Text>
+                <Text style={{ fontSize: 11, fontWeight: '600', color: afiliados.bonus10k ? PRIMARY : 'rgba(255,255,255,0.4)' }}>
+                  {afiliados.bonus10k ? 'Recebido' : `${Math.min(afiliados.ativas, 10)}/10`}
+                </Text>
+              </View>
+              <View style={{ backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 99, height: 5, overflow: 'hidden' }}>
+                <View style={{
+                  width: `${Math.min((afiliados.ativas / 10) * 100, 100)}%`,
+                  height: 5, borderRadius: 99,
+                  backgroundColor: afiliados.bonus10k ? PRIMARY : 'rgba(198,255,74,0.45)',
+                }} />
+              </View>
+            </View>
+
+            <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 14 }}>
+              +100 pts imediato por cada novo cadastro via código
             </Text>
 
             {/* Código */}
@@ -590,7 +657,7 @@ export default function ProfileScreen({ route, navigation }) {
                 borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
                 borderRadius: 14, padding: 24, alignItems: 'center',
               }}>
-                <Text style={{ fontSize: 24, marginBottom: 8 }}>📭</Text>
+                <Inbox size={28} color="rgba(255,255,255,0.2)" style={{ marginBottom: 8 }} />
                 <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>Nenhum saque realizado ainda</Text>
               </View>
             ) : (

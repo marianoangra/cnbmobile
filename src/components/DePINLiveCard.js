@@ -200,8 +200,6 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.08)',
     borderRadius: 16,
     padding: 16,
-    marginHorizontal: 16,
-    marginVertical: 8,
   },
 
   // Header

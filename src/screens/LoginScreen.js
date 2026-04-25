@@ -22,6 +22,7 @@ import {
   appleLoginDisponivel,
 } from '../services/authSocial';
 import { useTheme } from '../context/ThemeContext';
+import { Zap } from 'lucide-react-native';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -168,7 +169,7 @@ export default function LoginScreen({ navigation }) {
     try {
       await sendPasswordResetEmail(auth, emailDigitado);
       Alert.alert(
-        '✅ E-mail enviado',
+        'E-mail enviado',
         `Verifique sua caixa de entrada em ${emailDigitado} e siga as instruções para redefinir sua senha.`,
       );
     } catch (e) {
@@ -190,7 +191,7 @@ export default function LoginScreen({ navigation }) {
 
           <Animated.View style={[styles.logoArea, { opacity, transform: [{ translateY }] }]}>
             <View style={styles.logoBox}>
-              <Text style={styles.logoBolt}>⚡</Text>
+              <Zap size={22} color={colors.primary} strokeWidth={2.5} />
               <Text style={styles.logoText}>CNB</Text>
             </View>
             <Text style={styles.logoSub}>M O B I L E</Text>
@@ -307,7 +308,6 @@ function createStyles(colors) {
       backgroundColor: colors.card, borderWidth: 2, borderColor: colors.primary,
       alignItems: 'center', justifyContent: 'center', marginBottom: 10, gap: 1,
     },
-    logoBolt: { fontSize: 22, lineHeight: 26 },
     logoText: { fontSize: 18, fontWeight: 'bold', color: colors.primary, letterSpacing: 2 },
     logoSub: { fontSize: 12, color: colors.secondary, letterSpacing: 8 },
     form: {},

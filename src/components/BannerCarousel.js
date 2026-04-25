@@ -1,52 +1,76 @@
-import React, { useRef, useState, useEffect } from 'react';
-import { Animated as RNAnimated, View, StyleSheet } from 'react-native';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
+import { Dimensions, ScrollView, View, StyleSheet } from 'react-native';
+import FrontierBanner from './FrontierBanner';
 import KastBanner from './KastBanner';
 import SolflareBanner from './SolflareBanner';
+import BingXBanner from './BingXBanner';
 
 const PRIMARY = '#c6ff4a';
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const BANNERS = ['kast', 'frontier', 'solflare', 'bingx'];
 
 export default function BannerCarousel({ uid }) {
-  const bannerFade = useRef(new RNAnimated.Value(1)).current;
-  const [bannerIdx, setBannerIdx] = useState(0);
+  const scrollRef = useRef(null);
+  const [activeIdx, setActiveIdx] = useState(0);
+  const activeIdxRef = useRef(0);
 
+  const scrollTo = useCallback((idx) => {
+    scrollRef.current?.scrollTo({ x: idx * SCREEN_WIDTH, animated: true });
+  }, []);
+
+  // Auto-avanço a cada 6s
   useEffect(() => {
     const interval = setInterval(() => {
-      RNAnimated.timing(bannerFade, {
-        toValue: 0,
-        duration: 400,
-        useNativeDriver: true,
-      }).start(({ finished }) => {
-        if (finished) {
-          setBannerIdx(prev => (prev === 0 ? 1 : 0));
-          RNAnimated.timing(bannerFade, {
-            toValue: 1,
-            duration: 400,
-            useNativeDriver: true,
-          }).start();
-        }
-      });
+      const next = (activeIdxRef.current + 1) % BANNERS.length;
+      scrollTo(next);
     }, 6000);
-
     return () => clearInterval(interval);
-  }, [bannerFade]);
+  }, [scrollTo]);
+
+  function handleScroll(e) {
+    const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+    if (idx !== activeIdxRef.current) {
+      activeIdxRef.current = idx;
+      setActiveIdx(idx);
+    }
+  }
 
   return (
     <View>
-      <RNAnimated.View style={{ opacity: bannerFade }}>
-        {bannerIdx === 0 ? (
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={handleScroll}
+        scrollEventThrottle={16}
+        // Compensa o paddingHorizontal do ScrollView pai
+        style={{ marginHorizontal: -20 }}
+        contentContainerStyle={{ paddingHorizontal: 20 }}
+        snapToInterval={SCREEN_WIDTH}
+        decelerationRate="fast"
+      >
+        <View style={{ width: SCREEN_WIDTH - 40 }}>
           <KastBanner uid={uid} />
-        ) : (
+        </View>
+        <View style={{ width: SCREEN_WIDTH - 40, marginLeft: 40 }}>
+          <FrontierBanner />
+        </View>
+        <View style={{ width: SCREEN_WIDTH - 40, marginLeft: 40 }}>
           <SolflareBanner />
-        )}
-      </RNAnimated.View>
+        </View>
+        <View style={{ width: SCREEN_WIDTH - 40, marginLeft: 40 }}>
+          <BingXBanner />
+        </View>
+      </ScrollView>
 
       <View style={styles.dotsContainer}>
-        {[0, 1].map(i => (
+        {BANNERS.map((_, i) => (
           <View
             key={i}
             style={[
               styles.dotBase,
-              i === bannerIdx ? styles.dotActive : styles.dotInactive,
+              i === activeIdx ? styles.dotActive : styles.dotInactive,
             ]}
           />
         ))}

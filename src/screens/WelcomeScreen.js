@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Zap } from 'lucide-react-native';
 
 const PRIMARY = '#c6ff4a';
 
@@ -48,7 +49,7 @@ export default function WelcomeScreen({ nome }) {
           alignItems: 'center', justifyContent: 'center',
           gap: 2,
         }}>
-          <Text style={{ fontSize: 30, lineHeight: 36 }}>⚡</Text>
+          <Zap size={30} color={PRIMARY} strokeWidth={2.5} />
           <Text style={{ fontSize: 22, fontWeight: '800', color: PRIMARY, letterSpacing: 4 }}>CNB</Text>
         </View>
       </Animated.View>

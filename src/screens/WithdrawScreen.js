@@ -1,21 +1,28 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, Alert, ActivityIndicator,
+  ScrollView, Alert, ActivityIndicator, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { solicitarSaque } from '../services/pontos';
 import { logSaqueSolicitado, logResgateCNB, logResgateCNBSucesso } from '../services/analytics';
 import { getWalletAddress } from '../services/walletService';
+import bs58 from 'bs58';
 import { useTheme } from '../context/ThemeContext';
+import { ArrowLeft, CreditCard, Lock, DollarSign, Clock, Zap, Smartphone, Shield, AlertTriangle, Key } from 'lucide-react-native';
 
 const functions = getFunctions();
 const resgatarCNBFn = httpsCallable(functions, 'resgatarCNB');
 const resgatarPrivadoFn = httpsCallable(functions, 'resgatarPrivado');
 
 function solanaValido(addr) {
-  return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(addr.trim());
+  try {
+    const decoded = bs58.decode(addr.trim());
+    return decoded.length === 32;
+  } catch {
+    return false;
+  }
 }
 
 export default function WithdrawScreen({ route, navigation }) {
@@ -127,7 +134,7 @@ export default function WithdrawScreen({ route, navigation }) {
               });
               const sig = result.data?.signature ?? '';
               Alert.alert(
-                '🔒 SOL enviado privadamente!',
+                'SOL enviado com privacidade',
                 `~${solLiquido.toFixed(4)} SOL enviados via Cloak.\n\nAssinatura: ${sig.slice(0, 16)}...\n\nNenhum link on-chain entre o projeto e sua carteira.`,
                 [{ text: 'OK', onPress: () => navigation.goBack() }]
               );
@@ -163,7 +170,7 @@ export default function WithdrawScreen({ route, navigation }) {
               const sig = result.data?.signature ?? '';
               logResgateCNBSucesso(qtdCNB, sig);
               Alert.alert(
-                '✅ CNB enviado!',
+                'CNB enviado com sucesso',
                 `${qtdCNB.toLocaleString('pt-BR')} CNB tokens enviados para sua carteira Solana.\n\nSignature: ${sig.slice(0, 16)}...`,
                 [{ text: 'OK', onPress: () => navigation.goBack() }]
               );
@@ -177,7 +184,20 @@ export default function WithdrawScreen({ route, navigation }) {
   }
 
   return (
-    <SafeAreaView style={styles.flex} edges={['bottom']}>
+    <SafeAreaView style={styles.flex} edges={['top', 'bottom']}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          activeOpacity={0.7}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 }}
+        >
+          <ArrowLeft size={18} color="rgba(255,255,255,0.6)" />
+          <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>Voltar</Text>
+        </TouchableOpacity>
         <ScrollView
           contentContainerStyle={styles.container}
           keyboardShouldPersistTaps="handled"
@@ -194,7 +214,10 @@ export default function WithdrawScreen({ route, navigation }) {
               style={[styles.tab, aba === 'pix' && styles.tabAtiva]}
               onPress={() => setAba('pix')}
               activeOpacity={0.8}>
-              <Text style={[styles.tabText, aba === 'pix' && styles.tabTextAtiva]}>💳 PIX</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <CreditCard size={12} color={aba === 'pix' ? colors.white : colors.secondary} />
+                <Text style={[styles.tabText, aba === 'pix' && styles.tabTextAtiva]}>PIX</Text>
+              </View>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.tab, aba === 'cnb' && styles.tabAtiva]}
@@ -206,16 +229,24 @@ export default function WithdrawScreen({ route, navigation }) {
               style={[styles.tab, aba === 'privado' && styles.tabAtivaPrivado]}
               onPress={() => setAba('privado')}
               activeOpacity={0.8}>
-              <Text style={[styles.tabText, aba === 'privado' && styles.tabTextPrivado]}>🔒 Privado</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Lock size={12} color={aba === 'privado' ? '#c084fc' : colors.secondary} />
+                <Text style={[styles.tabText, aba === 'privado' && styles.tabTextPrivado]}>Privado</Text>
+              </View>
             </TouchableOpacity>
           </View>
 
           {aba === 'pix' && (
             <>
               <View style={styles.infoCard}>
-                <Text style={styles.infoLine}>💰 Mínimo: 100.000 pontos</Text>
-                <Text style={styles.infoLine}>📧 Pagamento: contato@criptonobolso.com.br</Text>
-                <Text style={styles.infoLine}>⏱ Prazo: até 72 horas</Text>
+                <View style={styles.infoRow}>
+                  <DollarSign size={13} color={colors.primary} />
+                  <Text style={styles.infoLine}>Mínimo: 100.000 pontos</Text>
+                </View>
+                <View style={styles.infoRow}>
+                  <Clock size={13} color={colors.primary} />
+                  <Text style={styles.infoLine}>Prazo: até 72 horas</Text>
+                </View>
               </View>
 
               <Text style={styles.fieldLabel}>Nome completo</Text>
@@ -262,12 +293,23 @@ export default function WithdrawScreen({ route, navigation }) {
           {aba === 'cnb' && (
             <>
               <View style={styles.infoCardSolana}>
-                <Text style={styles.infoLineSolana}>◎ 1 ponto = 1 CNB Token</Text>
-                <Text style={styles.infoLineSolana}>🔑 Mínimo: 100.000 pontos</Text>
-                <Text style={styles.infoLineSolana}>⚡ Envio imediato na Solana</Text>
-                <Text style={styles.infoLineSolana}>
-                  {walletNativa ? '📲 Sua carteira CNB já está selecionada' : '📱 Use Phantom, Solflare ou crie sua carteira no app'}
-                </Text>
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLineSolana}>◎ 1 ponto = 1 CNB Token</Text>
+                </View>
+                <View style={styles.infoRow}>
+                  <Key size={13} color="#9945FF" />
+                  <Text style={styles.infoLineSolana}>Mínimo: 100.000 pontos</Text>
+                </View>
+                <View style={styles.infoRow}>
+                  <Zap size={13} color="#9945FF" />
+                  <Text style={styles.infoLineSolana}>Envio imediato na Solana</Text>
+                </View>
+                <View style={styles.infoRow}>
+                  <Smartphone size={13} color="#9945FF" />
+                  <Text style={styles.infoLineSolana}>
+                    {walletNativa ? 'Sua carteira CNB já está selecionada' : 'Use Phantom, Solflare ou crie sua carteira no app'}
+                  </Text>
+                </View>
               </View>
 
               <Text style={styles.fieldLabel}>Endereço da carteira Solana</Text>
@@ -329,9 +371,10 @@ export default function WithdrawScreen({ route, navigation }) {
             <>
               {/* Explicação do saque privado */}
               <View style={{ backgroundColor: 'rgba(192,132,252,0.07)', borderWidth: 1, borderColor: 'rgba(192,132,252,0.2)', borderRadius: 16, padding: 16, marginBottom: 16 }}>
-                <Text style={{ fontSize: 14, fontWeight: '700', color: '#c084fc', marginBottom: 8 }}>
-                  🔒 O que é o Saque Privado?
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                  <Lock size={14} color="#c084fc" />
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#c084fc' }}>O que é o Saque Privado?</Text>
+                </View>
                 <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', lineHeight: 20, marginBottom: 12 }}>
                   O Saque Privado usa <Text style={{ color: '#c084fc', fontWeight: '600' }}>Zero-Knowledge Proofs (ZK)</Text> para converter seus pontos em SOL sem criar um link rastreável entre o CNB Mobile e sua carteira Solana.
                 </Text>
@@ -341,10 +384,21 @@ export default function WithdrawScreen({ route, navigation }) {
               </View>
 
               <View style={styles.infoCardPrivado}>
-                <Text style={styles.infoLinePrivado}>🔒 Resgate privado via Cloak Protocol</Text>
-                <Text style={styles.infoLinePrivado}>◎ 100.000 pontos = ~0.005 SOL líquido</Text>
-                <Text style={styles.infoLinePrivado}>🛡 Sem link on-chain entre projeto e você</Text>
-                <Text style={styles.infoLinePrivado}>⚡ ZK-proof gerado automaticamente</Text>
+                <View style={styles.infoRow}>
+                  <Lock size={13} color="#c4b5fd" />
+                  <Text style={styles.infoLinePrivado}>Resgate privado via Cloak Protocol</Text>
+                </View>
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLinePrivado}>◎ 100.000 pontos = ~0.005 SOL líquido</Text>
+                </View>
+                <View style={styles.infoRow}>
+                  <Shield size={13} color="#c4b5fd" />
+                  <Text style={styles.infoLinePrivado}>Sem link on-chain entre projeto e você</Text>
+                </View>
+                <View style={styles.infoRow}>
+                  <Zap size={13} color="#c4b5fd" />
+                  <Text style={styles.infoLinePrivado}>ZK-proof gerado automaticamente</Text>
+                </View>
               </View>
 
               <Text style={styles.fieldLabel}>Endereço da carteira Solana</Text>
@@ -388,7 +442,10 @@ export default function WithdrawScreen({ route, navigation }) {
                 disabled={loadingPrivado || !podeConfirmarPrivado}>
                 {loadingPrivado
                   ? <ActivityIndicator color="#ffffff" />
-                  : <Text style={styles.btnPrivadoText}>Resgatar SOL Privado 🔒</Text>}
+                  : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Lock size={15} color="#fff" />
+                      <Text style={styles.btnPrivadoText}>Resgatar SOL Privado</Text>
+                    </View>}
               </TouchableOpacity>
 
               <View style={styles.cloakBadge}>
@@ -397,8 +454,12 @@ export default function WithdrawScreen({ route, navigation }) {
             </>
           )}
 
-          <Text style={styles.aviso}>⚠️ Os pontos serão debitados da sua conta ao confirmar.</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center', marginTop: 16 }}>
+            <AlertTriangle size={12} color={colors.secondary} />
+            <Text style={[styles.aviso, { marginTop: 0 }]}>Os pontos serão debitados da sua conta ao confirmar.</Text>
+          </View>
         </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -420,10 +481,11 @@ function createStyles(colors) {
     tabTextAtiva: { color: colors.white },
 
     infoCard: { backgroundColor: '#0d1f0d', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: colors.primary, marginBottom: 20 },
-    infoLine: { fontSize: 14, color: colors.secondary, marginBottom: 6 },
+    infoRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
+    infoLine: { fontSize: 14, color: colors.secondary, flex: 1 },
 
     infoCardSolana: { backgroundColor: '#0d0d20', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#9945FF', marginBottom: 20 },
-    infoLineSolana: { fontSize: 14, color: '#b8a0e0', marginBottom: 6 },
+    infoLineSolana: { fontSize: 14, color: '#b8a0e0', flex: 1 },
 
     walletNativaTag: {
       flexDirection: 'row', alignItems: 'center', gap: 10,
@@ -452,7 +514,7 @@ function createStyles(colors) {
     tabAtivaPrivado: { backgroundColor: '#1a0a2e' },
     tabTextPrivado: { color: '#c084fc' },
     infoCardPrivado: { backgroundColor: '#0f0a1e', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#7c3aed', marginBottom: 20 },
-    infoLinePrivado: { fontSize: 14, color: '#c4b5fd', marginBottom: 6 },
+    infoLinePrivado: { fontSize: 14, color: '#c4b5fd', flex: 1 },
     conversaoPrivado: { fontSize: 13, color: '#a78bfa', marginTop: -10, marginBottom: 12, marginLeft: 4, fontWeight: '600' },
     btnPrivado: { backgroundColor: '#7c3aed', borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 4 },
     btnPrivadoText: { color: '#ffffff', fontWeight: 'bold', fontSize: 16 },

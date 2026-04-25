@@ -5,7 +5,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
-import { ArrowLeft, Copy, CheckCircle, AlertCircle } from 'lucide-react-native';
+import { ArrowLeft, Copy, CheckCircle, AlertCircle, Zap } from 'lucide-react-native';
 
 // ─── CONFIGURAÇÕES DO TIME CNB ────────────────────────────────────────────────
 const PIX_KEY       = 'cnb@cnbtoken.io';     // ← Substituir pela chave PIX real
@@ -139,7 +139,7 @@ export default function BuyTokensScreen({ navigation }) {
                   <Text style={{ fontSize: 14, fontWeight: '600' }}>CNB</Text>
                 </Text>
               </View>
-              <Text style={{ fontSize: 32 }}>⚡</Text>
+              <Zap size={32} color={PRIMARY} strokeWidth={2} />
             </View>
 
             <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 10, textAlign: 'center' }}>

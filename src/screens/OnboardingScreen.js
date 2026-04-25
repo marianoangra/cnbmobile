@@ -6,12 +6,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../context/ThemeContext';
+import { Plug, Coins, Users } from 'lucide-react-native';
 
 const SLIDE_META = [
-  { id: '1', emoji: '⚡', corFundo: '#0d2a0d', corBorda: '#39FF6A' },
-  { id: '2', emoji: '🔌', corFundo: '#0a1a2a', corBorda: '#3A8DFF' },
-  { id: '3', emoji: '💰', corFundo: '#2a1000', corBorda: '#F5A623' },
-  { id: '4', emoji: '👥', corFundo: '#12082a', corBorda: '#A855F7' },
+  { id: '1', Icon: null,  corFundo: '#0d2a0d', corBorda: '#39FF6A' },
+  { id: '2', Icon: Plug,  corFundo: '#0a1a2a', corBorda: '#3A8DFF' },
+  { id: '3', Icon: Coins, corFundo: '#2a1000', corBorda: '#F5A623' },
+  { id: '4', Icon: Users, corFundo: '#12082a', corBorda: '#A855F7' },
 ];
 
 function Dot({ active, corAtiva, colors }) {
@@ -102,7 +103,7 @@ export default function OnboardingScreen({ onConcluir }) {
         <View style={[styles.iconCircle, { backgroundColor: slide.corFundo, borderColor: slide.corBorda }]}>
           {slide.id === '1'
             ? <Image source={require('../../assets/icon.png')} style={styles.iconImg} />
-            : <Text style={styles.emoji}>{slide.emoji}</Text>}
+            : <slide.Icon size={68} color={slide.corBorda} strokeWidth={1.5} />}
         </View>
         <Text style={[styles.titulo, { color: colors.white }]}>{slide.title}</Text>
         <Text style={[styles.desc, { color: colors.secondary }]}>{slide.desc}</Text>
@@ -153,7 +154,6 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     marginBottom: 40, borderWidth: 2,
   },
-  emoji: { fontSize: 68 },
   iconImg: { width: 110, height: 110, borderRadius: 24 },
   titulo: {
     fontSize: 30, fontWeight: 'bold',

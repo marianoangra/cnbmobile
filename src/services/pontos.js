@@ -184,6 +184,10 @@ export async function excluirConta(uid, authUser) {
 
 // ─── Pontos ──────────────────────────────────────────────────────────────────
 
+export function calcularPontosTotal(minutos) {
+  return minutos * 10 + Math.floor(minutos / 60) * 50;
+}
+
 export async function adicionarPontos(uid, quantidade, minutosCarregando = 0) {
   await updateDoc(doc(db, 'usuarios', uid), {
     pontos: increment(quantidade),
@@ -322,15 +326,21 @@ async function garantirCodigoAfiliado(uid) {
 
 export async function getAfiliados(uid) {
   const snap = await getDoc(doc(db, 'usuarios', uid));
-  if (!snap.exists()) return { codigo: '', total: 0 };
-  let { codigoAfiliado = '', referidos = 0 } = snap.data();
+  if (!snap.exists()) return { codigo: '', total: 0, ativas: 0, bonus5k: false, bonus10k: false };
+  let {
+    codigoAfiliado = '',
+    referidos = 0,
+    indicacoesAtivas = 0,
+    bonus5kGranted = false,
+    bonus10kGranted = false,
+  } = snap.data();
 
   // Gera código retroativamente para usuários antigos
   if (!codigoAfiliado) {
     codigoAfiliado = await garantirCodigoAfiliado(uid);
   }
 
-  return { codigo: codigoAfiliado, total: referidos };
+  return { codigo: codigoAfiliado, total: referidos, ativas: indicacoesAtivas, bonus5k: bonus5kGranted, bonus10k: bonus10kGranted };
 }
 
 export async function processarIndicacao(novoUid, codigo) {

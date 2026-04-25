@@ -1,6 +1,6 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity,
+  View, Text, TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -11,7 +11,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, {
   Circle, Defs, LinearGradient as SvgGradient, Stop,
-  RadialGradient, G,
+  RadialGradient,
 } from 'react-native-svg';
 import * as Battery from 'expo-battery';
 import { Zap, Plug, TrendingUp } from 'lucide-react-native';
@@ -27,14 +27,26 @@ const CY       = 110;
 const CIRC     = 2 * Math.PI * R;
 const SVG_SIZE = 220;
 
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
-const AnimatedG      = Animated.createAnimatedComponent(G);
+// Platinum palette — ativada silenciosamente para 100k+ pontos
+const PT = {
+  arc1:  '#FFFFFF',
+  arc2:  '#D4D8DC',
+  arc3:  '#8EA0AC',
+  halo:  'rgba(210,220,228,0.13)',
+  glow:  'rgba(220,228,234,0.18)',
+  ring:  'rgba(200,210,218,0.45)',
+  inner: 'rgba(220,228,234,',
+  spark1: '#FFFFFF',
+  spark2: '#B8C8D4',
+  text:  '#E8EEF2',
+};
 
-// ─── Anel SVG (fiel ao Figma) ─────────────────────────────────────────────────
-function AnelSVG({ pct, carregando }) {
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+
+// ─── Anel SVG ────────────────────────────────────────────────────────────────
+function AnelSVG({ pct, carregando, platinum }) {
   const dashOffset = useSharedValue(CIRC);
   const plasmaRot  = useSharedValue(0);
-  const outerRot   = useSharedValue(0);
   const innerAlpha = useSharedValue(0.15);
 
   useEffect(() => {
@@ -43,19 +55,24 @@ function AnelSVG({ pct, carregando }) {
     );
   }, [pct]);
 
+  // Animações condicionadas ao estado de carregamento
   useEffect(() => {
-    plasmaRot.value = withRepeat(withTiming(360, { duration: 3600, easing: Easing.linear }), -1, false);
-    outerRot.value  = withRepeat(withTiming(-360, { duration: 10000, easing: Easing.linear }), -1, false);
-    innerAlpha.value = withRepeat(
-      withSequence(withTiming(0.5, { duration: 1200 }), withTiming(0.15, { duration: 1200 })),
-      -1, true,
-    );
+    if (carregando) {
+      plasmaRot.value = withRepeat(withTiming(360, { duration: 3600, easing: Easing.linear }), -1, false);
+      innerAlpha.value = withRepeat(
+        withSequence(withTiming(0.5, { duration: 1200 }), withTiming(0.15, { duration: 1200 })),
+        -1, true,
+      );
+    } else {
+      cancelAnimation(plasmaRot);
+      cancelAnimation(innerAlpha);
+      innerAlpha.value = withTiming(0.15, { duration: 400 });
+    }
     return () => {
       cancelAnimation(plasmaRot);
-      cancelAnimation(outerRot);
       cancelAnimation(innerAlpha);
     };
-  }, []);
+  }, [carregando]);
 
   const mainArcProps = useAnimatedProps(() => ({
     strokeDashoffset: dashOffset.value,
@@ -65,43 +82,58 @@ function AnelSVG({ pct, carregando }) {
     transform: [{ rotate: `${plasmaRot.value}deg` }],
   }));
 
-  const outerRotStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${outerRot.value}deg` }],
-  }));
-
   const innerAlphaProps = useAnimatedProps(() => ({
     strokeOpacity: innerAlpha.value,
   }));
 
+  const arc1  = platinum ? PT.arc1  : '#E4FF8A';
+  const arc2  = platinum ? PT.arc2  : PRIMARY;
+  const arc3  = platinum ? PT.arc3  : '#2ecc71';
+  const pCol  = platinum ? PT.spark1 : PRIMARY;
+  const haloC = platinum ? PT.halo  : 'rgba(198,255,74,0.10)';
+  const ringC = platinum ? PT.ring  : PRIMARY;
+  const textActive = platinum ? PT.text : PRIMARY;
+
   return (
     <View style={{ width: SVG_SIZE, height: SVG_SIZE, alignItems: 'center', justifyContent: 'center' }}>
+
       {/* Halo de fundo */}
       <View style={{
         position: 'absolute', width: 320, height: 320, borderRadius: 160,
-        backgroundColor: 'rgba(198,255,74,0.10)',
+        backgroundColor: haloC,
         top: (SVG_SIZE - 320) / 2, left: (SVG_SIZE - 320) / 2,
       }} pointerEvents="none" />
+
+      {/* Anel extra platinum — borda prateada dupla */}
+      {platinum && (
+        <View style={{
+          position: 'absolute', width: SVG_SIZE + 18, height: SVG_SIZE + 18,
+          borderRadius: (SVG_SIZE + 18) / 2,
+          borderWidth: 1, borderColor: 'rgba(210,220,228,0.18)',
+          top: -9, left: -9,
+        }} pointerEvents="none" />
+      )}
 
       <Svg width={SVG_SIZE} height={SVG_SIZE} style={{ position: 'absolute', transform: [{ rotate: '-90deg' }] }}>
         <Defs>
           <SvgGradient id="coreGrad" x1="0" y1="0" x2="1" y2="1">
-            <Stop offset="0%"   stopColor="#E4FF8A" />
-            <Stop offset="50%"  stopColor={PRIMARY} />
-            <Stop offset="100%" stopColor="#2ecc71" />
+            <Stop offset="0%"   stopColor={arc1} />
+            <Stop offset="50%"  stopColor={arc2} />
+            <Stop offset="100%" stopColor={arc3} />
           </SvgGradient>
           <SvgGradient id="plasmaGrad" x1="0" y1="0" x2="1" y2="0">
-            <Stop offset="0%"   stopColor={PRIMARY} stopOpacity="0" />
-            <Stop offset="60%"  stopColor={PRIMARY} stopOpacity="0.9" />
+            <Stop offset="0%"   stopColor={pCol} stopOpacity="0" />
+            <Stop offset="60%"  stopColor={pCol} stopOpacity="0.9" />
             <Stop offset="100%" stopColor="#ffffff" stopOpacity="1" />
           </SvgGradient>
           <RadialGradient id="sparkGrad">
             <Stop offset="0%"   stopColor="#ffffff" stopOpacity="1" />
-            <Stop offset="60%"  stopColor={PRIMARY} stopOpacity="0.6" />
-            <Stop offset="100%" stopColor={PRIMARY} stopOpacity="0" />
+            <Stop offset="60%"  stopColor={pCol} stopOpacity="0.6" />
+            <Stop offset="100%" stopColor={pCol} stopOpacity="0" />
           </RadialGradient>
           <RadialGradient id="coreHalo" cx="0.5" cy="0.5" r="0.5">
-            <Stop offset="0%"   stopColor={PRIMARY} stopOpacity="0.3" />
-            <Stop offset="100%" stopColor={PRIMARY} stopOpacity="0" />
+            <Stop offset="0%"   stopColor={arc2} stopOpacity={platinum ? '0.2' : '0.3'} />
+            <Stop offset="100%" stopColor={arc2} stopOpacity="0" />
           </RadialGradient>
         </Defs>
 
@@ -124,22 +156,35 @@ function AnelSVG({ pct, carregando }) {
           animatedProps={mainArcProps}
         />
 
-        {/* Anel tracejado externo girando ao contrário */}
+        {/* Anel tracejado externo */}
         <Circle
           cx={CX} cy={CY} r={R + 16}
-          stroke={PRIMARY} strokeOpacity="0.35" strokeWidth="1" fill="none"
-          strokeDasharray="2 8"
+          stroke={ringC}
+          strokeOpacity={platinum ? '0.5' : '0.35'}
+          strokeWidth={platinum ? '1.5' : '1'}
+          fill="none"
+          strokeDasharray={platinum ? '3 6' : '2 8'}
         />
 
         {/* Anel interno pulsante */}
         <AnimatedCircle
           cx={CX} cy={CY} r={R - 14}
-          stroke={PRIMARY} strokeWidth="1" fill="none"
+          stroke={platinum ? PT.arc2 : PRIMARY}
+          strokeWidth={platinum ? '1.5' : '1'}
+          fill="none"
           animatedProps={innerAlphaProps}
         />
+
+        {/* Platinum: segundo anel interno */}
+        {platinum && (
+          <Circle
+            cx={CX} cy={CY} r={R - 28}
+            stroke="rgba(210,220,228,0.12)" strokeWidth="1" fill="none"
+          />
+        )}
       </Svg>
 
-      {/* Plasma spark — só aparece quando carregando */}
+      {/* Plasma spark — só quando carregando */}
       {carregando && (
         <Animated.View
           style={[{
@@ -151,17 +196,17 @@ function AnelSVG({ pct, carregando }) {
           <Svg width={SVG_SIZE} height={SVG_SIZE} style={{ position: 'absolute', transform: [{ rotate: '-90deg' }] }}>
             <Circle
               cx={CX} cy={CY} r={R}
-              stroke="url(#plasmaGrad)" strokeWidth="4" fill="none"
+              stroke="url(#plasmaGrad)" strokeWidth={platinum ? '5' : '4'} fill="none"
               strokeLinecap="round"
               strokeDasharray={`${CIRC * 0.22} ${CIRC}`}
             />
-            <Circle cx={CX + R} cy={CY} r={10} fill="url(#sparkGrad)" />
-            <Circle cx={CX + R} cy={CY} r={3}  fill="#ffffff" />
+            <Circle cx={CX + R} cy={CY} r={platinum ? 12 : 10} fill="url(#sparkGrad)" />
+            <Circle cx={CX + R} cy={CY} r={3} fill="#ffffff" />
           </Svg>
         </Animated.View>
       )}
 
-      {/* Centro: sempre mostra % da bateria */}
+      {/* Centro */}
       <View style={{ alignItems: 'center', gap: 2 }}>
         <Text style={{
           fontSize: 10, letterSpacing: 4,
@@ -172,7 +217,7 @@ function AnelSVG({ pct, carregando }) {
         </Text>
         <Text style={{
           fontSize: 48, fontWeight: '600',
-          color: carregando ? PRIMARY : 'rgba(255,255,255,0.7)',
+          color: carregando ? textActive : 'rgba(255,255,255,0.7)',
           lineHeight: 52, letterSpacing: -1,
         }}>
           {pct}%
@@ -191,18 +236,73 @@ function AnelSVG({ pct, carregando }) {
   );
 }
 
+// ─── Barra de progresso 1 hora ────────────────────────────────────────────────
+function ProgressoHora({ segundosRestantes, carregando }) {
+  const progresso = (3600 - segundosRestantes) / 3600;
+  const barWidth = useSharedValue(progresso);
+
+  useEffect(() => {
+    barWidth.value = withTiming(progresso, { duration: 800, easing: Easing.out(Easing.cubic) });
+  }, [segundosRestantes]);
+
+  const barStyle = useAnimatedStyle(() => ({
+    width: `${interpolate(barWidth.value, [0, 1], [0, 100])}%`,
+  }));
+
+  const mins = Math.floor(segundosRestantes / 60);
+  const secs = segundosRestantes % 60;
+  const timeStr = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  const pct = Math.round(progresso * 100);
+
+  return (
+    <View style={{ width: '100%' }}>
+      {/* Cabeçalho */}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>
+          Progresso da hora
+        </Text>
+        <Text style={{ fontSize: 11, fontWeight: '600', color: carregando ? PRIMARY : 'rgba(255,255,255,0.25)' }}>
+          {carregando ? `${timeStr} restante` : '--:--'}
+        </Text>
+      </View>
+
+      {/* Trilha */}
+      <View style={{
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        borderRadius: 99, height: 6, overflow: 'hidden',
+      }}>
+        <Animated.View style={[{
+          height: 6, borderRadius: 99, backgroundColor: PRIMARY,
+        }, barStyle]} />
+      </View>
+
+      {/* Rodapé */}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
+        <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>
+          {carregando ? '+50 pts bônus ao completar 1h' : 'Conecte o carregador para iniciar'}
+        </Text>
+        {carregando && (
+          <Text style={{ fontSize: 10, color: PRIMARY, fontWeight: '600' }}>{pct}%</Text>
+        )}
+      </View>
+    </View>
+  );
+}
+
 // ─── Bar chart 10 dias ────────────────────────────────────────────────────────
-const DAYS_EMPTY = Array(10).fill(0);
+// Valores de referência Figma — exibidos enquanto dado real não está disponível
+const STATIC_BARS = [28, 42, 35, 58, 40, 72, 55, 68, 85, 78];
 
 function BarChart({ heights }) {
+  const bars = heights.every(h => h === 0) ? STATIC_BARS : heights;
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 3, height: 56 }}>
-      {heights.map((h, i) => (
+      {bars.map((h, i) => (
         <View
           key={i}
           style={{
             width: 6, borderRadius: 3,
-            height: `${h}%`,
+            height: (h / 100) * 56,
             backgroundColor: PRIMARY,
             opacity: 0.3 + (h / 100) * 0.7,
           }}
@@ -217,7 +317,7 @@ export default function ChargingScreen({ route, navigation }) {
   const { user, uid, perfil, onAtualizar } = route?.params || {};
   const { carregando, pontosGanhos, segundosRestantes } = useCarregamento(uid, onAtualizar);
 
-  const [bateria, setBateria] = React.useState(68);
+  const [bateria, setBateria] = useState(0);
   useEffect(() => {
     Battery.getBatteryLevelAsync()
       .then(l => setBateria(Math.round(l * 100)))
@@ -241,7 +341,8 @@ export default function ChargingScreen({ route, navigation }) {
     transform: [{ translateY: entradaY.value }],
   }));
 
-  const podeSacar = (perfil?.pontos ?? 0) >= 100000;
+  const podeSacar  = (perfil?.pontos ?? 0) >= 100000;
+  const platinum   = (perfil?.pontos ?? 0) >= 100000;
   const barHeights = calcularAtividadeDiaria(perfil?.atividadeDias);
 
   // ── Gate de login ──
@@ -285,25 +386,23 @@ export default function ChargingScreen({ route, navigation }) {
   return (
     <LinearGradient colors={['#000000', '#05100b', '#071a12']} locations={[0, 0.5, 1]} style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
-        <ScrollView
-          contentContainerStyle={{ flexGrow: 1, paddingBottom: 120 }}
-          showsVerticalScrollIndicator={false}
-        >
-          <Animated.View style={[{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 24 }, entradaStyle]}>
+        <Animated.View style={[{ flex: 1 }, entradaStyle]}>
 
-            {/* Anel SVG centralizado */}
-            <View style={{ alignItems: 'center', marginBottom: 84 }}>
-              <AnelSVG pct={bateria} carregando={carregando} />
-            </View>
+          {/* ── Esfera — ocupa todo espaço acima do card ── */}
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+            <AnelSVG pct={bateria} carregando={carregando} platinum={platinum} />
+          </View>
 
-            {/* Card de recompensa acumulada + bar chart */}
+          {/* ── Seção inferior fixa ── */}
+          <View style={{ paddingHorizontal: 20, paddingBottom: 120, gap: 10 }}>
+
+            {/* Card de recompensa + bar chart */}
             <LinearGradient
               colors={['#14251a', '#0a130e']}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
               style={{
-                marginHorizontal: 20, borderRadius: 16, padding: 16,
+                borderRadius: 16, padding: 16,
                 borderWidth: 1, borderColor: 'rgba(198,255,74,0.20)',
-                width: '100%', maxWidth: 380,
                 flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
               }}
             >
@@ -321,18 +420,20 @@ export default function ChargingScreen({ route, navigation }) {
               <BarChart heights={barHeights} />
             </LinearGradient>
 
-            {/* Botão saque disponível */}
+            {/* Progresso da hora */}
+            <View style={{ paddingHorizontal: 0 }}>
+              <ProgressoHora segundosRestantes={segundosRestantes} carregando={carregando} />
+            </View>
+
+            {/* Botão saque */}
             {podeSacar && (
               <TouchableOpacity
                 onPress={() => navigation.navigate('Withdraw', { perfil })}
                 activeOpacity={0.88}
                 style={{
-                  marginHorizontal: 20, marginTop: 12,
                   backgroundColor: PRIMARY, borderRadius: 12,
                   paddingVertical: 14,
-                  flexDirection: 'row', alignItems: 'center',
-                  justifyContent: 'center', gap: 8,
-                  width: '100%', maxWidth: 380,
+                  flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
                 }}
               >
                 <TrendingUp size={16} color="#000" />
@@ -342,9 +443,8 @@ export default function ChargingScreen({ route, navigation }) {
               </TouchableOpacity>
             )}
 
-            {/* Estado de conexão */}
+            {/* Badge de estado */}
             <View style={{
-              marginTop: 16, marginHorizontal: 20,
               flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
               backgroundColor: carregando ? 'rgba(198,255,74,0.08)' : 'rgba(255,255,255,0.05)',
               borderWidth: 1,
@@ -368,39 +468,13 @@ export default function ChargingScreen({ route, navigation }) {
               )}
             </View>
 
-            {/* Texto informativo fixo */}
-            <Text style={{
-              marginTop: 14,
-              fontSize: 11, color: 'rgba(255,255,255,0.3)',
-              textAlign: 'center',
-            }}>
+            {/* Informativo */}
+            <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', textAlign: 'center' }}>
               Saque disponível a partir de 100.000 pontos.
             </Text>
 
-            {/* Botão de saque — visível quando pontos >= 100.000 */}
-            {podeSacar && (
-              <TouchableOpacity
-                onPress={() => navigation.navigate('Withdraw', { perfil })}
-                activeOpacity={0.88}
-                style={{
-                  marginHorizontal: 20, marginTop: 12,
-                  borderWidth: 1.5, borderColor: PRIMARY,
-                  borderRadius: 12, paddingVertical: 13,
-                  flexDirection: 'row', alignItems: 'center',
-                  justifyContent: 'center', gap: 8,
-                  width: '100%', maxWidth: 380,
-                  backgroundColor: 'rgba(198,255,74,0.08)',
-                }}
-              >
-                <TrendingUp size={15} color={PRIMARY} />
-                <Text style={{ color: PRIMARY, fontWeight: '600', fontSize: 14 }}>
-                  Solicitar saque
-                </Text>
-              </TouchableOpacity>
-            )}
-
-          </Animated.View>
-        </ScrollView>
+          </View>
+        </Animated.View>
       </SafeAreaView>
     </LinearGradient>
   );
