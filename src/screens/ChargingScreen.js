@@ -286,7 +286,7 @@ export default function ChargingScreen({ route, navigation }) {
     <LinearGradient colors={['#000000', '#05100b', '#071a12']} locations={[0, 0.5, 1]} style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         <ScrollView
-          contentContainerStyle={{ flexGrow: 1, paddingBottom: 48 }}
+          contentContainerStyle={{ flexGrow: 1, paddingBottom: 120 }}
           showsVerticalScrollIndicator={false}
         >
           <Animated.View style={[{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 24 }, entradaStyle]}>

@@ -375,7 +375,7 @@ export default function HomeScreen({ route, navigation }) {
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 40 }}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 120 }}
           showsVerticalScrollIndicator={false}
         >
 

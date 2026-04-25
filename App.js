@@ -26,8 +26,10 @@ import { getConfiguracaoApp } from './src/services/config';
 import { setUsuarioId, resetUsuarioId, logLoginDiario } from './src/services/analytics';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import ErrorBoundary from './src/components/ErrorBoundary';
-import { Home, Zap, Trophy, User } from 'lucide-react-native';
+import { Home, Zap, Trophy, User, Target } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import MissoesScreen from './src/screens/MissoesScreen';
 import OnboardingScreen from './src/screens/OnboardingScreen';
 import WelcomeScreen from './src/screens/WelcomeScreen';
 import SplashScreen from './src/screens/SplashScreen';
@@ -49,28 +51,128 @@ const Tab = createBottomTabNavigator();
 
 const PRIMARY = '#c6ff4a';
 
-function TabIcon({ IconComponent, focused }) {
+const TAB_ICONS = {
+  Home: Home,
+  Missoes: Target,
+  Carregar: Zap,
+  Ranking: Trophy,
+  Perfil: User,
+};
+
+function FloatingTabBar({ state, descriptors, navigation }) {
+  const insets = useSafeAreaInsets();
+
   return (
-    <View style={{ alignItems: 'center', gap: 3 }}>
-      {/* Glow simulado via camada semi-transparente sob o ícone */}
-      {focused && (
-        <View style={{
-          position: 'absolute', top: -6, left: -6, right: -6, bottom: -2,
-          borderRadius: 16,
-          backgroundColor: 'rgba(198,255,74,0.12)',
-        }} pointerEvents="none" />
-      )}
-      <IconComponent
-        size={20}
-        color={focused ? PRIMARY : 'rgba(255,255,255,0.45)'}
-        strokeWidth={focused ? 2.4 : 2.0}
-      />
-      {focused && (
-        <View style={{
-          width: 4, height: 4, borderRadius: 2,
-          backgroundColor: PRIMARY,
-        }} />
-      )}
+    <View style={{
+      position: 'absolute',
+      bottom: insets.bottom + 14,
+      left: 16,
+      right: 16,
+      alignItems: 'center',
+      pointerEvents: 'box-none',
+    }}>
+      <View style={{
+        flexDirection: 'row',
+        backgroundColor: 'rgba(14,19,14,0.97)',
+        borderRadius: 50,
+        height: 66,
+        alignItems: 'center',
+        paddingHorizontal: 6,
+        width: '100%',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.45,
+        shadowRadius: 20,
+        elevation: 14,
+        borderWidth: 1,
+        borderColor: 'rgba(198,255,74,0.10)',
+      }}>
+        {state.routes.map((route, index) => {
+          const { options } = descriptors[route.key];
+          const label = options.tabBarLabel ?? route.name;
+          const focused = state.index === index;
+          const isCenter = index === 2;
+          const Icon = TAB_ICONS[route.name] ?? Zap;
+
+          function onPress() {
+            const event = navigation.emit({
+              type: 'tabPress',
+              target: route.key,
+              canPreventDefault: true,
+            });
+            if (!focused && !event.defaultPrevented) {
+              navigation.navigate(route.name);
+            }
+          }
+
+          if (isCenter) {
+            return (
+              <TouchableOpacity
+                key={route.key}
+                onPress={onPress}
+                activeOpacity={0.85}
+                style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 6 }}>
+                {/* botão circular que sobe acima da pill */}
+                <View style={{
+                  width: 54,
+                  height: 54,
+                  borderRadius: 27,
+                  backgroundColor: PRIMARY,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: 2,
+                  marginTop: -28,
+                  shadowColor: PRIMARY,
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.6,
+                  shadowRadius: 14,
+                  elevation: 10,
+                }}>
+                  <Icon size={22} color="#0A0F1E" strokeWidth={2.5} />
+                </View>
+                <Text style={{
+                  fontSize: 9,
+                  fontWeight: '700',
+                  color: focused ? PRIMARY : 'rgba(255,255,255,0.5)',
+                  letterSpacing: 0.2,
+                }}>{label}</Text>
+              </TouchableOpacity>
+            );
+          }
+
+          return (
+            <TouchableOpacity
+              key={route.key}
+              onPress={onPress}
+              activeOpacity={0.8}
+              style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 8 }}>
+              {/* fundo destacado no ativo */}
+              {focused && (
+                <View style={{
+                  position: 'absolute',
+                  top: 8,
+                  width: 46,
+                  height: 32,
+                  borderRadius: 12,
+                  backgroundColor: 'rgba(198,255,74,0.13)',
+                }} pointerEvents="none" />
+              )}
+              <Icon
+                size={20}
+                color={focused ? PRIMARY : 'rgba(255,255,255,0.40)'}
+                strokeWidth={focused ? 2.4 : 2.0}
+              />
+              <Text style={{
+                fontSize: 9,
+                fontWeight: focused ? '700' : '500',
+                color: focused ? PRIMARY : 'rgba(255,255,255,0.40)',
+                marginTop: 4,
+                letterSpacing: 0.2,
+              }}>{label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
     </View>
   );
 }
@@ -78,31 +180,22 @@ function TabIcon({ IconComponent, focused }) {
 function MainTabs({ user, perfil, onAtualizar, atualizarPerfil }) {
   return (
     <Tab.Navigator
-      screenOptions={{
-        headerShown: false,
-        tabBarStyle: {
-          backgroundColor: 'rgba(0,0,0,0.92)',
-          borderTopColor: 'rgba(255,255,255,0.10)',
-          borderTopWidth: 1,
-          height: 72,
-          paddingBottom: 12,
-          paddingTop: 10,
-        },
-        tabBarActiveTintColor: PRIMARY,
-        tabBarInactiveTintColor: 'rgba(255,255,255,0.45)',
-        tabBarLabelStyle: { fontSize: 9, fontWeight: '600', letterSpacing: 0.3 },
-        tabBarBorderTopColor: 'rgba(255,255,255,0.10)',
-      }}>
-      <Tab.Screen name="Home" options={{ tabBarLabel: 'Início', tabBarIcon: ({ focused }) => <TabIcon IconComponent={Home} focused={focused} /> }}>
+      tabBar={(props) => <FloatingTabBar {...props} />}
+      sceneContainerStyle={{ backgroundColor: 'transparent' }}
+      screenOptions={{ headerShown: false }}>
+      <Tab.Screen name="Home" options={{ tabBarLabel: 'Início' }}>
         {(props) => <HomeScreen {...props} route={{ ...props.route, params: { user, perfil, onAtualizar } }} />}
       </Tab.Screen>
-      <Tab.Screen name="Carregar" options={{ tabBarLabel: 'Carregar', tabBarIcon: ({ focused }) => <TabIcon IconComponent={Zap} focused={focused} /> }}>
+      <Tab.Screen name="Missoes" options={{ tabBarLabel: 'Missões' }}>
+        {(props) => <MissoesScreen {...props} />}
+      </Tab.Screen>
+      <Tab.Screen name="Carregar" options={{ tabBarLabel: 'Carregar' }}>
         {(props) => <ChargingScreen {...props} route={{ ...props.route, params: { user, uid: perfil?.uid, perfil, onAtualizar } }} />}
       </Tab.Screen>
-      <Tab.Screen name="Ranking" options={{ tabBarLabel: 'Ranking', tabBarIcon: ({ focused }) => <TabIcon IconComponent={Trophy} focused={focused} /> }}>
+      <Tab.Screen name="Ranking" options={{ tabBarLabel: 'Ranking' }}>
         {(props) => <RankingScreen {...props} route={{ ...props.route, params: { uid: perfil?.uid, perfil } }} />}
       </Tab.Screen>
-      <Tab.Screen name="Perfil" options={{ tabBarLabel: 'Perfil', tabBarIcon: ({ focused }) => <TabIcon IconComponent={User} focused={focused} /> }}>
+      <Tab.Screen name="Perfil" options={{ tabBarLabel: 'Perfil' }}>
         {(props) => <ProfileScreen {...props} route={{ ...props.route, params: { user, perfil, onAtualizar, atualizarPerfil } }} />}
       </Tab.Screen>
     </Tab.Navigator>

@@ -259,7 +259,7 @@ export default function RankingScreen({ route }) {
         <FlatList
           data={listaAbaixoPodium}
           keyExtractor={i => i.uid}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 32 }}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 120 }}
           showsVerticalScrollIndicator={false}
           getItemLayout={(_, index) => ({ length: ITEM_HEIGHT + 6, offset: (ITEM_HEIGHT + 6) * index, index })}
           refreshControl={
