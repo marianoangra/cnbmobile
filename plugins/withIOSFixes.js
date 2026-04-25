@@ -19,6 +19,15 @@ use_modular_headers!
 `;
 
 const POST_INSTALL_BLOCK = `    # [CNB_IOS_FIXES_APPLIED] Fixes de compatibilidade com New Architecture
+    # Cria stub para FirebaseStorage-Swift.h (não gerado sem use_frameworks!)
+    require 'fileutils'
+    stub_dir = "#{installer.sandbox.root}/Headers/Public/FirebaseStorage"
+    FileUtils.mkdir_p(stub_dir)
+    stub_path = "#{stub_dir}/FirebaseStorage-Swift.h"
+    unless File.exist?(stub_path)
+      File.write(stub_path, "// FirebaseStorage-Swift.h - stub para build sem use_frameworks!\\n")
+      puts "CNB: Created FirebaseStorage-Swift.h stub"
+    end
     installer.pods_project.targets.each do |target|
       target.build_configurations.each do |cfg|
         extra_flags = %w[-Wno-implicit-int -Wno-implicit-function-declaration -Wno-deprecated-declarations]
