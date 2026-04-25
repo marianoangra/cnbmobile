@@ -1,12 +1,13 @@
 import React, { useRef } from 'react';
-import { Animated, TouchableOpacity, Image, StyleSheet, useWindowDimensions, Linking, Alert } from 'react-native';
+import { Animated, TouchableOpacity, Image, View, useWindowDimensions, Linking, Alert } from 'react-native';
 
-const KAST_URL = 'https://join.kast.xyz/click?offer_id=6&pub_id=96';
-const IMG_RATIO = 1200 / 630;
+const SOLFLARE_URL = 'https://solflare.com';
+const BANNER_H = 127;
 
-export default function KastBanner({ uid }) {
+export default function SolflareBanner() {
   const scale = useRef(new Animated.Value(1)).current;
   const { width } = useWindowDimensions();
+  const imgWidth = width - 40;
 
   function onPressIn() {
     Animated.spring(scale, { toValue: 0.97, useNativeDriver: true }).start();
@@ -15,18 +16,15 @@ export default function KastBanner({ uid }) {
     Animated.spring(scale, { toValue: 1, useNativeDriver: true }).start();
   }
   function handlePress() {
-    const url = uid ? `${KAST_URL}&sub1=${uid}` : KAST_URL;
     Alert.alert(
       'Abrir link externo',
       'Você será redirecionado para fora do app.',
       [
         { text: 'Cancelar', style: 'cancel' },
-        { text: 'Abrir', onPress: () => Linking.openURL(url) },
+        { text: 'Abrir', onPress: () => Linking.openURL(SOLFLARE_URL) },
       ],
     );
   }
-
-  const imgWidth = width - 40;
 
   return (
     <Animated.View style={{ transform: [{ scale }] }}>
@@ -34,20 +32,19 @@ export default function KastBanner({ uid }) {
         onPress={handlePress}
         onPressIn={onPressIn}
         onPressOut={onPressOut}
-        activeOpacity={1}
-        style={styles.container}>
-        <Image
-          source={require('../../assets/kast-banner.png')}
-          style={{ width: imgWidth, height: 127, borderRadius: 16 }}
-          resizeMode="cover"
-        />
+        activeOpacity={1}>
+        {/* cover preenche o banner inteiro — sem letterboxing, sem problema de cor */}
+        <View style={{
+          width: imgWidth, height: BANNER_H, borderRadius: 16,
+          overflow: 'hidden',
+        }}>
+          <Image
+            source={require('../../assets/solflare-banner.jpg')}
+            style={{ width: imgWidth, height: BANNER_H }}
+            resizeMode="cover"
+          />
+        </View>
       </TouchableOpacity>
     </Animated.View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    overflow: 'hidden',
-  },
-});

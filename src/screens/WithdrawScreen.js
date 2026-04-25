@@ -22,7 +22,7 @@ export default function WithdrawScreen({ route, navigation }) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { perfil } = route.params || {};
-  const [aba, setAba] = useState('pix');
+  const [aba, setAba] = useState(route.params?.initialAba ?? 'pix');
 
   const [nome, setNome] = useState(perfil?.nome ?? '');
   const [pix, setPix] = useState('');
@@ -327,6 +327,19 @@ export default function WithdrawScreen({ route, navigation }) {
 
           {aba === 'privado' && (
             <>
+              {/* Explicação do saque privado */}
+              <View style={{ backgroundColor: 'rgba(192,132,252,0.07)', borderWidth: 1, borderColor: 'rgba(192,132,252,0.2)', borderRadius: 16, padding: 16, marginBottom: 16 }}>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: '#c084fc', marginBottom: 8 }}>
+                  🔒 O que é o Saque Privado?
+                </Text>
+                <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', lineHeight: 20, marginBottom: 12 }}>
+                  O Saque Privado usa <Text style={{ color: '#c084fc', fontWeight: '600' }}>Zero-Knowledge Proofs (ZK)</Text> para converter seus pontos em SOL sem criar um link rastreável entre o CNB Mobile e sua carteira Solana.
+                </Text>
+                <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', lineHeight: 20 }}>
+                  Nenhum observador on-chain consegue relacionar seu resgate ao app — sua privacidade financeira é garantida matematicamente.
+                </Text>
+              </View>
+
               <View style={styles.infoCardPrivado}>
                 <Text style={styles.infoLinePrivado}>🔒 Resgate privado via Cloak Protocol</Text>
                 <Text style={styles.infoLinePrivado}>◎ 100.000 pontos = ~0.005 SOL líquido</Text>

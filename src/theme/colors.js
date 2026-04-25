@@ -1,11 +1,13 @@
 export const darkColors = {
-  background: '#141E30',
-  card:       '#1C2B3E',
-  primary:    '#39FF6A',
+  background: '#0b1310',
+  card:       '#14251a',
+  card2:      '#0a130e',
+  primary:    '#c6ff4a',
   secondary:  '#8A9BB0',
   white:      '#FFFFFF',
   danger:     '#FF4444',
   border:     '#263A50',
+  glow:       'rgba(198,255,74,0.35)',
 };
 
 export const lightColors = {

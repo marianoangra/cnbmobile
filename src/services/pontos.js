@@ -209,13 +209,34 @@ export async function adicionarMinutoComBonus(uid) {
     const bonus = Math.floor(novoMinutos / 60) > Math.floor(minutosAtual / 60) ? 50 : 0;
     bonusConcedido = bonus > 0;
     minutosAoCompletar = novoMinutos;
+    const d = new Date();
+    const diaKey = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
     t.update(ref, {
       pontos: increment(10 + bonus),
       minutos: increment(1),
+      [`atividadeDias.${diaKey}`]: increment(10 + bonus),
     });
   });
   if (bonusConcedido) logBonusHora(minutosAoCompletar);
   return bonusConcedido;
+}
+
+/**
+ * Converte o mapa atividadeDias (armazenado no perfil do usuário) em
+ * alturas percentuais (0–100) para os últimos `dias` dias, do mais
+ * antigo ao mais recente. Dias sem atividade retornam 0.
+ */
+export function calcularAtividadeDiaria(atividadeDias = {}, dias = 10) {
+  const hoje = new Date();
+  const pontosPorDia = [];
+  for (let i = dias - 1; i >= 0; i--) {
+    const d = new Date(hoje);
+    d.setDate(hoje.getDate() - i);
+    const key = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+    pontosPorDia.push(atividadeDias?.[key] ?? 0);
+  }
+  const maxPts = Math.max(...pontosPorDia, 1);
+  return pontosPorDia.map(p => (p > 0 ? Math.max(Math.round((p / maxPts) * 100), 8) : 0));
 }
 
 export async function registrarLoginDiario(uid) {

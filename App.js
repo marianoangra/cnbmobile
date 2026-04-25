@@ -1,6 +1,7 @@
+import './global.css'; // NativeWind
 import './src/i18n'; // inicializa i18n antes de tudo
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Alert, Platform, Modal, Text, TouchableOpacity, StyleSheet, Linking, AppState } from 'react-native';
+import { View, Alert, Platform, Modal, Text, TouchableOpacity, StyleSheet, Linking, AppState, StatusBar } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -25,8 +26,10 @@ import { getConfiguracaoApp } from './src/services/config';
 import { setUsuarioId, resetUsuarioId, logLoginDiario } from './src/services/analytics';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import ErrorBoundary from './src/components/ErrorBoundary';
+import { Home, Zap, Trophy, User } from 'lucide-react-native';
 
 import OnboardingScreen from './src/screens/OnboardingScreen';
+import WelcomeScreen from './src/screens/WelcomeScreen';
 import SplashScreen from './src/screens/SplashScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
@@ -38,44 +41,68 @@ import WithdrawScreen from './src/screens/WithdrawScreen';
 import RankingDetailScreen from './src/screens/RankingDetailScreen';
 import EditProfileScreen from './src/screens/EditProfileScreen';
 import WalletScreen from './src/screens/WalletScreen';
+import DePINInfoScreen from './src/screens/DePINInfoScreen';
+import BuyTokensScreen from './src/screens/BuyTokensScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-function TabIcon({ emoji, focused }) {
+const PRIMARY = '#c6ff4a';
+
+function TabIcon({ IconComponent, focused }) {
   return (
-    <Text style={{ fontSize: focused ? 24 : 22, opacity: focused ? 1 : 0.6 }}>{emoji}</Text>
+    <View style={{ alignItems: 'center', gap: 3 }}>
+      {/* Glow simulado via camada semi-transparente sob o ícone */}
+      {focused && (
+        <View style={{
+          position: 'absolute', top: -6, left: -6, right: -6, bottom: -2,
+          borderRadius: 16,
+          backgroundColor: 'rgba(198,255,74,0.12)',
+        }} pointerEvents="none" />
+      )}
+      <IconComponent
+        size={20}
+        color={focused ? PRIMARY : 'rgba(255,255,255,0.45)'}
+        strokeWidth={focused ? 2.4 : 2.0}
+      />
+      {focused && (
+        <View style={{
+          width: 4, height: 4, borderRadius: 2,
+          backgroundColor: PRIMARY,
+        }} />
+      )}
+    </View>
   );
 }
 
 function MainTabs({ user, perfil, onAtualizar, atualizarPerfil }) {
-  const { colors } = useTheme();
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: colors.card,
-          borderTopColor: colors.border,
+          backgroundColor: 'rgba(0,0,0,0.92)',
+          borderTopColor: 'rgba(255,255,255,0.10)',
           borderTopWidth: 1,
-          height: 70,
-          paddingBottom: 10,
-          paddingTop: 8,
+          height: 72,
+          paddingBottom: 12,
+          paddingTop: 10,
         },
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.secondary,
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+        tabBarActiveTintColor: PRIMARY,
+        tabBarInactiveTintColor: 'rgba(255,255,255,0.45)',
+        tabBarLabelStyle: { fontSize: 9, fontWeight: '600', letterSpacing: 0.3 },
+        tabBarBorderTopColor: 'rgba(255,255,255,0.10)',
       }}>
-      <Tab.Screen name="Home" options={{ tabBarLabel: 'Início', tabBarIcon: ({ focused }) => <TabIcon emoji="🏠" focused={focused} /> }}>
+      <Tab.Screen name="Home" options={{ tabBarLabel: 'Início', tabBarIcon: ({ focused }) => <TabIcon IconComponent={Home} focused={focused} /> }}>
         {(props) => <HomeScreen {...props} route={{ ...props.route, params: { user, perfil, onAtualizar } }} />}
       </Tab.Screen>
-      <Tab.Screen name="Carregar" options={{ tabBarLabel: 'Carregar', tabBarIcon: ({ focused }) => <TabIcon emoji="⚡" focused={focused} /> }}>
-        {(props) => <ChargingScreen {...props} route={{ ...props.route, params: { user, uid: perfil?.uid, onAtualizar } }} />}
+      <Tab.Screen name="Carregar" options={{ tabBarLabel: 'Carregar', tabBarIcon: ({ focused }) => <TabIcon IconComponent={Zap} focused={focused} /> }}>
+        {(props) => <ChargingScreen {...props} route={{ ...props.route, params: { user, uid: perfil?.uid, perfil, onAtualizar } }} />}
       </Tab.Screen>
-      <Tab.Screen name="Ranking" options={{ tabBarLabel: 'Ranking', tabBarIcon: ({ focused }) => <TabIcon emoji="🏆" focused={focused} /> }}>
+      <Tab.Screen name="Ranking" options={{ tabBarLabel: 'Ranking', tabBarIcon: ({ focused }) => <TabIcon IconComponent={Trophy} focused={focused} /> }}>
         {(props) => <RankingScreen {...props} route={{ ...props.route, params: { uid: perfil?.uid, perfil } }} />}
       </Tab.Screen>
-      <Tab.Screen name="Perfil" options={{ tabBarLabel: 'Perfil', tabBarIcon: ({ focused }) => <TabIcon emoji="👤" focused={focused} /> }}>
+      <Tab.Screen name="Perfil" options={{ tabBarLabel: 'Perfil', tabBarIcon: ({ focused }) => <TabIcon IconComponent={User} focused={focused} /> }}>
         {(props) => <ProfileScreen {...props} route={{ ...props.route, params: { user, perfil, onAtualizar, atualizarPerfil } }} />}
       </Tab.Screen>
     </Tab.Navigator>
@@ -118,12 +145,20 @@ function AppNavigator({ user, perfil, onAtualizar, atualizarPerfil }) {
         name="Wallet" component={WalletScreen}
         options={{ headerShown: true, title: 'Minha Carteira', headerStyle, headerTintColor, headerBackTitle: 'Voltar' }}
       />
+      <Stack.Screen
+        name="DePINInfo" component={DePINInfoScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="BuyTokens" component={BuyTokensScreen}
+        options={{ headerShown: false }}
+      />
     </Stack.Navigator>
   );
 }
 
 const ONBOARDING_KEY = '@cnb_onboarding_done';
-const VERSAO_ATUAL = '1.2.35';
+const VERSAO_ATUAL = '1.2.37';
 
 const STORE_URL = Platform.OS === 'ios'
   ? 'https://apps.apple.com/app/id6741577961'
@@ -146,6 +181,7 @@ function AppContent() {
   const [splashDone, setSplashDone] = useState(false);
   const [onboardingFeito, setOnboardingFeito] = useState(null);
   const [updateObrigatorio, setUpdateObrigatorio] = useState(false);
+  const [welcomeDone, setWelcomeDone] = useState(false);
   const sessaoUnsubRef = useRef(null);
   const userRef = useRef(null);
 
@@ -154,6 +190,13 @@ function AppContent() {
     const t = setTimeout(() => setSplashDone(true), 2000);
     return () => clearTimeout(t);
   }, []);
+
+  // Tela de saudação: exibe por 1,8s após autenticação confirmada
+  useEffect(() => {
+    if (!user || !pronto || !splashDone || !onboardingFeito || welcomeDone) return;
+    const t = setTimeout(() => setWelcomeDone(true), 1800);
+    return () => clearTimeout(t);
+  }, [user, pronto, splashDone, onboardingFeito, welcomeDone]);
 
   useEffect(() => {
     getConfiguracaoApp().then(config => {
@@ -310,6 +353,10 @@ function AppContent() {
     );
   }
 
+  if (user && !welcomeDone) {
+    return <WelcomeScreen nome={perfil?.nome} />;
+  }
+
   return (
     <SafeAreaProvider>
       <Modal visible={updateObrigatorio} transparent animationType="fade" statusBarTranslucent>
@@ -331,6 +378,7 @@ function AppContent() {
         </View>
       </Modal>
 
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
       <NavigationContainer>
         <AppNavigator
           user={user}

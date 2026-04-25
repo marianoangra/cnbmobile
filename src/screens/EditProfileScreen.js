@@ -95,6 +95,15 @@ export default function EditProfileScreen({ route, navigation }) {
             <Text style={styles.avatarHint}>Toque para alterar a foto</Text>
           </View>
 
+          {/* E-mail — não editável */}
+          <View style={styles.campo}>
+            <Text style={styles.campoLabel}>E-mail</Text>
+            <View style={[styles.input, { justifyContent: 'center', opacity: 0.5 }]}>
+              <Text style={{ color: colors.white, fontSize: 17 }}>{perfil?.email ?? '—'}</Text>
+            </View>
+            <Text style={styles.campoHint}>O e-mail não pode ser alterado</Text>
+          </View>
+
           {/* Nome */}
           <View style={styles.campo}>
             <Text style={styles.campoLabel}>Nome de usuário</Text>

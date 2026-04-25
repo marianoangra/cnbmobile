@@ -48,7 +48,7 @@ export default function SplashScreen() {
 
 function createStyles(colors) {
   return StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', gap: 16 },
+    container: { flex: 1, backgroundColor: '#000000', alignItems: 'center', justifyContent: 'center', gap: 16 },
     glowCircle: {
       position: 'absolute',
       width: 260,

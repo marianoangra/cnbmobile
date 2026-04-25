@@ -1,52 +1,142 @@
-import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
-  View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity, Alert,
-  ActivityIndicator, Animated, Share,
+  View, Text, TextInput, ScrollView, TouchableOpacity, Alert,
+  ActivityIndicator, Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import Animated, {
+  useSharedValue, useAnimatedStyle, withTiming, withDelay, Easing,
+} from 'react-native-reanimated';
 import * as Clipboard from 'expo-clipboard';
 import { signOut } from 'firebase/auth';
 import { auth } from '../services/firebase';
 import { limparSessao } from '../services/session';
-import { getSaques, excluirConta, getAfiliados, processarIndicacao } from '../services/pontos';
-import { useTheme } from '../context/ThemeContext';
+import { getSaques, excluirConta, getAfiliados, processarIndicacao, getPosicaoRanking } from '../services/pontos';
 import Avatar from '../components/Avatar';
+import {
+  Wallet, Share2, Copy, LogOut,
+  ChevronRight, Shield, Bell, Settings, Award, User,
+} from 'lucide-react-native';
 
-const statusLabel = { pendente: '⏳ Pendente', aprovado: '✅ Aprovado', rejeitado: '❌ Rejeitado' };
+// ─── Constantes ───────────────────────────────────────────────────────────────
+const PRIMARY = '#c6ff4a';
 
-function useEntrada(delay = 0) {
-  const opacity = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(20)).current;
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(opacity, { toValue: 1, duration: 450, delay, useNativeDriver: true }),
-      Animated.timing(translateY, { toValue: 0, duration: 450, delay, useNativeDriver: true }),
-    ]).start();
-  }, []);
-  return { opacity, transform: [{ translateY }] };
+const NIVEIS = [
+  { min: 0,      label: 'Starter',   cor: '#8A9BB0' },
+  { min: 1000,   label: 'Collector', cor: '#4FC3F7' },
+  { min: 10000,  label: 'Earner',    cor: '#81C784' },
+  { min: 50000,  label: 'Miner',     cor: PRIMARY   },
+  { min: 100000, label: 'Validator', cor: '#FFD700' },
+];
+
+function calcularNivel(pontos) {
+  let nivel = NIVEIS[0];
+  for (const n of NIVEIS) {
+    if (pontos >= n.min) nivel = n;
+    else break;
+  }
+  return nivel;
 }
 
-export default function ProfileScreen({ route, navigation }) {
-  const { colors } = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  const statusColor = { pendente: '#F5A623', aprovado: colors.primary, rejeitado: colors.danger };
+const STATUS_LABEL = { pendente: 'Pendente', aprovado: 'Aprovado', rejeitado: 'Rejeitado' };
+const STATUS_COLOR = { pendente: '#F5A623', aprovado: PRIMARY, rejeitado: '#FF4444' };
 
-  const { user, perfil, onAtualizar, atualizarPerfil } = route.params || {};
-  const [saques, setSaques] = useState([]);
+// ─── Hook de entrada ──────────────────────────────────────────────────────────
+function useEntrada(delayMs = 0) {
+  const opacity    = useSharedValue(0);
+  const translateY = useSharedValue(20);
+  useEffect(() => {
+    const cfg = { duration: 480, easing: Easing.out(Easing.cubic) };
+    opacity.value    = withDelay(delayMs, withTiming(1, cfg));
+    translateY.value = withDelay(delayMs, withTiming(0, cfg));
+  }, []);
+  return useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateY: translateY.value }],
+  }));
+}
+
+// ─── Componentes internos ─────────────────────────────────────────────────────
+function NivelBadge({ pontos }) {
+  const nivel = calcularNivel(pontos);
+  return (
+    <View style={{
+      flexDirection: 'row', alignItems: 'center', gap: 5,
+      backgroundColor: 'rgba(255,255,255,0.07)',
+      borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
+      borderRadius: 99, paddingHorizontal: 10, paddingVertical: 4,
+    }}>
+      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: nivel.cor }} />
+      <Text style={{ fontSize: 11, color: nivel.cor, fontWeight: '600' }}>
+        {nivel.label}
+      </Text>
+    </View>
+  );
+}
+
+function StatBox({ label, value, cor }) {
+  return (
+    <View style={{
+      flex: 1, alignItems: 'center', paddingVertical: 14,
+      backgroundColor: 'rgba(255,255,255,0.04)',
+      borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
+      borderRadius: 14,
+    }}>
+      <Text style={{ fontSize: 22, fontWeight: '700', color: cor ?? '#fff' }}>{value}</Text>
+      <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginTop: 3 }}>{label}</Text>
+    </View>
+  );
+}
+
+function MenuItem({ Icon, title, sub, onPress, danger }) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.75}
+      style={{
+        flexDirection: 'row', alignItems: 'center', gap: 12,
+        paddingVertical: 14,
+        borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)',
+      }}
+    >
+      <View style={{
+        width: 36, height: 36, borderRadius: 18,
+        backgroundColor: danger ? 'rgba(255,68,68,0.1)' : 'rgba(198,255,74,0.1)',
+        alignItems: 'center', justifyContent: 'center',
+      }}>
+        <Icon size={16} color={danger ? '#FF4444' : PRIMARY} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontSize: 14, color: danger ? '#FF4444' : '#fff', fontWeight: '500' }}>{title}</Text>
+        {sub && <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{sub}</Text>}
+      </View>
+      {!danger && <ChevronRight size={16} color="rgba(255,255,255,0.3)" />}
+    </TouchableOpacity>
+  );
+}
+
+// ─── Tela principal ───────────────────────────────────────────────────────────
+export default function ProfileScreen({ route, navigation }) {
+  const { user, perfil, onAtualizar, atualizarPerfil } = route?.params || {};
+
+  const [saques, setSaques]               = useState([]);
   const [loadingSaques, setLoadingSaques] = useState(true);
-  const [afiliados, setAfiliados] = useState({ codigo: '', total: 0 });
-  const [perfilLocal, setPerfilLocal] = useState(perfil);
-  const [codigoParaAplicar, setCodigoParaAplicar] = useState('');
-  const [aplicandoCodigo, setAplicandoCodigo] = useState(false);
+  const [afiliados, setAfiliados]         = useState({ codigo: '', total: 0 });
+  const [perfilLocal, setPerfilLocal]     = useState(perfil);
+  const [minhaPos, setMinhaPos]           = useState(null);
+  const [codigoParaAplicar, setCodigo]    = useState('');
+  const [aplicandoCodigo, setAplicando]   = useState(false);
   const afiliadosCacheRef = useRef({ data: null, ts: 0 });
   const CACHE_TTL = 5 * 60 * 1000;
+
   useEffect(() => { if (perfil) setPerfilLocal(perfil); }, [perfil]);
 
-  const a = useEntrada(0);
-  const b = useEntrada(100);
-  const c = useEntrada(180);
-  const d = useEntrada(260);
+  const a0 = useEntrada(0);
+  const a1 = useEntrada(80);
+  const a2 = useEntrada(160);
+  const a3 = useEntrada(240);
 
   useEffect(() => {
     if (!perfil?.uid) return;
@@ -55,6 +145,13 @@ export default function ProfileScreen({ route, navigation }) {
       .then(setSaques)
       .catch(() => setSaques([]))
       .finally(() => setLoadingSaques(false));
+  }, [perfil?.uid]);
+
+  useEffect(() => {
+    if (!perfil?.uid) return;
+    getPosicaoRanking(perfil.uid)
+      .then(pos => { if (pos) setMinhaPos(pos); })
+      .catch(() => {});
   }, [perfil?.uid]);
 
   useFocusEffect(useCallback(() => {
@@ -78,10 +175,6 @@ export default function ProfileScreen({ route, navigation }) {
     return () => { active = false; };
   }, [perfil?.uid]));
 
-  function handleAbrirCarteira() {
-    navigation.navigate('Wallet', { user: perfilLocal });
-  }
-
   function handleEditarPerfil() {
     navigation.navigate('EditProfile', {
       perfil: perfilLocal,
@@ -95,37 +188,35 @@ export default function ProfileScreen({ route, navigation }) {
   async function handleAplicarCodigo() {
     const codigo = codigoParaAplicar.trim().toUpperCase();
     if (!codigo) return Alert.alert('Atenção', 'Digite um código de indicação.');
-    setAplicandoCodigo(true);
+    setAplicando(true);
     try {
       await processarIndicacao(perfil.uid, codigo);
-      setCodigoParaAplicar('');
+      setCodigo('');
       afiliadosCacheRef.current = { data: null, ts: 0 };
-      Alert.alert('✅ Código aplicado!', 'Você foi indicado com sucesso. O indicador recebeu +100 pts.');
+      Alert.alert('Código aplicado!', 'Você foi indicado com sucesso. O indicador recebeu +100 pts.');
     } catch (e) {
       Alert.alert('Erro', e.message ?? 'Código inválido ou já utilizado.');
     } finally {
-      setAplicandoCodigo(false);
+      setAplicando(false);
     }
   }
 
   async function handleCompartilharCodigo() {
     if (!afiliados.codigo) return;
-    const linkAndroid =
-      `https://play.google.com/store/apps/details?id=com.cnb.cnbappv2&referrer=${afiliados.codigo}`;
+    const link = `https://play.google.com/store/apps/details?id=com.cnb.cnbappv2&referrer=${afiliados.codigo}`;
     try {
       await Share.share({
         message:
           `⚡ Transforme o carregamento do seu celular em dinheiro real!\n\n` +
-          `Baixe o CNB Mobile gratuitamente:\n${linkAndroid}\n\n` +
-          `O código de indicação já vem preenchido automaticamente ao instalar pelo link! 🎁\n\n` +
-          `Acumule pontos e saque via PIX. É grátis!`,
+          `Baixe o CNB Mobile gratuitamente:\n${link}\n\n` +
+          `O código de indicação já vem preenchido automaticamente ao instalar pelo link! 🎁`,
       });
     } catch { }
   }
 
   async function handleCopiarCodigo() {
     await Clipboard.setStringAsync(afiliados.codigo);
-    Alert.alert('✅ Copiado!', 'Código copiado para a área de transferência.');
+    Alert.alert('Copiado!', 'Código copiado para a área de transferência.');
   }
 
   async function handleLogout() {
@@ -136,7 +227,7 @@ export default function ProfileScreen({ route, navigation }) {
   }
 
   async function handleExcluirConta() {
-    Alert.alert('⚠️ Excluir conta', 'Todos os seus dados e pontos serão apagados permanentemente.', [
+    Alert.alert('Excluir conta', 'Todos os seus dados e pontos serão apagados permanentemente.', [
       { text: 'Cancelar', style: 'cancel' },
       {
         text: 'Excluir', style: 'destructive', onPress: () => {
@@ -167,252 +258,354 @@ export default function ProfileScreen({ route, navigation }) {
     return d.toLocaleDateString('pt-BR');
   }
 
+  // ── Gate de login ──
   if (!user) {
     return (
-      <SafeAreaView style={styles.safe} edges={['top']}>
-        <View style={styles.loginGate}>
-          <View style={styles.loginGateAvatar}>
-            <Text style={styles.loginGateIcon}>👤</Text>
+      <LinearGradient colors={['#0b1310', '#0a0f0d', '#000000']} locations={[0, 0.5, 1]} style={{ flex: 1 }}>
+        <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }}>
+            <View style={{
+              width: 88, height: 88, borderRadius: 44,
+              backgroundColor: 'rgba(198,255,74,0.08)',
+              borderWidth: 1.5, borderColor: 'rgba(198,255,74,0.2)',
+              alignItems: 'center', justifyContent: 'center', marginBottom: 24,
+            }}>
+              <User size={36} color={PRIMARY} />
+            </View>
+            <Text style={{ fontSize: 21, fontWeight: '700', color: '#fff', textAlign: 'center', marginBottom: 10 }}>
+              Faça login para ver seu perfil
+            </Text>
+            <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', textAlign: 'center', lineHeight: 21, marginBottom: 36 }}>
+              Acesse sua conta para ver pontos, saques e programa de indicação.
+            </Text>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Login')}
+              activeOpacity={0.85}
+              style={{ backgroundColor: PRIMARY, borderRadius: 14, paddingVertical: 14, width: '100%', alignItems: 'center' }}
+            >
+              <Text style={{ color: '#000', fontWeight: '700', fontSize: 16 }}>Entrar / Cadastrar</Text>
+            </TouchableOpacity>
           </View>
-          <Text style={styles.loginGateTitle}>Faça login para ver seu perfil</Text>
-          <Text style={styles.loginGateSub}>Acesse sua conta para ver pontos, saques e programa de indicação.</Text>
-          <TouchableOpacity
-            style={styles.loginGateBtn}
-            onPress={() => navigation.navigate('Login')}
-            activeOpacity={0.85}>
-            <Text style={styles.loginGateBtnText}>Entrar / Cadastrar</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
+        </SafeAreaView>
+      </LinearGradient>
     );
   }
 
+  const pontos = perfilLocal?.pontos ?? 0;
+
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+    <LinearGradient colors={['#0b1310', '#0a0f0d', '#000000']} locations={[0, 0.5, 1]} style={{ flex: 1 }}>
+      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+        <ScrollView
+          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 48 }}
+          showsVerticalScrollIndicator={false}
+        >
 
-        <Animated.View style={[styles.avatarSection, a]}>
-          <View style={styles.avatarTouchable}>
-            <View style={styles.avatarRing}>
-              <Avatar uri={perfilLocal?.avatarURL} nome={perfilLocal?.nome} size={84} borderColor={colors.primary} />
-            </View>
-          </View>
-          <Text style={styles.nome}>{perfilLocal?.nome ?? 'Usuário'}</Text>
-          <Text style={styles.email}>{perfilLocal?.email ?? ''}</Text>
+          {/* ── Avatar + Nome ── */}
+          <Animated.View style={[{ paddingTop: 12, paddingBottom: 20 }, a0]}>
+            <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 16 }}>Perfil</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+              {/* Avatar 64px com Award badge */}
+              <View style={{ position: 'relative' }}>
+                <LinearGradient
+                  colors={['#c6ff4a', '#2ecc71']}
+                  start={{ x: 0.13, y: 0 }} end={{ x: 1, y: 1 }}
+                  style={{
+                    width: 64, height: 64, borderRadius: 32,
+                    alignItems: 'center', justifyContent: 'center',
+                  }}
+                >
+                  {perfilLocal?.avatarURL ? (
+                    <Avatar uri={perfilLocal.avatarURL} nome={perfilLocal.nome} size={64} />
+                  ) : (
+                    <Text style={{ color: '#000', fontWeight: '700', fontSize: 20 }}>
+                      {(perfilLocal?.nome ?? 'U').charAt(0).toUpperCase()}
+                    </Text>
+                  )}
+                </LinearGradient>
+                {/* Award badge */}
+                <View style={{
+                  position: 'absolute', bottom: -2, right: -2,
+                  width: 22, height: 22, borderRadius: 11,
+                  backgroundColor: PRIMARY,
+                  borderWidth: 2, borderColor: '#000',
+                  alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <Award size={11} color="#000" />
+                </View>
+              </View>
 
-          <TouchableOpacity style={styles.editarPerfilBtn} onPress={handleEditarPerfil} activeOpacity={0.85}>
-            <Text style={styles.editarPerfilIcon}>✏️</Text>
-            <Text style={styles.editarPerfilText}>Editar Perfil</Text>
-          </TouchableOpacity>
-        </Animated.View>
-
-        <Animated.View style={[styles.pontosCard, b]}>
-          <TouchableOpacity style={styles.walletBtn} onPress={handleAbrirCarteira} activeOpacity={0.85}>
-            <Text style={styles.walletBtnIcon}>◎</Text>
-            <View style={styles.walletBtnTexts}>
-              <Text style={styles.walletBtnTitle}>Minha Carteira Solana</Text>
-              <Text style={styles.walletBtnSub}>Ver saldo CNB e endereço</Text>
-            </View>
-            <Text style={styles.walletBtnArrow}>›</Text>
-          </TouchableOpacity>
-        </Animated.View>
-
-        <Animated.View style={[styles.pontosCard, b]}>
-          <Text style={styles.pontosLabel}>Pontos totais</Text>
-          <Text style={styles.pontos}>{(perfilLocal?.pontos ?? 0).toLocaleString('pt-BR')}</Text>
-          {(perfilLocal?.pontos ?? 0) >= 100000 && <Text style={styles.podeSacarBadge}>🎉 Disponível para saque!</Text>}
-        </Animated.View>
-
-        <Animated.View style={[styles.afiliadoCard, c]}>
-          <View style={styles.afiliadoHeader}>
-            <Text style={styles.afiliadoTitle}>👥 Programa de Indicação</Text>
-            <View style={styles.afiliadoBadge}>
-              <Text style={styles.afiliadoBadgeText}>{afiliados.total} indicados</Text>
-            </View>
-          </View>
-          <Text style={styles.afiliadoSub}>
-            Indique amigos e ganhe <Text style={styles.destaque}>+100 pts</Text> por cada cadastro!
-          </Text>
-
-          <View style={styles.codigoRow}>
-            <View style={styles.codigoBox}>
-              <Text style={styles.codigoLabel}>Seu código</Text>
-              <Text style={styles.codigoCodigo}>{afiliados.codigo || '...'}</Text>
-            </View>
-            <TouchableOpacity style={styles.copiarBtn} onPress={handleCopiarCodigo} activeOpacity={0.8}>
-              <Text style={styles.copiarBtnText}>📋 Copiar</Text>
-            </TouchableOpacity>
-          </View>
-
-          <TouchableOpacity style={styles.compartilharBtn} onPress={handleCompartilharCodigo} activeOpacity={0.85}>
-            <Text style={styles.compartilharBtnText}>🚀 Compartilhar código</Text>
-          </TouchableOpacity>
-
-          {!perfilLocal?.referidoPor && (
-            <View style={styles.aplicarBox}>
-              <Text style={styles.aplicarLabel}>🎁 Tem um código de referência?</Text>
-              <View style={styles.aplicarRow}>
-                <TextInput
-                  style={styles.aplicarInput}
-                  placeholder="Digite o código aqui"
-                  placeholderTextColor={colors.secondary}
-                  value={codigoParaAplicar}
-                  onChangeText={v => setCodigoParaAplicar(v.toUpperCase())}
-                  autoCapitalize="characters"
-                  maxLength={10}
-                />
-                <TouchableOpacity
-                  style={[styles.aplicarBtn, aplicandoCodigo && { opacity: 0.5 }]}
-                  onPress={handleAplicarCodigo}
-                  disabled={aplicandoCodigo}
-                  activeOpacity={0.85}>
-                  {aplicandoCodigo
-                    ? <ActivityIndicator color={colors.background} size="small" />
-                    : <Text style={styles.aplicarBtnText}>Aplicar</Text>}
-                </TouchableOpacity>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 16, fontWeight: '600', color: '#fff' }}>
+                  {perfilLocal?.nome ?? 'Usuário'}
+                </Text>
+                <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 }} numberOfLines={1}>
+                  {perfilLocal?.email ?? ''}
+                </Text>
+                <Text style={{ fontSize: 10, color: PRIMARY, marginTop: 3 }}>
+                  {calcularNivel(pontos).label}
+                </Text>
               </View>
             </View>
-          )}
-        </Animated.View>
+          </Animated.View>
 
-        <Animated.View style={[{ width: '100%' }, d]}>
-          <Text style={styles.sectionTitle}>Histórico de Saques</Text>
-
-          {loadingSaques ? (
-            <ActivityIndicator color={colors.primary} style={{ marginTop: 16 }} />
-          ) : saques.length === 0 ? (
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyIcon}>📭</Text>
-              <Text style={styles.emptyText}>Nenhum saque realizado ainda</Text>
-            </View>
-          ) : (
-            saques.map(s => (
-              <View key={s.id} style={styles.saqueItem}>
-                <View style={styles.saqueInfo}>
-                  <Text style={styles.saqueData}>{formatarData(s.criadoEm)}</Text>
-                  <Text style={styles.saquePix} numberOfLines={1}>{s.chavePix}</Text>
+          {/* ── Stats grid (Figma: Pontos · #Ranking · Provas ZK) ── */}
+          <Animated.View style={[{ marginBottom: 20 }, a1]}>
+            <LinearGradient
+              colors={['#14251a', '#0a130e']}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={{
+                borderRadius: 16, padding: 16,
+                borderWidth: 1, borderColor: 'rgba(198,255,74,0.2)',
+              }}
+            >
+              <View style={{ flexDirection: 'row' }}>
+                {/* Pontos */}
+                <View style={{ flex: 1, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 18, fontWeight: '600', color: PRIMARY }}>
+                    {pontos.toLocaleString('pt-BR')}
+                  </Text>
+                  <Text style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 1, marginTop: 3 }}>
+                    Pontos
+                  </Text>
                 </View>
-                <View style={styles.saqueRight}>
-                  <Text style={styles.saquePts}>-{(s.pontos ?? 0).toLocaleString('pt-BR')} pts</Text>
-                  <Text style={[styles.saqueStatus, { color: statusColor[s.status] ?? colors.secondary }]}>
-                    {statusLabel[s.status] ?? s.status}
+                {/* Divider */}
+                <View style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.1)' }} />
+                {/* Ranking */}
+                <View style={{ flex: 1, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 18, fontWeight: '600', color: '#fff' }}>
+                    {minhaPos?.posicao ?? '—'}
+                  </Text>
+                  <Text style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 1, marginTop: 3 }}>
+                    Ranking
+                  </Text>
+                </View>
+                {/* Divider */}
+                <View style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.1)' }} />
+                {/* Indicações */}
+                <View style={{ flex: 1, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 18, fontWeight: '600', color: '#fff' }}>{afiliados.total}</Text>
+                  <Text style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 1, marginTop: 3 }}>
+                    Indicações
                   </Text>
                 </View>
               </View>
-            ))
-          )}
+            </LinearGradient>
+          </Animated.View>
 
-          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>
-            <Text style={styles.logoutBtnText}>Sair da conta</Text>
-          </TouchableOpacity>
+          {/* ── Menu principal (4 itens do Figma) ── */}
+          <Animated.View style={[{ gap: 8, marginBottom: 20 }, a2]}>
+            {[
+              { Icon: Wallet,   title: 'Carteira Solana',  sub: 'Phantom · ' + (perfilLocal?.walletAddress ? perfilLocal.walletAddress.slice(0,4) + '…' + perfilLocal.walletAddress.slice(-3) : '—'),
+                onPress: () => navigation.navigate('Wallet', { user: perfilLocal }) },
+              { Icon: Shield,   title: 'Privacidade ZK',   sub: 'Cloak ativo',
+                onPress: () => navigation.navigate('Wallet', { user: perfilLocal }) },
+              { Icon: Bell,     title: 'Notificações',     sub: 'Ativadas',
+                onPress: () => {} },
+              { Icon: Settings, title: 'Preferências',     sub: 'Editar perfil, tema',
+                onPress: handleEditarPerfil },
+            ].map(({ Icon, title, sub, onPress }) => (
+              <TouchableOpacity
+                key={title}
+                onPress={onPress}
+                activeOpacity={0.75}
+                style={{
+                  flexDirection: 'row', alignItems: 'center', gap: 12,
+                  padding: 12, borderRadius: 14,
+                  backgroundColor: 'rgba(255,255,255,0.03)',
+                  borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
+                }}
+              >
+                <View style={{
+                  width: 36, height: 36, borderRadius: 18,
+                  backgroundColor: 'rgba(198,255,74,0.1)',
+                  alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <Icon size={16} color={PRIMARY} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '500', color: '#fff' }}>{title}</Text>
+                  <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginTop: 1 }} numberOfLines={1}>{sub}</Text>
+                </View>
+                <ChevronRight size={16} color="rgba(255,255,255,0.3)" />
+              </TouchableOpacity>
+            ))}
+          </Animated.View>
 
-          <TouchableOpacity style={styles.excluirBtn} onPress={handleExcluirConta} activeOpacity={0.8}>
-            <Text style={styles.excluirBtnText}>🗑 Excluir minha conta</Text>
-          </TouchableOpacity>
-        </Animated.View>
+          {/* ── Programa de indicação ── */}
+          <Animated.View style={[{
+            backgroundColor: 'rgba(255,255,255,0.04)',
+            borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
+            borderRadius: 16, padding: 16, marginBottom: 20,
+          }, a2]}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <Text style={{ fontSize: 14, fontWeight: '600', color: '#fff' }}>Programa de Indicação</Text>
+              <View style={{
+                backgroundColor: 'rgba(198,255,74,0.1)',
+                borderRadius: 99, paddingHorizontal: 8, paddingVertical: 3,
+                borderWidth: 1, borderColor: 'rgba(198,255,74,0.25)',
+              }}>
+                <Text style={{ fontSize: 10, color: PRIMARY, fontWeight: '600' }}>{afiliados.total} indicados</Text>
+              </View>
+            </View>
 
-      </ScrollView>
-    </SafeAreaView>
+            <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', lineHeight: 18, marginBottom: 14 }}>
+              Indique amigos e ganhe <Text style={{ color: PRIMARY, fontWeight: '600' }}>+100 pts</Text> por cada cadastro!
+            </Text>
+
+            {/* Código */}
+            <View style={{
+              backgroundColor: 'rgba(0,0,0,0.3)',
+              borderWidth: 1, borderColor: 'rgba(198,255,74,0.2)',
+              borderRadius: 12, padding: 12, marginBottom: 10,
+            }}>
+              <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>Seu código</Text>
+              <Text style={{ fontSize: 24, fontWeight: '700', color: PRIMARY, letterSpacing: 4 }}>
+                {afiliados.codigo || '---'}
+              </Text>
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+              <TouchableOpacity
+                onPress={handleCopiarCodigo}
+                activeOpacity={0.8}
+                style={{
+                  flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  backgroundColor: 'rgba(255,255,255,0.06)',
+                  borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+                  borderRadius: 10, paddingVertical: 10,
+                }}
+              >
+                <Copy size={13} color="rgba(255,255,255,0.8)" />
+                <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.9)' }}>Copiar</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handleCompartilharCodigo}
+                activeOpacity={0.8}
+                style={{
+                  flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  backgroundColor: 'rgba(198,255,74,0.1)',
+                  borderWidth: 1, borderColor: 'rgba(198,255,74,0.25)',
+                  borderRadius: 10, paddingVertical: 10,
+                }}
+              >
+                <Share2 size={13} color={PRIMARY} />
+                <Text style={{ fontSize: 12, color: PRIMARY, fontWeight: '600' }}>Compartilhar</Text>
+              </TouchableOpacity>
+            </View>
+
+            {!perfilLocal?.referidoPor && (
+              <View style={{ borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.07)', paddingTop: 12 }}>
+                <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 8 }}>
+                  Tem um código de referência?
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <TextInput
+                    style={{
+                      flex: 1, backgroundColor: 'rgba(0,0,0,0.3)',
+                      borderRadius: 10, padding: 10,
+                      color: '#fff', fontSize: 14,
+                      borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+                      letterSpacing: 2,
+                    }}
+                    placeholder="Digite o código"
+                    placeholderTextColor="rgba(255,255,255,0.3)"
+                    value={codigoParaAplicar}
+                    onChangeText={v => setCodigo(v.toUpperCase())}
+                    autoCapitalize="characters"
+                    maxLength={10}
+                  />
+                  <TouchableOpacity
+                    onPress={handleAplicarCodigo}
+                    disabled={aplicandoCodigo}
+                    activeOpacity={0.85}
+                    style={{
+                      backgroundColor: PRIMARY, borderRadius: 10,
+                      paddingHorizontal: 16, paddingVertical: 10,
+                      opacity: aplicandoCodigo ? 0.5 : 1,
+                    }}
+                  >
+                    {aplicandoCodigo
+                      ? <ActivityIndicator color="#000" size="small" />
+                      : <Text style={{ color: '#000', fontWeight: '700', fontSize: 13 }}>Aplicar</Text>
+                    }
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+          </Animated.View>
+
+          {/* ── Histórico de saques ── */}
+          <Animated.View style={[{ marginBottom: 24 }, a3]}>
+            <Text style={{ fontSize: 14, fontWeight: '600', color: '#fff', marginBottom: 12 }}>
+              Histórico de Saques
+            </Text>
+
+            {loadingSaques ? (
+              <ActivityIndicator color={PRIMARY} style={{ marginTop: 16 }} />
+            ) : saques.length === 0 ? (
+              <View style={{
+                backgroundColor: 'rgba(255,255,255,0.04)',
+                borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
+                borderRadius: 14, padding: 24, alignItems: 'center',
+              }}>
+                <Text style={{ fontSize: 24, marginBottom: 8 }}>📭</Text>
+                <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>Nenhum saque realizado ainda</Text>
+              </View>
+            ) : (
+              <View style={{ gap: 8 }}>
+                {saques.map(s => (
+                  <View key={s.id} style={{
+                    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+                    backgroundColor: 'rgba(255,255,255,0.04)',
+                    borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
+                    borderRadius: 12, padding: 14,
+                  }}>
+                    <View style={{ flex: 1, marginRight: 12 }}>
+                      <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{formatarData(s.criadoEm)}</Text>
+                      <Text style={{ fontSize: 13, color: '#fff', marginTop: 2 }} numberOfLines={1}>{s.chavePix}</Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: '#FF4444' }}>
+                        -{(s.pontos ?? 0).toLocaleString('pt-BR')} pts
+                      </Text>
+                      <Text style={{ fontSize: 11, color: STATUS_COLOR[s.status] ?? 'rgba(255,255,255,0.4)', marginTop: 2 }}>
+                        {STATUS_LABEL[s.status] ?? s.status}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
+          </Animated.View>
+
+          {/* ── Ações de conta ── */}
+          <Animated.View style={[{ gap: 8 }, a3]}>
+            <TouchableOpacity
+              onPress={handleLogout}
+              activeOpacity={0.8}
+              style={{
+                flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+                borderWidth: 1, borderColor: 'rgba(255,68,68,0.3)',
+                borderRadius: 12, paddingVertical: 14,
+              }}
+            >
+              <LogOut size={15} color="#FF4444" />
+              <Text style={{ color: '#FF4444', fontWeight: '600', fontSize: 14 }}>Sair da conta</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={handleExcluirConta}
+              activeOpacity={0.8}
+              style={{ alignItems: 'center', paddingVertical: 12 }}
+            >
+              <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12 }}>Excluir minha conta</Text>
+            </TouchableOpacity>
+          </Animated.View>
+
+        </ScrollView>
+      </SafeAreaView>
+    </LinearGradient>
   );
-}
-
-function createStyles(colors) {
-  return StyleSheet.create({
-    safe: { flex: 1, backgroundColor: colors.background },
-    container: { flex: 1, backgroundColor: colors.background },
-    content: { padding: 20, alignItems: 'center', paddingBottom: 40 },
-
-    avatarSection: { alignItems: 'center', marginBottom: 24, width: '100%' },
-    avatarTouchable: { alignItems: 'center', marginBottom: 12 },
-    avatarRing: {
-      width: 96, height: 96, borderRadius: 48,
-      borderWidth: 2.5, borderColor: colors.primary,
-      alignItems: 'center', justifyContent: 'center',
-    },
-    nome: { fontSize: 22, fontWeight: 'bold', color: colors.white, marginBottom: 4 },
-    email: { fontSize: 13, color: colors.secondary, marginBottom: 14 },
-
-    editarPerfilBtn: {
-      flexDirection: 'row', alignItems: 'center', gap: 6,
-      backgroundColor: colors.card, borderRadius: 20,
-      paddingHorizontal: 16, paddingVertical: 8,
-      borderWidth: 1, borderColor: colors.border,
-    },
-    editarPerfilIcon: { fontSize: 14 },
-    editarPerfilText: { fontSize: 13, color: colors.white, fontWeight: '600' },
-
-    walletBtn: {
-      flexDirection: 'row', alignItems: 'center', gap: 12,
-      backgroundColor: colors.card, borderRadius: 16,
-      padding: 16, width: '100%',
-      borderWidth: 1, borderColor: colors.border,
-    },
-    walletBtnIcon:  { fontSize: 28, color: '#9945FF' },
-    walletBtnTexts: { flex: 1 },
-    walletBtnTitle: { fontSize: 15, fontWeight: '700', color: colors.white },
-    walletBtnSub:   { fontSize: 12, color: colors.secondary, marginTop: 2 },
-    walletBtnArrow: { fontSize: 22, color: colors.secondary },
-
-    pontosCard: { backgroundColor: colors.card, borderRadius: 20, padding: 20, marginBottom: 14, width: '100%', alignItems: 'center', borderWidth: 1, borderColor: colors.border },
-    pontosLabel: { fontSize: 13, color: colors.secondary, marginBottom: 4 },
-    pontos: { fontSize: 44, fontWeight: 'bold', color: colors.primary },
-    podeSacarBadge: { fontSize: 13, color: colors.primary, marginTop: 8, fontWeight: '600' },
-
-    afiliadoCard: { backgroundColor: colors.card, borderRadius: 18, padding: 18, marginBottom: 24, width: '100%', borderWidth: 1, borderColor: colors.border },
-    afiliadoHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-    afiliadoTitle: { fontSize: 15, fontWeight: 'bold', color: colors.white },
-    afiliadoBadge: { backgroundColor: colors.card, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: colors.primary },
-    afiliadoBadgeText: { fontSize: 11, color: colors.primary, fontWeight: '600' },
-    afiliadoSub: { fontSize: 13, color: colors.secondary, marginBottom: 14, lineHeight: 18 },
-    destaque: { color: colors.primary, fontWeight: 'bold' },
-    codigoRow: { flexDirection: 'row', gap: 10, marginBottom: 12, alignItems: 'center' },
-    codigoBox: { flex: 1, backgroundColor: colors.background, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: colors.primary },
-    codigoLabel: { fontSize: 10, color: colors.secondary, marginBottom: 2 },
-    codigoCodigo: { fontSize: 22, fontWeight: 'bold', color: colors.primary, letterSpacing: 3 },
-    copiarBtn: { backgroundColor: colors.card, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: colors.border },
-    copiarBtnText: { fontSize: 13, color: colors.white },
-    compartilharBtn: { backgroundColor: colors.card, borderRadius: 12, padding: 14, alignItems: 'center', borderWidth: 1, borderColor: colors.primary },
-    compartilharBtnText: { color: colors.primary, fontWeight: 'bold', fontSize: 14 },
-
-    aplicarBox: { marginTop: 14, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 14 },
-    aplicarLabel: { fontSize: 13, color: colors.secondary, marginBottom: 8, fontWeight: '600' },
-    aplicarRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
-    aplicarInput: { flex: 1, backgroundColor: colors.background, borderRadius: 10, padding: 12, color: colors.white, fontSize: 15, borderWidth: 1, borderColor: colors.border, letterSpacing: 2 },
-    aplicarBtn: { backgroundColor: colors.primary, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 12 },
-    aplicarBtnText: { color: colors.background, fontWeight: 'bold', fontSize: 14 },
-
-    sectionTitle: { fontSize: 17, fontWeight: 'bold', color: colors.white, marginBottom: 12, alignSelf: 'flex-start' },
-    emptyCard: { backgroundColor: colors.card, borderRadius: 14, padding: 24, width: '100%', alignItems: 'center', marginBottom: 16 },
-    emptyIcon: { fontSize: 28, marginBottom: 8 },
-    emptyText: { color: colors.secondary, fontSize: 14 },
-    saqueItem: { flexDirection: 'row', backgroundColor: colors.card, borderRadius: 12, padding: 14, marginBottom: 8, width: '100%', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: colors.border },
-    saqueInfo: { flex: 1, marginRight: 12 },
-    saqueData: { fontSize: 12, color: colors.secondary },
-    saquePix: { fontSize: 14, color: colors.white, marginTop: 2 },
-    saqueRight: { alignItems: 'flex-end' },
-    saquePts: { fontSize: 14, fontWeight: 'bold', color: colors.danger },
-    saqueStatus: { fontSize: 12, marginTop: 4 },
-
-    logoutBtn: { borderWidth: 1, borderColor: colors.danger, borderRadius: 14, padding: 16, alignItems: 'center', width: '100%', marginTop: 8, marginBottom: 8 },
-    logoutBtnText: { color: colors.danger, fontWeight: 'bold', fontSize: 15 },
-    excluirBtn: { padding: 12, alignItems: 'center', width: '100%' },
-    excluirBtnText: { color: colors.secondary, fontSize: 13 },
-
-    loginGate: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
-    loginGateAvatar: {
-      width: 100, height: 100, borderRadius: 50,
-      backgroundColor: colors.card,
-      borderWidth: 2, borderColor: colors.border,
-      alignItems: 'center', justifyContent: 'center',
-      marginBottom: 28,
-    },
-    loginGateIcon: { fontSize: 44 },
-    loginGateTitle: { fontSize: 20, fontWeight: 'bold', color: colors.white, textAlign: 'center', marginBottom: 10 },
-    loginGateSub: { fontSize: 14, color: colors.secondary, textAlign: 'center', lineHeight: 21, marginBottom: 32 },
-    loginGateBtn: {
-      backgroundColor: colors.primary, borderRadius: 16,
-      paddingVertical: 16, width: '100%', alignItems: 'center',
-    },
-    loginGateBtnText: { color: colors.background, fontWeight: 'bold', fontSize: 16 },
-  });
 }

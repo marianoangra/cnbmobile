@@ -2,11 +2,11 @@
   "expo": {
     "name": "CNB Mobile",
     "slug": "cnbmobile",
-    "version": "1.2.36",
+    "version": "1.2.37",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "cover",
@@ -22,6 +22,7 @@
       "infoPlist": {
         "NSCameraUsageDescription": "Usada para foto de perfil.",
         "NSPhotoLibraryUsageDescription": "Usada para selecionar foto de perfil.",
+        "NSUserTrackingUsageDescription": "Usamos dados de análise para melhorar sua experiência no app.",
         "UIBackgroundModes": [
           "fetch",
           "remote-notification"
@@ -31,7 +32,7 @@
     },
     "android": {
       "package": "com.cnb.cnbappv2",
-      "versionCode": 171,
+      "versionCode": 177,
       "permissions": [
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_DATA_SYNC"
@@ -48,6 +49,7 @@
     },
     "plugins": [
       "./plugins/withBackgroundActions",
+      "./plugins/withIOSFixes",
       "expo-web-browser",
       "@react-native-firebase/app",
       "expo-localization",
