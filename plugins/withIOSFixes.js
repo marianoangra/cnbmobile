@@ -1,10 +1,14 @@
 /**
  * Config plugin para corrigir incompatibilidades de build iOS com New Architecture.
  *
- * Sem use_frameworks! :linkage => :static, os pods Swift do Firebase (FirebaseStorage,
- * FirebaseCoreInternal) não conseguem importar pods ObjC sem module maps.
- * A solução é use_modular_headers! globalmente — gera module maps para todos os pods
- * sem criar framework module context (que causava FIRApp* undefined).
+ * Firebase Storage 11+ é 100% Swift. As classes FIRStorage, FIRStorageReference, etc.
+ * são expostas para ObjC somente via FirebaseStorage-Swift.h, que o compilador Swift
+ * gera APENAS quando use_frameworks! :linkage => :static está ativo.
+ *
+ * Sem use_frameworks!, o arquivo não é gerado e RNFBStorageModule.m falha ao compilar.
+ *
+ * NÃO usar use_modular_headers! junto com use_frameworks! — a combinação cria
+ * definições de módulo duplicadas para FirebaseCore, causando FIRApp* undefined.
  */
 const { withDangerousMod } = require('@expo/config-plugins');
 const fs = require('fs');
@@ -13,21 +17,12 @@ const path = require('path');
 const FIX_MARKER = 'CNB_IOS_FIXES_APPLIED';
 
 // Inserido ANTES do target 'CNBMobile' do
-const MODULAR_HEADERS_BLOCK = `# [CNB_IOS_FIXES_APPLIED] use_modular_headers! para Firebase Swift pods
-use_modular_headers!
+const FRAMEWORKS_BLOCK = `# [CNB_IOS_FIXES_APPLIED] Firebase Storage 11+ é Swift: use_frameworks! gera o bridge header
+use_frameworks! :linkage => :static
 
 `;
 
-const POST_INSTALL_BLOCK = `    # [CNB_IOS_FIXES_APPLIED] Fixes de compatibilidade com New Architecture
-    # Cria stub para FirebaseStorage-Swift.h (não gerado sem use_frameworks!)
-    require 'fileutils'
-    stub_dir = "#{installer.sandbox.root}/Headers/Public/FirebaseStorage"
-    FileUtils.mkdir_p(stub_dir)
-    stub_path = "#{stub_dir}/FirebaseStorage-Swift.h"
-    unless File.exist?(stub_path)
-      File.write(stub_path, "// FirebaseStorage-Swift.h - stub para build sem use_frameworks!\\n")
-      puts "CNB: Created FirebaseStorage-Swift.h stub"
-    end
+const POST_INSTALL_BLOCK = `    # [CNB_IOS_FIXES_APPLIED] Suprime warnings de C legado que quebram compilação
     installer.pods_project.targets.each do |target|
       target.build_configurations.each do |cfg|
         extra_flags = %w[-Wno-implicit-int -Wno-implicit-function-declaration -Wno-deprecated-declarations]
@@ -51,13 +46,13 @@ module.exports = function withIOSFixes(config) {
 
       let podfile = fs.readFileSync(podfilePath, 'utf8');
 
-      // Pula se já tem use_modular_headers! (fix já aplicado) ou se está no contexto antigo
-      if (podfile.includes('use_modular_headers!')) return config;
+      // Pula se já aplicado
+      if (podfile.includes(FIX_MARKER)) return config;
 
-      // 1. Inserir use_modular_headers! antes do target 'CNBMobile' do
+      // 1. Inserir use_frameworks! antes do target 'CNBMobile' do
       podfile = podfile.replace(
         /^(target 'CNBMobile' do)/m,
-        `${MODULAR_HEADERS_BLOCK}$1`,
+        `${FRAMEWORKS_BLOCK}$1`,
       );
 
       // 2. Inserir post_install fixes antes do "  end\nend" final
