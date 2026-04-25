@@ -16,8 +16,13 @@ const FIX_BLOCK = `    # [CNB_IOS_FIXES_APPLIED] Fixes de compatibilidade com Ne
         cfg.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
         # Fix 2: código C legado — implicit int proibido em C99+
         cfg.build_settings['GCC_C_LANGUAGE_STANDARD'] = 'gnu99'
-        other_cflags = cfg.build_settings['OTHER_CFLAGS'] || '$(inherited)'
-        cfg.build_settings['OTHER_CFLAGS'] = "#{other_cflags} -Wno-implicit-int"
+        existing_flags = cfg.build_settings['OTHER_CFLAGS']
+        if existing_flags.is_a?(Array)
+          cfg.build_settings['OTHER_CFLAGS'] = existing_flags + ['-Wno-implicit-int'] unless existing_flags.include?('-Wno-implicit-int')
+        else
+          base = existing_flags || '$(inherited)'
+          cfg.build_settings['OTHER_CFLAGS'] = "#{base} -Wno-implicit-int" unless base.include?('-Wno-implicit-int')
+        end
       end
     end
 `;
