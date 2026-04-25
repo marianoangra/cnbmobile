@@ -2,7 +2,7 @@
   "expo": {
     "name": "CNB Mobile",
     "slug": "cnbmobile",
-    "version": "1.2.37",
+    "version": "1.2.38",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -32,7 +32,7 @@
     },
     "android": {
       "package": "com.cnb.cnbappv2",
-      "versionCode": 177,
+      "versionCode": 178,
       "permissions": [
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_DATA_SYNC"

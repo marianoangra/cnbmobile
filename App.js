@@ -187,7 +187,7 @@ function MainTabs({ user, perfil, onAtualizar, atualizarPerfil }) {
         {(props) => <HomeScreen {...props} route={{ ...props.route, params: { user, perfil, onAtualizar } }} />}
       </Tab.Screen>
       <Tab.Screen name="Missoes" options={{ tabBarLabel: 'Missões' }}>
-        {(props) => <MissoesScreen {...props} />}
+        {(props) => <MissoesScreen {...props} route={{ ...props.route, params: { user, perfil, onAtualizar } }} />}
       </Tab.Screen>
       <Tab.Screen name="Carregar" options={{ tabBarLabel: 'Carregar' }}>
         {(props) => <ChargingScreen {...props} route={{ ...props.route, params: { user, uid: perfil?.uid, perfil, onAtualizar } }} />}
