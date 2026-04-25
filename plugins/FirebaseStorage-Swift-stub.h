@@ -231,6 +231,9 @@ typedef NSString *FIRStorageHandle NS_SWIFT_NAME(StorageHandle);
     NS_SWIFT_NAME(getData(maxSize:completion:));
 
 - (FIRStorageDownloadTask *)writeToFile:(NSURL *)fileURL
+    NS_SWIFT_NAME(write(toFile:));
+
+- (FIRStorageDownloadTask *)writeToFile:(NSURL *)fileURL
                              completion:(nullable void (^)(NSURL *_Nullable,
                                                            NSError *_Nullable))completion
     NS_SWIFT_NAME(write(toFile:completion:));
@@ -292,10 +295,6 @@ typedef NSString *FIRStorageHandle NS_SWIFT_NAME(StorageHandle);
 - (FIRStorageReference *)referenceForURL:(NSString *)url NS_SWIFT_NAME(reference(forURL:));
 - (FIRStorageReference *)referenceWithPath:(NSString *)path NS_SWIFT_NAME(reference(withPath:));
 - (void)useEmulatorWithHost:(NSString *)host port:(NSInteger)port NS_SWIFT_NAME(useEmulator(withHost:port:));
-
-// Aliases used by RNFB
-- (void)setMaxUploadRetryTime:(NSTimeInterval)time;
-- (void)setMaxDownloadRetryTime:(NSTimeInterval)time;
 
 @end
 
