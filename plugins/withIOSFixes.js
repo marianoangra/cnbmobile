@@ -1,14 +1,18 @@
 /**
  * Config plugin para corrigir incompatibilidades de build iOS com New Architecture.
  *
- * Firebase Storage 11+ é 100% Swift. As classes FIRStorage, FIRStorageReference, etc.
- * são expostas para ObjC somente via FirebaseStorage-Swift.h, que o compilador Swift
- * gera APENAS quando use_frameworks! :linkage => :static está ativo.
+ * Firebase Storage 11+ é 100% Swift. Sem use_frameworks!, o compilador Swift não
+ * gera FirebaseStorage-Swift.h automaticamente. Firebase.h inclui condicionalmente
+ * esse arquivo quando FirebaseStorage-umbrella.h é encontrado (via sistema de módulos).
  *
- * Sem use_frameworks!, o arquivo não é gerado e RNFBStorageModule.m falha ao compilar.
+ * Solução:
+ *  1. use_modular_headers! global para que FirebaseCoreInternal (Swift) consiga
+ *     importar GoogleUtilities (ObjC) durante pod install.
+ *  2. Stub FirebaseStorage-Swift.h com declarações ObjC completas para os tipos
+ *     Swift (@objc) de FirebaseStorage que RNFBStorage usa.
  *
- * NÃO usar use_modular_headers! junto com use_frameworks! — a combinação cria
- * definições de módulo duplicadas para FirebaseCore, causando FIRApp* undefined.
+ * NÃO usar use_frameworks! junto com use_modular_headers! — a combinação cria
+ * definições de módulo duplicadas para FirebaseCore → FIRApp* undefined.
  */
 const { withDangerousMod } = require('@expo/config-plugins');
 const fs = require('fs');
@@ -17,12 +21,22 @@ const path = require('path');
 const FIX_MARKER = 'CNB_IOS_FIXES_APPLIED';
 
 // Inserido ANTES do target 'CNBMobile' do
-const FRAMEWORKS_BLOCK = `# [CNB_IOS_FIXES_APPLIED] Firebase Storage 11+ é Swift: use_frameworks! gera o bridge header
-use_frameworks! :linkage => :static
+const MODULAR_HEADERS_BLOCK = `# [CNB_IOS_FIXES_APPLIED] use_modular_headers! para Firebase Swift pods
+use_modular_headers!
 
 `;
 
-const POST_INSTALL_BLOCK = `    # [CNB_IOS_FIXES_APPLIED] Suprime warnings de C legado que quebram compilação
+const POST_INSTALL_BLOCK = `    # [CNB_IOS_FIXES_APPLIED] Stub FirebaseStorage-Swift.h + warnings flags
+    require 'fileutils'
+    stub_dir = "#{installer.sandbox.root}/Headers/Public/FirebaseStorage"
+    FileUtils.mkdir_p(stub_dir)
+    stub_src = File.join(__dir__, '..', 'plugins', 'FirebaseStorage-Swift-stub.h')
+    stub_dst = "#{stub_dir}/FirebaseStorage-Swift.h"
+    if File.exist?(stub_src)
+      FileUtils.cp(stub_src, stub_dst)
+    else
+      File.write(stub_dst, "// FirebaseStorage-Swift.h stub\\n") unless File.exist?(stub_dst)
+    end
     installer.pods_project.targets.each do |target|
       target.build_configurations.each do |cfg|
         extra_flags = %w[
@@ -54,10 +68,10 @@ module.exports = function withIOSFixes(config) {
       // Pula se já aplicado
       if (podfile.includes(FIX_MARKER)) return config;
 
-      // 1. Inserir use_frameworks! antes do target 'CNBMobile' do
+      // 1. Inserir use_modular_headers! antes do target 'CNBMobile' do
       podfile = podfile.replace(
         /^(target 'CNBMobile' do)/m,
-        `${FRAMEWORKS_BLOCK}$1`,
+        `${MODULAR_HEADERS_BLOCK}$1`,
       );
 
       // 2. Inserir post_install fixes antes do "  end\nend" final
