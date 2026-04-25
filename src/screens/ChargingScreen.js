@@ -324,7 +324,7 @@ export default function ChargingScreen({ route, navigation }) {
             {/* Botão saque disponível */}
             {podeSacar && (
               <TouchableOpacity
-                onPress={() => navigation.navigate('Withdraw', {})}
+                onPress={() => navigation.navigate('Withdraw', { perfil })}
                 activeOpacity={0.88}
                 style={{
                   marginHorizontal: 20, marginTop: 12,
@@ -380,7 +380,7 @@ export default function ChargingScreen({ route, navigation }) {
             {/* Botão de saque — visível quando pontos >= 100.000 */}
             {podeSacar && (
               <TouchableOpacity
-                onPress={() => navigation.navigate('Withdraw', {})}
+                onPress={() => navigation.navigate('Withdraw', { perfil })}
                 activeOpacity={0.88}
                 style={{
                   marginHorizontal: 20, marginTop: 12,

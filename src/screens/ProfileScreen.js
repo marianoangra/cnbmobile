@@ -4,6 +4,8 @@ import {
   View, Text, TextInput, ScrollView, TouchableOpacity, Alert,
   ActivityIndicator, Share,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Notifications from 'expo-notifications';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
@@ -14,6 +16,7 @@ import { signOut } from 'firebase/auth';
 import { auth } from '../services/firebase';
 import { limparSessao } from '../services/session';
 import { getSaques, excluirConta, getAfiliados, processarIndicacao, getPosicaoRanking } from '../services/pontos';
+import { registrarTokenPush } from '../services/notificacoes';
 import Avatar from '../components/Avatar';
 import {
   Wallet, Share2, Copy, LogOut,
@@ -128,8 +131,16 @@ export default function ProfileScreen({ route, navigation }) {
   const [minhaPos, setMinhaPos]           = useState(null);
   const [codigoParaAplicar, setCodigo]    = useState('');
   const [aplicandoCodigo, setAplicando]   = useState(false);
+  const [notifAtivas, setNotifAtivas]     = useState(true);
   const afiliadosCacheRef = useRef({ data: null, ts: 0 });
   const CACHE_TTL = 5 * 60 * 1000;
+
+  // Carrega preferência de notificações salva
+  useEffect(() => {
+    AsyncStorage.getItem('@cnb_notif_desabilitadas')
+      .then(v => { if (v === 'true') setNotifAtivas(false); })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => { if (perfil) setPerfilLocal(perfil); }, [perfil]);
 
@@ -174,6 +185,35 @@ export default function ProfileScreen({ route, navigation }) {
       .catch(() => {});
     return () => { active = false; };
   }, [perfil?.uid]));
+
+  async function handleNotificacoes() {
+    const { status } = await Notifications.getPermissionsAsync().catch(() => ({ status: 'denied' }));
+    if (status !== 'granted') {
+      const { status: novo } = await Notifications.requestPermissionsAsync().catch(() => ({ status: 'denied' }));
+      if (novo === 'granted') {
+        await AsyncStorage.removeItem('@cnb_notif_desabilitadas').catch(() => {});
+        setNotifAtivas(true);
+        if (perfil?.uid) registrarTokenPush(perfil.uid).catch(() => {});
+        Alert.alert('Notificações ativadas!', 'Você receberá alertas de pontos e missões.');
+      } else {
+        Alert.alert('Permissão necessária', 'Ative as notificações nas Configurações do dispositivo para receber alertas do CNB Mobile.');
+      }
+    } else if (notifAtivas) {
+      Alert.alert(
+        'Desativar notificações',
+        'Para desativar completamente, acesse as Configurações do dispositivo > CNB Mobile > Notificações.',
+        [
+          { text: 'Abrir Configurações', onPress: () => Notifications.requestPermissionsAsync() },
+          { text: 'Cancelar', style: 'cancel' },
+        ]
+      );
+    } else {
+      await AsyncStorage.removeItem('@cnb_notif_desabilitadas').catch(() => {});
+      setNotifAtivas(true);
+      if (perfil?.uid) registrarTokenPush(perfil.uid).catch(() => {});
+      Alert.alert('Notificações reativadas!', 'Você voltará a receber alertas de pontos e missões.');
+    }
+  }
 
   function handleEditarPerfil() {
     navigation.navigate('EditProfile', {
@@ -398,10 +438,10 @@ export default function ProfileScreen({ route, navigation }) {
             {[
               { Icon: Wallet,   title: 'Carteira Solana',  sub: 'Phantom · ' + (perfilLocal?.walletAddress ? perfilLocal.walletAddress.slice(0,4) + '…' + perfilLocal.walletAddress.slice(-3) : '—'),
                 onPress: () => navigation.navigate('Wallet', { user: perfilLocal }) },
-              { Icon: Shield,   title: 'Privacidade ZK',   sub: 'Cloak ativo',
-                onPress: () => navigation.navigate('Wallet', { user: perfilLocal }) },
-              { Icon: Bell,     title: 'Notificações',     sub: 'Ativadas',
-                onPress: () => {} },
+              { Icon: Shield,   title: 'Privacidade ZK',   sub: 'Cloak ativo · saque sem rastro',
+                onPress: () => navigation.navigate('Withdraw', { perfil: perfilLocal, initialAba: 'privado' }) },
+              { Icon: Bell,     title: 'Notificações',     sub: notifAtivas ? 'Ativadas' : 'Desativadas',
+                onPress: handleNotificacoes },
               { Icon: Settings, title: 'Preferências',     sub: 'Editar perfil, tema',
                 onPress: handleEditarPerfil },
             ].map(({ Icon, title, sub, onPress }) => (

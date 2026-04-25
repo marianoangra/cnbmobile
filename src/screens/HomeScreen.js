@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useCallback, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Alert, Animated as RNAnimated,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -18,6 +19,7 @@ import {
 import Avatar from '../components/Avatar';
 import KastBanner from '../components/KastBanner';
 import SolflareBanner from '../components/SolflareBanner';
+import { getSaques } from '../services/pontos';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 const PRIMARY  = '#c6ff4a';
@@ -101,11 +103,54 @@ const ATALHOS = [
   { Icon: BarChart3, label: 'Dados',  id: 'stats'  },
 ];
 
-const ATIVIDADES = [
-  { Icon: ArrowDownLeft, title: 'Recompensa de caminho', sub: 'DePIN · +1.240 passos', value: '+420 pts', pos: true  },
-  { Icon: ArrowUpRight,  title: 'PIX enviado',           sub: 'Ana Costa · Hoje, 09:12', value: '-R$ 32,00', pos: false },
-  { Icon: ArrowDownLeft, title: 'Prova ZK resgatada',    sub: 'Cloak · verificada',    value: '+180 pts', pos: true  },
-];
+// Constrói lista de atividades reais a partir de saques + atividadeDias do perfil
+function diaKey(d) {
+  return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+}
+
+async function buscarAtividades(uid, atividadeDias) {
+  const items = [];
+
+  // 1. Últimos saques (máx 3)
+  try {
+    const saques = await getSaques(uid);
+    saques.slice(0, 3).forEach(s => {
+      const ts = s.criadoEm?.toDate ? s.criadoEm.toDate() : new Date(0);
+      const tipo = s.chavePix ? 'Saque PIX' : s.walletAddress ? 'Resgate CNB' : 'Saque';
+      items.push({
+        Icon: ArrowUpRight,
+        title: tipo,
+        sub: ts.getTime() ? ts.toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : 'Em processamento',
+        value: `-${(s.pontos ?? 0).toLocaleString('pt-BR')} pts`,
+        pos: false,
+        ts: ts.getTime(),
+      });
+    });
+  } catch { /* silencia */ }
+
+  // 2. Dias com atividade de carregamento (últimos 7 dias)
+  const hoje = new Date();
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(hoje);
+    d.setDate(hoje.getDate() - i);
+    const pts = atividadeDias?.[diaKey(d)] ?? 0;
+    if (pts > 0) {
+      const labelDia = i === 0 ? 'Hoje' : i === 1 ? 'Ontem' : d.toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit' });
+      items.push({
+        Icon: ArrowDownLeft,
+        title: 'Pontos de carregamento',
+        sub: `${labelDia} · carregamento`,
+        value: `+${pts.toLocaleString('pt-BR')} pts`,
+        pos: true,
+        ts: d.setHours(23, 59, 59),
+      });
+    }
+  }
+
+  // Ordena por data decrescente, limita a 5
+  items.sort((a, b) => b.ts - a.ts);
+  return items.slice(0, 5);
+}
 
 // ─── Componentes internos ─────────────────────────────────────────────────────
 
@@ -127,7 +172,7 @@ function AvatarHeader({ user, perfil }) {
   );
 }
 
-function CardPontos({ pontos, progresso, faltam, user, estaCarregando, onSaque, onPix, barStyle }) {
+function CardPontos({ pontos, progresso, faltam, user, estaCarregando, onSaque, onPix, barStyle, pontosHoje, pontosOntem }) {
   const pct = Math.round(progresso * 100);
   return (
     <LinearGradient
@@ -175,14 +220,22 @@ function CardPontos({ pontos, progresso, faltam, user, estaCarregando, onSaque, 
           }}>
             <Text style={{ fontSize: 10, color: PRIMARY, fontWeight: '600' }}>⚡ Ativo</Text>
           </View>
-        ) : (
+        ) : pontosHoje > 0 ? (
           <View style={{
             flexDirection: 'row', alignItems: 'center', gap: 3,
             backgroundColor: 'rgba(198,255,74,0.1)',
             paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99,
           }}>
-            <ArrowUpRight size={11} color={PRIMARY} />
-            <Text style={{ fontSize: 10, color: PRIMARY }}>+2,4%</Text>
+            <ArrowDownLeft size={11} color={PRIMARY} />
+            <Text style={{ fontSize: 10, color: PRIMARY }}>+{pontosHoje.toLocaleString('pt-BR')} hoje</Text>
+          </View>
+        ) : (
+          <View style={{
+            flexDirection: 'row', alignItems: 'center', gap: 3,
+            backgroundColor: 'rgba(255,255,255,0.07)',
+            paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99,
+          }}>
+            <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>Meta: 100k pts</Text>
           </View>
         )}
       </View>
@@ -281,7 +334,7 @@ function Atalhos({ onPress }) {
   );
 }
 
-function Atividades({ onVerTudo }) {
+function Atividades({ onVerTudo, atividades, loading }) {
   return (
     <View>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -291,34 +344,51 @@ function Atividades({ onVerTudo }) {
         </TouchableOpacity>
       </View>
 
-      <View style={{ gap: 8 }}>
-        {ATIVIDADES.map((t, i) => (
-          <View
-            key={i}
-            style={{
-              flexDirection: 'row', alignItems: 'center', gap: 12,
-              padding: 12, borderRadius: 12,
-              backgroundColor: 'rgba(255,255,255,0.03)',
-              borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
-            }}
-          >
-            <View style={{
-              width: 36, height: 36, borderRadius: 18,
-              backgroundColor: t.pos ? 'rgba(198,255,74,0.15)' : 'rgba(255,255,255,0.10)',
-              alignItems: 'center', justifyContent: 'center',
-            }}>
-              <t.Icon size={16} color={t.pos ? PRIMARY : 'rgba(255,255,255,0.8)'} />
+      {loading ? (
+        <ActivityIndicator color={PRIMARY} style={{ marginVertical: 16 }} />
+      ) : atividades.length === 0 ? (
+        <View style={{
+          padding: 20, borderRadius: 12, alignItems: 'center',
+          backgroundColor: 'rgba(255,255,255,0.03)',
+          borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
+        }}>
+          <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>
+            Nenhuma atividade ainda
+          </Text>
+          <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', marginTop: 4, textAlign: 'center' }}>
+            Carregue seu celular para acumular pontos
+          </Text>
+        </View>
+      ) : (
+        <View style={{ gap: 8 }}>
+          {atividades.map((t, i) => (
+            <View
+              key={i}
+              style={{
+                flexDirection: 'row', alignItems: 'center', gap: 12,
+                padding: 12, borderRadius: 12,
+                backgroundColor: 'rgba(255,255,255,0.03)',
+                borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
+              }}
+            >
+              <View style={{
+                width: 36, height: 36, borderRadius: 18,
+                backgroundColor: t.pos ? 'rgba(198,255,74,0.15)' : 'rgba(255,255,255,0.10)',
+                alignItems: 'center', justifyContent: 'center',
+              }}>
+                <t.Icon size={16} color={t.pos ? PRIMARY : 'rgba(255,255,255,0.8)'} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 12, fontWeight: '500', color: '#fff' }} numberOfLines={1}>{t.title}</Text>
+                <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginTop: 2 }} numberOfLines={1}>{t.sub}</Text>
+              </View>
+              <Text style={{ fontSize: 12, fontWeight: '600', color: t.pos ? PRIMARY : 'rgba(255,255,255,0.8)' }}>
+                {t.value}
+              </Text>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 12, fontWeight: '500', color: '#fff' }} numberOfLines={1}>{t.title}</Text>
-              <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginTop: 2 }} numberOfLines={1}>{t.sub}</Text>
-            </View>
-            <Text style={{ fontSize: 12, fontWeight: '600', color: t.pos ? PRIMARY : 'rgba(255,255,255,0.8)' }}>
-              {t.value}
-            </Text>
-          </View>
-        ))}
-      </View>
+          ))}
+        </View>
+      )}
     </View>
   );
 }
@@ -330,6 +400,8 @@ export default function HomeScreen({ route, navigation }) {
   useEffect(() => { onAtualizarRef.current = onAtualizar; }, [onAtualizar]);
 
   const [frase] = useState(fraseDoDia);
+  const [atividades, setAtividades]           = useState([]);
+  const [loadingAtividades, setLoadingAtiv]   = useState(false);
 
   const [focused, setFocused] = useState(true);
   useFocusEffect(useCallback(() => {
@@ -338,12 +410,28 @@ export default function HomeScreen({ route, navigation }) {
     return () => setFocused(false);
   }, [user]));
 
+  // Busca atividades reais sempre que o perfil muda (pontos ou saques)
+  useEffect(() => {
+    if (!perfil?.uid) { setAtividades([]); return; }
+    setLoadingAtiv(true);
+    buscarAtividades(perfil.uid, perfil.atividadeDias)
+      .then(setAtividades)
+      .catch(() => setAtividades([]))
+      .finally(() => setLoadingAtiv(false));
+  }, [perfil?.uid, perfil?.pontos]);
+
   const pontos    = perfil?.pontos ?? 0;
   const progresso = Math.min(pontos / META, 1);
   const faltam    = Math.max(META - pontos, 0);
   const podeSacar = pontos >= META;
   const nome      = perfil?.nome?.split(' ')[0] ?? (user ? 'Usuário' : 'Visitante');
   const estaCarregando = useCarregando();
+
+  // Badge dinâmico: pontos ganhos hoje vs ontem
+  const _hoje  = new Date();
+  const _ontem = new Date(_hoje); _ontem.setDate(_hoje.getDate() - 1);
+  const pontosHoje  = perfil?.atividadeDias?.[diaKey(_hoje)]  ?? 0;
+  const pontosOntem = perfil?.atividadeDias?.[diaKey(_ontem)] ?? 0;
 
   // Barra de progresso animada
   const barWidth = useSharedValue(0);
@@ -455,6 +543,8 @@ export default function HomeScreen({ route, navigation }) {
               onSaque={handleSaque}
               onPix={handlePrivado}
               barStyle={barStyle}
+              pontosHoje={pontosHoje}
+              pontosOntem={pontosOntem}
             />
           </Animated.View>
 
@@ -477,7 +567,11 @@ export default function HomeScreen({ route, navigation }) {
 
           {/* ── Atividades ── */}
           <Animated.View style={a4}>
-            <Atividades onVerTudo={() => navigation.navigate('Ranking', { uid: perfil?.uid, perfil })} />
+            <Atividades
+              onVerTudo={() => navigation.navigate('Ranking', { uid: perfil?.uid, perfil })}
+              atividades={atividades}
+              loading={loadingAtividades}
+            />
           </Animated.View>
 
         </ScrollView>
