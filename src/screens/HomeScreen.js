@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useCallback, useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, Alert, Animated as RNAnimated,
+  View, Text, ScrollView, TouchableOpacity, Alert,
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,8 +17,8 @@ import {
   QrCode, Lock, Wallet, Activity, BarChart3,
 } from 'lucide-react-native';
 import Avatar from '../components/Avatar';
-import KastBanner from '../components/KastBanner';
-import SolflareBanner from '../components/SolflareBanner';
+import DePINLiveCard from '../components/DePINLiveCard';
+import BannerCarousel from '../components/BannerCarousel';
 import { getSaques } from '../services/pontos';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -99,8 +99,8 @@ function useCarregando() {
 const ATALHOS = [
   { Icon: Wallet,    label: 'Wallet', id: 'wallet' },
   { Icon: Activity,  label: 'DePIN',  id: 'depin'  },
-  { Icon: QrCode,    label: 'PIX',    id: 'pix'    },
-  { Icon: BarChart3, label: 'Dados',  id: 'stats'  },
+  { Icon: QrCode,    label: 'Comprar', id: 'pix'    },
+  { Icon: BarChart3, label: 'Ranking', id: 'stats'  },
 ];
 
 // Constrói lista de atividades reais a partir de saques + atividadeDias do perfil
@@ -442,21 +442,6 @@ export default function HomeScreen({ route, navigation }) {
     width: `${interpolate(barWidth.value, [0, 1], [0, 100])}%`,
   }));
 
-  // Carousel de banners (RN Animated — callback no JS thread, sem problemas de serialização)
-  const [bannerIdx, setBannerIdx] = useState(0);
-  const bannerFade = useRef(new RNAnimated.Value(1)).current;
-  useEffect(() => {
-    const timer = setInterval(() => {
-      RNAnimated.timing(bannerFade, { toValue: 0, duration: 400, useNativeDriver: true }).start(({ finished }) => {
-        if (finished) {
-          setBannerIdx(prev => (prev === 0 ? 1 : 0));
-          RNAnimated.timing(bannerFade, { toValue: 1, duration: 400, useNativeDriver: true }).start();
-        }
-      });
-    }, 8000);
-    return () => clearInterval(timer);
-  }, []);
-
   // Animações de entrada escalonadas
   const a0 = useEntrada(0);
   const a1 = useEntrada(60);
@@ -515,6 +500,7 @@ export default function HomeScreen({ route, navigation }) {
 
             <TouchableOpacity
               activeOpacity={0.7}
+              onPress={() => Alert.alert('Notificações', 'Em breve você receberá alertas de pontos e missões.')}
               style={{
                 width: 36, height: 36, borderRadius: 18,
                 backgroundColor: 'rgba(255,255,255,0.05)',
@@ -553,16 +539,17 @@ export default function HomeScreen({ route, navigation }) {
             <Atalhos onPress={handleAtalho} />
           </Animated.View>
 
-          {/* ── Banners (carousel 6s) ── */}
+          {/* ── Rede DePIN ao vivo ── */}
+          <Animated.View style={[{ marginBottom: 16 }, a2]}>
+            <DePINLiveCard />
+          </Animated.View>
+
+          {/* ── Banners (carousel) ── */}
           <Animated.View style={[{ marginBottom: 20 }, a3]}>
             <Text style={{ fontSize: 10, letterSpacing: 2, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', marginBottom: 8 }}>
-              Anúncios
+              Parceiros
             </Text>
-            <RNAnimated.View style={{ opacity: bannerFade }}>
-              {bannerIdx === 0
-                ? <KastBanner uid={perfil?.uid} />
-                : <SolflareBanner />}
-            </RNAnimated.View>
+            <BannerCarousel uid={perfil?.uid} />
           </Animated.View>
 
           {/* ── Atividades ── */}
