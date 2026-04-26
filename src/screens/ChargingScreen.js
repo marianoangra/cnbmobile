@@ -1,282 +1,307 @@
 import React, { useEffect, useState } from 'react';
-import {
-  View, Text, TouchableOpacity,
-} from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   useSharedValue, useAnimatedStyle, useAnimatedProps,
-  withTiming, withDelay, withRepeat, withSequence,
-  Easing, interpolate, cancelAnimation,
+  withTiming, withDelay, withRepeat, withSequence, withSpring,
+  Easing, cancelAnimation, runOnJS,
 } from 'react-native-reanimated';
-import Svg, {
-  Circle, Defs, LinearGradient as SvgGradient, Stop,
-  RadialGradient,
-} from 'react-native-svg';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Svg, { Circle, Ellipse, Defs, RadialGradient, Stop } from 'react-native-svg';
 import * as Battery from 'expo-battery';
 import { Zap, Plug, TrendingUp } from 'lucide-react-native';
 import { useCarregamento } from '../hooks/useCarregamento';
 import { calcularAtividadeDiaria } from '../services/pontos';
 
-// ─── Constantes ───────────────────────────────────────────────────────────────
-const PRIMARY = '#c6ff4a';
-const R        = 92;
-const SW       = 14;
-const CX       = 110;
-const CY       = 110;
-const CIRC     = 2 * Math.PI * R;
-const SVG_SIZE = 220;
+// ── Constantes ────────────────────────────────────────────────────────────────
+const NEON         = '#00FF7F';  // spring green — cor base da esfera
+const NEON_TRIGGER = '#39FF14';  // lime elétrico — ativado ao atingir zona de disparo
+const NEON_DARK    = '#00994D';  // sombra da esfera
+const PRIMARY      = '#c6ff4a';  // mantido para seção inferior (consistência com o app)
+const PULL_TRIGGER = 150;        // px para disparar atualização
+const SZ           = 290;        // tamanho do container da esfera
+const CC           = SZ / 2;     // centro
 
-// Platinum palette — ativada silenciosamente para 100k+ pontos
-const PT = {
-  arc1:  '#FFFFFF',
-  arc2:  '#D4D8DC',
-  arc3:  '#8EA0AC',
-  halo:  'rgba(210,220,228,0.13)',
-  glow:  'rgba(220,228,234,0.18)',
-  ring:  'rgba(200,210,218,0.45)',
-  inner: 'rgba(220,228,234,',
-  spark1: '#FFFFFF',
-  spark2: '#B8C8D4',
-  text:  '#E8EEF2',
-};
+const AnimatedEllipse = Animated.createAnimatedComponent(Ellipse);
 
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
-
-// ─── Anel SVG ────────────────────────────────────────────────────────────────
-function AnelSVG({ pct, carregando, platinum }) {
-  const dashOffset = useSharedValue(CIRC);
-  const plasmaRot  = useSharedValue(0);
-  const innerAlpha = useSharedValue(0.15);
+// ── Anel orbital ──────────────────────────────────────────────────────────────
+function OrbitalRing({ rx, ry, period, dashArray, color, strokeOpacity = 0.45, strokeWidth = 1.2, delay = 0, reverse = false }) {
+  const rot = useSharedValue(0);
 
   useEffect(() => {
-    dashOffset.value = withDelay(300,
-      withTiming(CIRC - (pct / 100) * CIRC, { duration: 1600, easing: Easing.bezier(0.22, 1, 0.36, 1) })
+    rot.value = withDelay(
+      delay,
+      withRepeat(
+        withTiming(reverse ? -360 : 360, { duration: period, easing: Easing.linear }),
+        -1, false,
+      ),
     );
-  }, [pct]);
+    return () => cancelAnimation(rot);
+  }, []);
 
-  // Animações condicionadas ao estado de carregamento
-  useEffect(() => {
-    if (carregando) {
-      plasmaRot.value = withRepeat(withTiming(360, { duration: 3600, easing: Easing.linear }), -1, false);
-      innerAlpha.value = withRepeat(
-        withSequence(withTiming(0.5, { duration: 1200 }), withTiming(0.15, { duration: 1200 })),
-        -1, true,
-      );
-    } else {
-      cancelAnimation(plasmaRot);
-      cancelAnimation(innerAlpha);
-      innerAlpha.value = withTiming(0.15, { duration: 400 });
-    }
-    return () => {
-      cancelAnimation(plasmaRot);
-      cancelAnimation(innerAlpha);
-    };
-  }, [carregando]);
-
-  const mainArcProps = useAnimatedProps(() => ({
-    strokeDashoffset: dashOffset.value,
+  const rotStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${rot.value}deg` }],
   }));
-
-  const plasmaRotStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${plasmaRot.value}deg` }],
-  }));
-
-  const innerAlphaProps = useAnimatedProps(() => ({
-    strokeOpacity: innerAlpha.value,
-  }));
-
-  const arc1  = platinum ? PT.arc1  : '#E4FF8A';
-  const arc2  = platinum ? PT.arc2  : PRIMARY;
-  const arc3  = platinum ? PT.arc3  : '#2ecc71';
-  const pCol  = platinum ? PT.spark1 : PRIMARY;
-  const haloC = platinum ? PT.halo  : 'rgba(198,255,74,0.10)';
-  const ringC = platinum ? PT.ring  : PRIMARY;
-  const textActive = platinum ? PT.text : PRIMARY;
 
   return (
-    <View style={{ width: SVG_SIZE, height: SVG_SIZE, alignItems: 'center', justifyContent: 'center' }}>
-
-      {/* Halo de fundo */}
-      <View style={{
-        position: 'absolute', width: 320, height: 320, borderRadius: 160,
-        backgroundColor: haloC,
-        top: (SVG_SIZE - 320) / 2, left: (SVG_SIZE - 320) / 2,
-      }} pointerEvents="none" />
-
-      {/* Anel extra platinum — borda prateada dupla */}
-      {platinum && (
-        <View style={{
-          position: 'absolute', width: SVG_SIZE + 18, height: SVG_SIZE + 18,
-          borderRadius: (SVG_SIZE + 18) / 2,
-          borderWidth: 1, borderColor: 'rgba(210,220,228,0.18)',
-          top: -9, left: -9,
-        }} pointerEvents="none" />
-      )}
-
-      <Svg width={SVG_SIZE} height={SVG_SIZE} style={{ position: 'absolute', transform: [{ rotate: '-90deg' }] }}>
-        <Defs>
-          <SvgGradient id="coreGrad" x1="0" y1="0" x2="1" y2="1">
-            <Stop offset="0%"   stopColor={arc1} />
-            <Stop offset="50%"  stopColor={arc2} />
-            <Stop offset="100%" stopColor={arc3} />
-          </SvgGradient>
-          <SvgGradient id="plasmaGrad" x1="0" y1="0" x2="1" y2="0">
-            <Stop offset="0%"   stopColor={pCol} stopOpacity="0" />
-            <Stop offset="60%"  stopColor={pCol} stopOpacity="0.9" />
-            <Stop offset="100%" stopColor="#ffffff" stopOpacity="1" />
-          </SvgGradient>
-          <RadialGradient id="sparkGrad">
-            <Stop offset="0%"   stopColor="#ffffff" stopOpacity="1" />
-            <Stop offset="60%"  stopColor={pCol} stopOpacity="0.6" />
-            <Stop offset="100%" stopColor={pCol} stopOpacity="0" />
-          </RadialGradient>
-          <RadialGradient id="coreHalo" cx="0.5" cy="0.5" r="0.5">
-            <Stop offset="0%"   stopColor={arc2} stopOpacity={platinum ? '0.2' : '0.3'} />
-            <Stop offset="100%" stopColor={arc2} stopOpacity="0" />
-          </RadialGradient>
-        </Defs>
-
-        {/* Halo interno */}
-        <Circle cx={CX} cy={CY} r={R + 28} fill="url(#coreHalo)" />
-
-        {/* Trilha */}
-        <Circle cx={CX} cy={CY} r={R} stroke="rgba(255,255,255,0.06)" strokeWidth={SW} fill="none" />
-        {/* Anel fino externo */}
-        <Circle cx={CX} cy={CY} r={R + 8} stroke="rgba(255,255,255,0.05)" strokeWidth="1" fill="none" />
-
-        {/* Arco principal animado */}
-        <AnimatedCircle
-          cx={CX} cy={CY} r={R}
-          stroke="url(#coreGrad)"
-          strokeWidth={SW}
-          fill="none"
-          strokeLinecap="round"
-          strokeDasharray={CIRC}
-          animatedProps={mainArcProps}
+    <Animated.View
+      style={[{ position: 'absolute', width: SZ, height: SZ }, rotStyle]}
+      pointerEvents="none"
+    >
+      <Svg width={SZ} height={SZ}>
+        <Ellipse
+          cx={CC} cy={CC} rx={rx} ry={ry}
+          stroke={color} strokeWidth={strokeWidth}
+          fill="none" strokeOpacity={strokeOpacity}
+          strokeDasharray={dashArray}
         />
-
-        {/* Anel tracejado externo */}
-        <Circle
-          cx={CX} cy={CY} r={R + 16}
-          stroke={ringC}
-          strokeOpacity={platinum ? '0.5' : '0.35'}
-          strokeWidth={platinum ? '1.5' : '1'}
-          fill="none"
-          strokeDasharray={platinum ? '3 6' : '2 8'}
-        />
-
-        {/* Anel interno pulsante */}
-        <AnimatedCircle
-          cx={CX} cy={CY} r={R - 14}
-          stroke={platinum ? PT.arc2 : PRIMARY}
-          strokeWidth={platinum ? '1.5' : '1'}
-          fill="none"
-          animatedProps={innerAlphaProps}
-        />
-
-        {/* Platinum: segundo anel interno */}
-        {platinum && (
-          <Circle
-            cx={CX} cy={CY} r={R - 28}
-            stroke="rgba(210,220,228,0.12)" strokeWidth="1" fill="none"
-          />
-        )}
       </Svg>
+    </Animated.View>
+  );
+}
 
-      {/* Plasma spark — só quando carregando */}
-      {carregando && (
-        <Animated.View
-          style={[{
-            position: 'absolute', width: SVG_SIZE, height: SVG_SIZE,
-            alignItems: 'center', justifyContent: 'center',
-          }, plasmaRotStyle]}
-          pointerEvents="none"
-        >
-          <Svg width={SVG_SIZE} height={SVG_SIZE} style={{ position: 'absolute', transform: [{ rotate: '-90deg' }] }}>
-            <Circle
-              cx={CX} cy={CY} r={R}
-              stroke="url(#plasmaGrad)" strokeWidth={platinum ? '5' : '4'} fill="none"
-              strokeLinecap="round"
-              strokeDasharray={`${CIRC * 0.22} ${CIRC}`}
-            />
-            <Circle cx={CX + R} cy={CY} r={platinum ? 12 : 10} fill="url(#sparkGrad)" />
-            <Circle cx={CX + R} cy={CY} r={3} fill="#ffffff" />
-          </Svg>
-        </Animated.View>
-      )}
+// ── Partícula orbital ─────────────────────────────────────────────────────────
+// Orbita em torno do centro, percorrendo o anel principal
+function OrbitalParticle({ color, period, radius }) {
+  const rot = useSharedValue(0);
 
-      {/* Centro */}
-      <View style={{ alignItems: 'center', gap: 2 }}>
+  useEffect(() => {
+    rot.value = withRepeat(
+      withTiming(360, { duration: period, easing: Easing.linear }),
+      -1, false,
+    );
+    return () => cancelAnimation(rot);
+  }, []);
+
+  const style = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${rot.value}deg` }],
+  }));
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[{ position: 'absolute', width: SZ, height: SZ }, style]}
+    >
+      <Svg width={SZ} height={SZ}>
+        {/* ponto brilhante */}
+        <Circle cx={CC + radius} cy={CC} r={5}   fill={color} opacity={0.9} />
+        <Circle cx={CC + radius} cy={CC} r={9}   fill={color} opacity={0.35} />
+        <Circle cx={CC + radius} cy={CC} r={14}  fill={color} opacity={0.12} />
+      </Svg>
+    </Animated.View>
+  );
+}
+
+// ── Esfera Futurista ──────────────────────────────────────────────────────────
+function EsferaFuturista({ carregando, pullY, phase }) {
+  // Animações internas
+  const floatY    = useSharedValue(0);   // flutuação idle
+  const pulse     = useSharedValue(1);   // escala pulsante
+  const glowAlpha = useSharedValue(0.12);
+  const flashAnim = useSharedValue(0);   // flash de sucesso
+  const ringAlpha = useSharedValue(0.45);
+
+  // ── Idle float (sempre ativo) ─────────────────────────────────────────────
+  useEffect(() => {
+    floatY.value = withRepeat(
+      withSequence(
+        withTiming(-9, { duration: 1800, easing: Easing.inOut(Easing.sin) }),
+        withTiming(9,  { duration: 1800, easing: Easing.inOut(Easing.sin) }),
+      ),
+      -1, true,
+    );
+    return () => cancelAnimation(floatY);
+  }, []);
+
+  // ── Animação de carregamento ──────────────────────────────────────────────
+  useEffect(() => {
+    if (carregando) {
+      // Pulsação da esfera
+      pulse.value = withRepeat(
+        withSequence(
+          withTiming(1.08, { duration: 820, easing: Easing.inOut(Easing.quad) }),
+          withTiming(0.95, { duration: 820, easing: Easing.inOut(Easing.quad) }),
+        ),
+        -1, true,
+      );
+      // Glow pulsante
+      glowAlpha.value = withRepeat(
+        withSequence(
+          withTiming(0.72, { duration: 680 }),
+          withTiming(0.22, { duration: 680 }),
+        ),
+        -1, true,
+      );
+      // Anéis ficam mais vivos
+      ringAlpha.value = withTiming(0.65, { duration: 500 });
+    } else {
+      cancelAnimation(pulse);
+      cancelAnimation(glowAlpha);
+      pulse.value     = withSpring(1, { damping: 12, stiffness: 180 });
+      glowAlpha.value = withTiming(0.12, { duration: 600 });
+      ringAlpha.value = withTiming(0.45, { duration: 400 });
+    }
+  }, [carregando]);
+
+  // ── Animação de sucesso (flash + contração) ───────────────────────────────
+  useEffect(() => {
+    if (phase === 'success') {
+      flashAnim.value = withSequence(
+        withTiming(0.85, { duration: 90  }),
+        withTiming(0,    { duration: 550 }),
+      );
+      pulse.value = withSequence(
+        withTiming(1.40,  { duration: 100 }),
+        withTiming(0.82,  { duration: 180 }),
+        withSpring(1.0, { damping: 14, stiffness: 200 }),
+      );
+    }
+  }, [phase]);
+
+  const isTriggered = phase === 'triggered' || phase === 'refreshing' || phase === 'success';
+  const neon     = isTriggered ? NEON_TRIGGER : NEON;
+  const neonDark = isTriggered ? '#00AA00'    : NEON_DARK;
+
+  // ── Estilo animado da esfera (responde ao pull) ───────────────────────────
+  const sphereStyle = useAnimatedStyle(() => {
+    const pY       = pullY.value;
+    const pullMove = Math.min(pY * 0.52, 108);
+    const pullScl  = 1 + Math.min(pY / PULL_TRIGGER, 1) * 0.11;
+    return {
+      transform: [
+        { translateY: floatY.value + pullMove },
+        { scale: pulse.value * pullScl },
+      ],
+    };
+  });
+
+  const glowStyle = useAnimatedStyle(() => ({ opacity: glowAlpha.value }));
+  const flashStyle = useAnimatedStyle(() => ({ opacity: flashAnim.value }));
+
+  // ── Texto dinâmico ────────────────────────────────────────────────────────
+  const textLabel = (() => {
+    if (phase === 'triggered')  return { text: 'Solte para atualizar', color: NEON_TRIGGER };
+    if (phase === 'pulling')    return { text: 'Puxe para atualizar',  color: NEON };
+    if (phase === 'refreshing') return { text: 'Atualizando...',       color: NEON_TRIGGER };
+    if (phase === 'success')    return { text: 'Atualizado',           color: NEON_TRIGGER };
+    if (carregando)             return { text: 'Carregando ativo',     color: NEON };
+    return { text: 'Em pausa', color: 'rgba(255,255,255,0.3)' };
+  })();
+
+  return (
+    <View style={{ width: SZ, height: SZ, alignItems: 'center', justifyContent: 'center' }}>
+
+      {/* Glow externo difuso */}
+      <Animated.View
+        pointerEvents="none"
+        style={[{
+          position: 'absolute',
+          width: 230, height: 230, borderRadius: 115,
+          backgroundColor: neon,
+        }, glowStyle]}
+      />
+
+      {/* Anéis orbitais — giram independentemente */}
+      <OrbitalRing
+        rx={106} ry={24}  period={13500} dashArray="4 11"
+        color={neon} strokeOpacity={isTriggered ? 0.65 : 0.4}
+        delay={0}
+      />
+      <OrbitalRing
+        rx={90}  ry={32}  period={8400}  dashArray="2 8"
+        color={neon} strokeOpacity={isTriggered ? 0.7 : 0.5} strokeWidth={1.4}
+        delay={300} reverse
+      />
+      <OrbitalRing
+        rx={120} ry={14}  period={22000} dashArray="1 16"
+        color={neon} strokeOpacity={isTriggered ? 0.4 : 0.2}
+        delay={700}
+      />
+
+      {/* Partícula orbital no anel principal */}
+      <OrbitalParticle color={neon} period={4200} radius={106} />
+
+      {/* Esfera + texto dinâmico */}
+      <Animated.View style={[{ alignItems: 'center' }, sphereStyle]}>
+
+        {/* SVG da esfera com gradiente radial 3D */}
+        <Svg width={144} height={144}>
+          <Defs>
+            <RadialGradient id="sphGrad" cx="36%" cy="32%" r="64%">
+              <Stop offset="0%"   stopColor="#ffffff"  stopOpacity="0.95" />
+              <Stop offset="18%"  stopColor={neon}     stopOpacity="1" />
+              <Stop offset="62%"  stopColor={neonDark} stopOpacity="1" />
+              <Stop offset="100%" stopColor="#001508"  stopOpacity="1" />
+            </RadialGradient>
+            <RadialGradient id="auraGrad" cx="50%" cy="50%" r="50%">
+              <Stop offset="0%"   stopColor={neon} stopOpacity="0.32" />
+              <Stop offset="100%" stopColor={neon} stopOpacity="0" />
+            </RadialGradient>
+          </Defs>
+          {/* Aura suave ao redor */}
+          <Circle cx={72} cy={72} r={70}  fill="url(#auraGrad)" />
+          {/* Esfera principal */}
+          <Circle cx={72} cy={72} r={54}  fill="url(#sphGrad)" />
+          {/* Reflexo difuso */}
+          <Circle cx={54} cy={50} r={13}  fill="rgba(255,255,255,0.18)" />
+          {/* Ponto especular nítido */}
+          <Circle cx={49} cy={45} r={5}   fill="rgba(255,255,255,0.58)" />
+          <Circle cx={44} cy={41} r={2}   fill="rgba(255,255,255,0.85)" />
+        </Svg>
+
+        {/* Texto de estado */}
         <Text style={{
-          fontSize: 10, letterSpacing: 4,
-          color: carregando ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.35)',
-          textTransform: 'uppercase',
+          marginTop: 14,
+          fontSize: 9, letterSpacing: 2.8, textTransform: 'uppercase', fontWeight: '700',
+          color: textLabel.color,
         }}>
-          {carregando ? 'ATIVIDADE' : 'BATERIA'}
+          {textLabel.text}
         </Text>
-        <Text style={{
-          fontSize: 48, fontWeight: '600',
-          color: carregando ? textActive : 'rgba(255,255,255,0.7)',
-          lineHeight: 52, letterSpacing: -1,
-        }}>
-          {pct}%
-        </Text>
-        {!carregando && (
-          <Text style={{
-            fontSize: 10, letterSpacing: 3,
-            color: 'rgba(255,255,255,0.3)',
-            textTransform: 'uppercase',
-          }}>
-            Em pausa
-          </Text>
-        )}
-      </View>
+      </Animated.View>
+
+      {/* Flash de sucesso */}
+      <Animated.View
+        pointerEvents="none"
+        style={[{
+          position: 'absolute',
+          width: 180, height: 180, borderRadius: 90,
+          backgroundColor: neon,
+        }, flashStyle]}
+      />
     </View>
   );
 }
 
-// ─── Barra de progresso 1 hora ────────────────────────────────────────────────
+// ── Barra de progresso 1 hora ─────────────────────────────────────────────────
 function ProgressoHora({ segundosRestantes, carregando }) {
   const progresso = (3600 - segundosRestantes) / 3600;
-  const barWidth = useSharedValue(progresso);
+  const barWidth  = useSharedValue(progresso);
 
   useEffect(() => {
     barWidth.value = withTiming(progresso, { duration: 800, easing: Easing.out(Easing.cubic) });
   }, [segundosRestantes]);
 
   const barStyle = useAnimatedStyle(() => ({
-    width: `${interpolate(barWidth.value, [0, 1], [0, 100])}%`,
+    width: `${barWidth.value * 100}%`,
   }));
 
-  const mins = Math.floor(segundosRestantes / 60);
-  const secs = segundosRestantes % 60;
+  const mins    = Math.floor(segundosRestantes / 60);
+  const secs    = segundosRestantes % 60;
   const timeStr = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-  const pct = Math.round(progresso * 100);
+  const pct     = Math.round(progresso * 100);
 
   return (
     <View style={{ width: '100%' }}>
-      {/* Cabeçalho */}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>
-          Progresso da hora
-        </Text>
+        <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>Progresso da hora</Text>
         <Text style={{ fontSize: 11, fontWeight: '600', color: carregando ? PRIMARY : 'rgba(255,255,255,0.25)' }}>
           {carregando ? `${timeStr} restante` : '--:--'}
         </Text>
       </View>
-
-      {/* Trilha */}
-      <View style={{
-        backgroundColor: 'rgba(255,255,255,0.08)',
-        borderRadius: 99, height: 6, overflow: 'hidden',
-      }}>
-        <Animated.View style={[{
-          height: 6, borderRadius: 99, backgroundColor: PRIMARY,
-        }, barStyle]} />
+      <View style={{ backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 99, height: 6, overflow: 'hidden' }}>
+        <Animated.View style={[{ height: 6, borderRadius: 99, backgroundColor: PRIMARY }, barStyle]} />
       </View>
-
-      {/* Rodapé */}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
         <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>
           {carregando ? '+50 pts bônus ao completar 1h' : 'Conecte o carregador para iniciar'}
@@ -289,20 +314,19 @@ function ProgressoHora({ segundosRestantes, carregando }) {
   );
 }
 
-// ─── Bar chart 10 dias ────────────────────────────────────────────────────────
-// Valores de referência Figma — exibidos enquanto dado real não está disponível
+// ── Bar chart 10 dias ──────────────────────────────────────────────────────────
 const STATIC_BARS = [28, 42, 35, 58, 40, 72, 55, 68, 85, 78];
 
 function BarChart({ heights }) {
   const bars = heights.every(h => h === 0) ? STATIC_BARS : heights;
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 3, height: 56 }}>
+    <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 3, height: 52 }}>
       {bars.map((h, i) => (
         <View
           key={i}
           style={{
             width: 6, borderRadius: 3,
-            height: (h / 100) * 56,
+            height: (h / 100) * 52,
             backgroundColor: PRIMARY,
             opacity: 0.3 + (h / 100) * 0.7,
           }}
@@ -312,12 +336,15 @@ function BarChart({ heights }) {
   );
 }
 
-// ─── Tela principal ───────────────────────────────────────────────────────────
+// ── Tela principal ────────────────────────────────────────────────────────────
 export default function ChargingScreen({ route, navigation }) {
   const { user, uid, perfil, onAtualizar } = route?.params || {};
   const { carregando, pontosGanhos, segundosRestantes } = useCarregamento(uid, onAtualizar);
 
   const [bateria, setBateria] = useState(0);
+  const [phase, setPhase]     = useState('idle');
+  // 'idle' | 'pulling' | 'triggered' | 'refreshing' | 'success'
+
   useEffect(() => {
     Battery.getBatteryLevelAsync()
       .then(l => setBateria(Math.round(l * 100)))
@@ -328,11 +355,11 @@ export default function ChargingScreen({ route, navigation }) {
     return () => sub?.remove();
   }, []);
 
-  // Animação de entrada
+  // ── Animação de entrada ──────────────────────────────────────────────────
   const entrada  = useSharedValue(0);
   const entradaY = useSharedValue(24);
   useEffect(() => {
-    const cfg = { duration: 500, easing: Easing.out(Easing.cubic) };
+    const cfg = { duration: 520, easing: Easing.out(Easing.cubic) };
     entrada.value  = withTiming(1, cfg);
     entradaY.value = withTiming(0, cfg);
   }, []);
@@ -341,25 +368,60 @@ export default function ChargingScreen({ route, navigation }) {
     transform: [{ translateY: entradaY.value }],
   }));
 
+  // ── Pull-to-refresh ──────────────────────────────────────────────────────
+  const pullY = useSharedValue(0);
+
+  async function handleRefresh() {
+    setPhase('refreshing');
+    try {
+      await Promise.race([
+        onAtualizar?.() ?? Promise.resolve(),
+        new Promise(res => setTimeout(res, 1600)),
+      ]);
+    } catch {}
+    setPhase('success');
+    setTimeout(() => setPhase('idle'), 1200);
+  }
+
+  const panGesture = Gesture.Pan()
+    .onUpdate((event) => {
+      if (event.translationY > 0) {
+        pullY.value = Math.min(event.translationY * 0.58, 200);
+        if (pullY.value >= PULL_TRIGGER) {
+          runOnJS(setPhase)('triggered');
+        } else if (pullY.value > 8) {
+          runOnJS(setPhase)('pulling');
+        }
+      }
+    })
+    .onEnd(() => {
+      const didTrigger = pullY.value >= PULL_TRIGGER;
+      pullY.value = withSpring(0, { damping: 20, stiffness: 220 });
+      if (didTrigger) {
+        runOnJS(handleRefresh)();
+      } else {
+        runOnJS(setPhase)('idle');
+      }
+    });
+
   const podeSacar  = (perfil?.pontos ?? 0) >= 100000;
-  const platinum   = (perfil?.pontos ?? 0) >= 100000;
   const barHeights = calcularAtividadeDiaria(perfil?.atividadeDias);
 
-  // ── Gate de login ──
+  // ── Gate de login ─────────────────────────────────────────────────────────
   if (!user) {
     return (
-      <LinearGradient colors={['#000000', '#05100b', '#071a12']} locations={[0, 0.5, 1]} style={{ flex: 1 }}>
+      <LinearGradient colors={['#0A0F1E', '#040810', '#000000']} locations={[0, 0.6, 1]} style={{ flex: 1 }}>
         <SafeAreaView style={{ flex: 1 }} edges={['top']}>
           <Animated.View style={[{
             flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32,
           }, entradaStyle]}>
             <View style={{
               width: 96, height: 96, borderRadius: 48,
-              backgroundColor: 'rgba(198,255,74,0.08)',
-              borderWidth: 1.5, borderColor: 'rgba(198,255,74,0.2)',
+              backgroundColor: 'rgba(0,255,127,0.08)',
+              borderWidth: 1.5, borderColor: 'rgba(0,255,127,0.2)',
               alignItems: 'center', justifyContent: 'center', marginBottom: 28,
             }}>
-              <Zap size={40} color={PRIMARY} />
+              <Zap size={40} color={NEON} />
             </View>
             <Text style={{ fontSize: 22, fontWeight: '700', color: '#fff', textAlign: 'center', marginBottom: 10 }}>
               Ganhe pontos carregando
@@ -371,11 +433,11 @@ export default function ChargingScreen({ route, navigation }) {
               onPress={() => navigation.navigate('Login')}
               activeOpacity={0.85}
               style={{
-                backgroundColor: PRIMARY, borderRadius: 14,
+                backgroundColor: NEON, borderRadius: 14,
                 paddingVertical: 14, width: '100%', alignItems: 'center',
               }}
             >
-              <Text style={{ color: '#000', fontWeight: '700', fontSize: 16 }}>Entrar / Cadastrar</Text>
+              <Text style={{ color: '#001508', fontWeight: '700', fontSize: 16 }}>Entrar / Cadastrar</Text>
             </TouchableOpacity>
           </Animated.View>
         </SafeAreaView>
@@ -384,96 +446,118 @@ export default function ChargingScreen({ route, navigation }) {
   }
 
   return (
-    <LinearGradient colors={['#000000', '#05100b', '#071a12']} locations={[0, 0.5, 1]} style={{ flex: 1 }}>
+    <LinearGradient colors={['#0A0F1E', '#040810', '#000000']} locations={[0, 0.6, 1]} style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         <Animated.View style={[{ flex: 1 }, entradaStyle]}>
 
-          {/* ── Esfera — ocupa todo espaço acima do card ── */}
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-            <AnelSVG pct={bateria} carregando={carregando} platinum={platinum} />
-          </View>
+          {/* ── Área da esfera com gesto de pull ── */}
+          <GestureDetector gesture={panGesture}>
+            <Animated.View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+              <EsferaFuturista
+                carregando={carregando}
+                pullY={pullY}
+                phase={phase}
+              />
 
-          {/* ── Seção inferior fixa ── */}
+              {/* Pontos + bateria abaixo da esfera */}
+              <View style={{ alignItems: 'center', marginTop: 4 }}>
+                <Text style={{
+                  fontSize: 38, fontWeight: '600', letterSpacing: -0.5,
+                  color: carregando ? NEON : 'rgba(255,255,255,0.55)',
+                }}>
+                  +{pontosGanhos.toLocaleString('pt-BR')}
+                </Text>
+                <Text style={{ fontSize: 10, letterSpacing: 3, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', marginTop: 2 }}>
+                  pontos on-chain
+                </Text>
+                {bateria > 0 && (
+                  <View style={{
+                    marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 5,
+                    backgroundColor: 'rgba(255,255,255,0.05)',
+                    borderRadius: 99, paddingHorizontal: 10, paddingVertical: 4,
+                    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+                  }}>
+                    <Zap size={10} color="rgba(255,255,255,0.35)" />
+                    <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>
+                      Bateria {bateria}%
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </Animated.View>
+          </GestureDetector>
+
+          {/* ── Seção inferior ── */}
           <View style={{ paddingHorizontal: 20, paddingBottom: 120, gap: 10 }}>
 
             {/* Card de recompensa + bar chart */}
             <LinearGradient
-              colors={['#14251a', '#0a130e']}
+              colors={['#0d1a24', '#080f18']}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
               style={{
                 borderRadius: 16, padding: 16,
-                borderWidth: 1, borderColor: 'rgba(198,255,74,0.20)',
+                borderWidth: 1, borderColor: 'rgba(0,255,127,0.14)',
                 flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
               }}
             >
               <View>
-                <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>
-                  Recompensa acumulada
-                </Text>
+                <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>Recompensa acumulada</Text>
                 <Text style={{ fontSize: 24, fontWeight: '600', color: PRIMARY, marginTop: 2 }}>
                   +{pontosGanhos.toLocaleString('pt-BR')}
                 </Text>
-                <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
-                  pontos · on-chain
-                </Text>
+                <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>pontos · on-chain</Text>
               </View>
               <BarChart heights={barHeights} />
             </LinearGradient>
 
             {/* Progresso da hora */}
-            <View style={{ paddingHorizontal: 0 }}>
-              <ProgressoHora segundosRestantes={segundosRestantes} carregando={carregando} />
-            </View>
+            <ProgressoHora segundosRestantes={segundosRestantes} carregando={carregando} />
 
-            {/* Botão saque */}
+            {/* Botão de saque */}
             {podeSacar && (
               <TouchableOpacity
                 onPress={() => navigation.navigate('Withdraw', { perfil })}
                 activeOpacity={0.88}
                 style={{
-                  backgroundColor: PRIMARY, borderRadius: 12,
-                  paddingVertical: 14,
+                  backgroundColor: PRIMARY, borderRadius: 12, paddingVertical: 14,
                   flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
                 }}
               >
                 <TrendingUp size={16} color="#000" />
-                <Text style={{ color: '#000', fontWeight: '600', fontSize: 14 }}>
-                  Saque disponível
-                </Text>
+                <Text style={{ color: '#000', fontWeight: '600', fontSize: 14 }}>Saque disponível</Text>
               </TouchableOpacity>
             )}
 
             {/* Badge de estado */}
             <View style={{
               flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-              backgroundColor: carregando ? 'rgba(198,255,74,0.08)' : 'rgba(255,255,255,0.05)',
+              backgroundColor: carregando ? 'rgba(0,255,127,0.07)' : 'rgba(255,255,255,0.04)',
               borderWidth: 1,
-              borderColor: carregando ? 'rgba(198,255,74,0.2)' : 'rgba(255,255,255,0.1)',
+              borderColor: carregando ? 'rgba(0,255,127,0.18)' : 'rgba(255,255,255,0.08)',
               borderRadius: 99, paddingHorizontal: 14, paddingVertical: 7,
             }}>
               {carregando ? (
                 <>
-                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: PRIMARY }} />
-                  <Text style={{ fontSize: 12, color: PRIMARY, fontWeight: '600' }}>
+                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: NEON }} />
+                  <Text style={{ fontSize: 12, color: NEON, fontWeight: '600' }}>
                     Sessão ativa · +{pontosGanhos.toLocaleString('pt-BR')} pts
                   </Text>
                 </>
               ) : (
                 <>
-                  <Plug size={12} color="rgba(255,255,255,0.4)" />
-                  <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>
+                  <Plug size={12} color="rgba(255,255,255,0.35)" />
+                  <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>
                     Conecte o USB para começar
                   </Text>
                 </>
               )}
             </View>
 
-            {/* Informativo */}
-            <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', textAlign: 'center' }}>
+            <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', textAlign: 'center' }}>
               Saque disponível a partir de 100.000 pontos.
             </Text>
-
           </View>
+
         </Animated.View>
       </SafeAreaView>
     </LinearGradient>

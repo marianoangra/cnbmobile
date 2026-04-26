@@ -200,13 +200,6 @@ function FloatingTabBar({ state, descriptors, navigation }) {
                       <Icon size={22} color="#0A0F1E" strokeWidth={2.5} />
                     </Animated.View>
                   </View>
-
-                  <Text style={{
-                    fontSize: 9,
-                    fontWeight: '700',
-                    color: focused ? PRIMARY : 'rgba(255,255,255,0.5)',
-                    letterSpacing: 0.2,
-                  }}>{label}</Text>
                 </TouchableOpacity>
               );
             }
