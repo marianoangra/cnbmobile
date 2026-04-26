@@ -25,6 +25,7 @@ import {
 
 import BannerCarousel from '../components/BannerCarousel';
 import { getSaques } from '../services/pontos';
+import { onPontosUpdate } from '../services/chargeEvents';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 const PRIMARY  = '#c6ff4a';
@@ -397,6 +398,12 @@ export default function HomeScreen({ route, navigation }) {
   const [atividades, setAtividades]           = useState([]);
   const [loadingAtividades, setLoadingAtiv]   = useState(false);
   const [refreshing, setRefreshing]           = useState(false);
+  const [pontosGanhosSessao, setPontosGanhosSessao] = useState(0);
+
+  // Sincroniza pontos do carregamento em tempo real
+  useEffect(() => {
+    return onPontosUpdate(pts => setPontosGanhosSessao(pts));
+  }, []);
 
   const [focused, setFocused] = useState(true);
   const [modalNotif, setModalNotif]           = useState(false);
@@ -453,7 +460,7 @@ export default function HomeScreen({ route, navigation }) {
       .finally(() => setLoadingAtiv(false));
   }, [perfil?.uid, perfil?.pontos]);
 
-  const pontos    = perfil?.pontos ?? 0;
+  const pontos    = (perfil?.pontos ?? 0) + pontosGanhosSessao;
   const progresso = Math.min(pontos / META, 1);
   const faltam    = Math.max(META - pontos, 0);
   const podeSacar = pontos >= META;

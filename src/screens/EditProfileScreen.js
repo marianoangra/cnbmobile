@@ -9,6 +9,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../context/ThemeContext';
 import Avatar from '../components/Avatar';
 import { atualizarNome, uploadAvatar } from '../services/pontos';
+import i18n, { salvarIdioma } from '../i18n';
 
 export default function EditProfileScreen({ route, navigation }) {
   const { perfil, onSalvar } = route.params || {};
@@ -20,6 +21,14 @@ export default function EditProfileScreen({ route, navigation }) {
   const [salvando, setSalvando] = useState(false);
   const [trocandoAvatar, setTrocandoAvatar] = useState(false);
   const [alterado, setAlterado] = useState(false);
+  const [idioma, setIdioma] = useState(i18n.language === 'en' ? 'en' : 'pt');
+
+  async function handleTrocarIdioma(lang) {
+    if (lang === idioma) return;
+    setIdioma(lang);
+    setAlterado(true);
+    await salvarIdioma(lang);
+  }
 
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(20)).current;
@@ -148,6 +157,27 @@ export default function EditProfileScreen({ route, navigation }) {
                 activeOpacity={0.8}>
                 <Text style={styles.themeBtnIcon}>☀️</Text>
                 <Text style={[styles.themeBtnText, !isDark && styles.themeBtnTextAtivo]}>Light</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Idioma */}
+          <View style={styles.campo}>
+            <Text style={styles.campoLabel}>Idioma</Text>
+            <View style={styles.themeRow}>
+              <TouchableOpacity
+                style={[styles.themeBtn, idioma === 'pt' && styles.themeBtnAtivo]}
+                onPress={() => handleTrocarIdioma('pt')}
+                activeOpacity={0.8}>
+                <Text style={styles.themeBtnIcon}>🇧🇷</Text>
+                <Text style={[styles.themeBtnText, idioma === 'pt' && styles.themeBtnTextAtivo]}>Português</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.themeBtn, idioma === 'en' && styles.themeBtnAtivo]}
+                onPress={() => handleTrocarIdioma('en')}
+                activeOpacity={0.8}>
+                <Text style={styles.themeBtnIcon}>🇺🇸</Text>
+                <Text style={[styles.themeBtnText, idioma === 'en' && styles.themeBtnTextAtivo]}>English</Text>
               </TouchableOpacity>
             </View>
           </View>

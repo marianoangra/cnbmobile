@@ -6,6 +6,7 @@ import { getFunctions, httpsCallable } from 'firebase/functions';
 import { iniciarForegroundService, pararForegroundService, servicoRodando, SESSAO_KEY } from '../services/backgroundService';
 import { logInicioCarregamento, logFimCarregamento, logSessaoOnChain } from '../services/analytics';
 import { calcularPontosTotal } from '../services/pontos';
+import { emitPontosUpdate } from '../services/chargeEvents';
 
 function estaCarregando(state) {
   return state === Battery.BatteryState.CHARGING || state === Battery.BatteryState.FULL;
@@ -70,7 +71,9 @@ export function useCarregamento(uid, onPontosAdicionados) {
           const { uid: savedUid, minutosAcumulados } = JSON.parse(raw);
           if (savedUid === uidRef.current && minutosAcumulados > minutosRef.current) {
             minutosRef.current = minutosAcumulados;
-            if (montadoRef.current) setPontosGanhos(calcularPontosTotal(minutosAcumulados));
+            const pts = calcularPontosTotal(minutosAcumulados);
+            if (montadoRef.current) setPontosGanhos(pts);
+            emitPontosUpdate(pts);
           }
         }
       } catch {}
@@ -82,10 +85,9 @@ export function useCarregamento(uid, onPontosAdicionados) {
       if (!minuteTickRef.current) {
         minuteTickRef.current = setInterval(() => {
           minutosRef.current += 1;
-          if (montadoRef.current) {
-            setPontosGanhos(calcularPontosTotal(minutosRef.current));
-
-          }
+          const pts = calcularPontosTotal(minutosRef.current);
+          if (montadoRef.current) setPontosGanhos(pts);
+          emitPontosUpdate(pts);
         }, 60000);
       }
 
@@ -114,6 +116,7 @@ export function useCarregamento(uid, onPontosAdicionados) {
         setPontosGanhos(0);
         setSegundosRestantes(3600);
       }
+      emitPontosUpdate(0);
       // Limpa AsyncStorage aqui: se o serviço foi morto pelo SO, ele nunca
       // executa removeItem, e a próxima sessão carregaria os minutos antigos.
       await AsyncStorage.removeItem(SESSAO_KEY).catch(() => {});
@@ -143,7 +146,9 @@ export function useCarregamento(uid, onPontosAdicionados) {
           const { minutosAcumulados } = JSON.parse(raw);
           if (minutosAcumulados > minutosRef.current) {
             minutosRef.current = minutosAcumulados;
-            if (montadoRef.current) setPontosGanhos(calcularPontosTotal(minutosAcumulados));
+            const pts = calcularPontosTotal(minutosAcumulados);
+            if (montadoRef.current) setPontosGanhos(pts);
+            emitPontosUpdate(pts);
           }
         }
       } catch {}
