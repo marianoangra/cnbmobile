@@ -14,7 +14,7 @@ import Svg, { Defs, RadialGradient, Stop, Rect } from 'react-native-svg';
 import * as Battery from 'expo-battery';
 import {
   Bell, ArrowUpRight, ArrowDownLeft,
-  QrCode, Wallet, Activity, Zap, Database,
+  QrCode, Wallet, Activity, Zap, Database, Cpu,
 } from 'lucide-react-native';
 import Avatar from '../components/Avatar';
 import { diaKey, diaKeyDe } from '../utils/date';
@@ -159,19 +159,23 @@ async function buscarAtividades(uid, atividadeDias) {
 
 // ─── Componentes internos ─────────────────────────────────────────────────────
 
-function AvatarHeader() {
+function AvatarHeader({ onPress }) {
   return (
-    <View style={{
-      width: 40, height: 40, borderRadius: 20,
-      borderWidth: 2, borderColor: PRIMARY,
-      overflow: 'hidden',
-    }}>
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.8}
+      style={{
+        width: 40, height: 40, borderRadius: 20,
+        borderWidth: 2, borderColor: PRIMARY,
+        overflow: 'hidden',
+      }}
+    >
       <Image
         source={require('../../assets/cnb-logo.png')}
         style={{ width: '100%', height: '100%' }}
         resizeMode="cover"
       />
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -409,6 +413,7 @@ export default function HomeScreen({ route, navigation }) {
   const [modalNotif, setModalNotif]           = useState(false);
   const [notifAtiva, setNotifAtiva]           = useState(false);
   const [loadingNotif, setLoadingNotif]       = useState(false);
+  const [modalPerfil, setModalPerfil]         = useState(false);
 
   // Verifica status de notificações ao abrir o modal
   async function abrirModalNotif() {
@@ -523,6 +528,109 @@ export default function HomeScreen({ route, navigation }) {
       locations={[0, 0.5, 1]}
       style={{ flex: 1 }}
     >
+      {/* ── Modal de perfil (Lite / Tech) ── */}
+      <Modal visible={modalPerfil} animationType="slide" transparent onRequestClose={() => setModalPerfil(false)}>
+        <TouchableOpacity
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.80)', justifyContent: 'flex-end' }}
+          activeOpacity={1}
+          onPress={() => setModalPerfil(false)}
+        >
+          <TouchableOpacity activeOpacity={1}>
+            <View style={{
+              backgroundColor: '#090909',
+              borderTopLeftRadius: 28, borderTopRightRadius: 28,
+              padding: 24, paddingBottom: 48,
+              borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
+            }}>
+              {/* Handle */}
+              <View style={{
+                width: 40, height: 4, borderRadius: 2,
+                backgroundColor: 'rgba(255,255,255,0.12)',
+                alignSelf: 'center', marginBottom: 24,
+              }} />
+
+              <Text style={{ fontSize: 20, fontWeight: '700', color: '#fff', marginBottom: 4 }}>
+                Qual é o seu perfil?
+              </Text>
+              <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginBottom: 24, lineHeight: 19 }}>
+                Personalize como o CNB Mobile funciona para você
+              </Text>
+
+              {/* ── LITE ── */}
+              <TouchableOpacity
+                onPress={() => setModalPerfil(false)}
+                activeOpacity={0.85}
+                style={{
+                  flexDirection: 'row', alignItems: 'center', gap: 16,
+                  backgroundColor: 'rgba(198,255,74,0.04)',
+                  borderWidth: 1.5, borderColor: 'rgba(198,255,74,0.22)',
+                  borderRadius: 20, padding: 18, marginBottom: 12,
+                }}
+              >
+                <View style={{
+                  width: 52, height: 52, borderRadius: 26,
+                  backgroundColor: 'rgba(198,255,74,0.10)',
+                  alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                }}>
+                  <Zap size={24} color={PRIMARY} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 5 }}>
+                    <Text style={{ fontSize: 17, fontWeight: '700', color: '#fff' }}>Lite</Text>
+                    <View style={{
+                      backgroundColor: 'rgba(198,255,74,0.12)',
+                      borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2,
+                      borderWidth: 1, borderColor: 'rgba(198,255,74,0.28)',
+                    }}>
+                      <Text style={{ fontSize: 9, fontWeight: '800', color: PRIMARY, letterSpacing: 1.2 }}>LITE</Text>
+                    </View>
+                  </View>
+                  <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', lineHeight: 18 }}>
+                    Sou novo em Tecnologia — ouvi falar que é só colocar para carregar e ganhar
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* ── TECH ── */}
+              <TouchableOpacity
+                onPress={() => setModalPerfil(false)}
+                activeOpacity={0.85}
+                style={{
+                  flexDirection: 'row', alignItems: 'center', gap: 16,
+                  backgroundColor: 'rgba(100,130,255,0.04)',
+                  borderWidth: 1.5, borderColor: 'rgba(100,130,255,0.28)',
+                  borderRadius: 20, padding: 18,
+                }}
+              >
+                <View style={{
+                  width: 52, height: 52, borderRadius: 26,
+                  backgroundColor: 'rgba(100,130,255,0.10)',
+                  alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                }}>
+                  <Cpu size={24} color="#6482FF" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 5 }}>
+                    <Text style={{ fontSize: 17, fontWeight: '700', color: '#fff' }}>Tech</Text>
+                    <View style={{
+                      backgroundColor: 'rgba(100,130,255,0.12)',
+                      borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2,
+                      borderWidth: 1, borderColor: 'rgba(100,130,255,0.32)',
+                    }}>
+                      <Text style={{ fontSize: 9, fontWeight: '800', color: '#6482FF', letterSpacing: 1.2 }}>TECH</Text>
+                    </View>
+                  </View>
+                  <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', lineHeight: 18 }}>
+                    Avançado em Tech — quero performar e me sinto confiante para utilizar todas as funções
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
       {/* ── Modal de notificações ── */}
       <Modal visible={modalNotif} animationType="slide" transparent onRequestClose={() => setModalNotif(false)}>
         <TouchableOpacity
@@ -609,7 +717,7 @@ export default function HomeScreen({ route, navigation }) {
             a0,
           ]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <AvatarHeader user={user} perfil={perfil} />
+              <AvatarHeader onPress={() => setModalPerfil(true)} />
               <View>
                 <Text style={{ fontSize: 14, fontWeight: '600', color: '#fff' }}>
                   {saudacao()}, {nome}!

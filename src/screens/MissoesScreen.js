@@ -160,7 +160,7 @@ function CountdownDisplay({ getFn }) {
 }
 
 // ─── MissionCard ──────────────────────────────────────────────────────────────
-function MissionCard({ Icon, titulo, descricao, pontos, completo, bloqueado, progresso, labelProgresso, delay }) {
+function MissionCard({ Icon, titulo, descricao, pontos, completo, bloqueado, progresso, labelProgresso, delay, onPress, labelCTA }) {
   const animStyle = useEntrada(delay);
   const statusLabel = completo ? 'Completa' : bloqueado ? 'Bloqueada' : `Progresso: ${labelProgresso}`;
   return (
@@ -219,7 +219,31 @@ function MissionCard({ Icon, titulo, descricao, pontos, completo, bloqueado, pro
         alignItems: 'center', marginTop: 8,
       }}>
         <Text style={{ fontSize: 10, color: TEXT_FAINT }}>{labelProgresso}</Text>
-        {completo ? <BadgeCompleto /> : bloqueado ? <BadgeBloqueado /> : null}
+        {completo
+          ? <BadgeCompleto />
+          : bloqueado
+            ? <BadgeBloqueado />
+            : onPress
+              ? (
+                <TouchableOpacity
+                  onPress={onPress}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel={labelCTA ?? 'Ir agora'}
+                  style={{
+                    backgroundColor: PRIMARY,
+                    borderRadius: 8,
+                    paddingHorizontal: 14,
+                    paddingVertical: 6,
+                  }}
+                >
+                  <Text style={{ fontSize: 11, color: '#000', fontWeight: '700' }}>
+                    {labelCTA ?? 'Ir agora'}
+                  </Text>
+                </TouchableOpacity>
+              )
+              : null
+        }
       </View>
     </Animated.View>
   );
@@ -298,37 +322,54 @@ export default function MissoesScreen({ route, navigation }) {
   const a3 = useEntrada(200);
 
   // ── Missões de onboarding ─────────────────────────────────────────────────
-  // useMemo evita recriar os objetos a cada render (corrige PERF-02).
-  const temAvatarURL    = !!perfil?.avatarURL;
-  const temWallet       = !!perfil?.walletAddress;
+  const temAvatarURL = !!perfil?.avatarURL;
+  const temNome      = !!perfil?.nome?.trim();
+  const temWallet    = !!perfil?.walletAddress;
+
+  // Perfil completo = foto + nome (e-mail é obrigatório no cadastro)
+  const perfilCompleto = temAvatarURL && temNome;
+  const perfilItens    = [
+    temAvatarURL ? null : 'foto',
+    temNome      ? null : 'nome',
+  ].filter(Boolean);
 
   const MISSOES_ONBOARDING = useMemo(() => [
     {
       id: 'onboarding-perfil',
       Icon: User,
       titulo: 'Completar perfil',
-      descricao: 'Adicione uma foto de perfil à sua conta',
+      descricao: 'Adicione foto e nome de usuário à sua conta',
       pontos: '+500 pts',
-      completo: !bloqueado && temAvatarURL,
+      completo: !bloqueado && perfilCompleto,
       bloqueado,
-      progresso: bloqueado ? 0 : temAvatarURL ? 1 : 0,
-      labelProgresso: temAvatarURL ? 'Foto adicionada' : 'Sem foto de perfil',
+      progresso: bloqueado ? 0 : ((temAvatarURL ? 1 : 0) + (temNome ? 1 : 0)) / 2,
+      labelProgresso: bloqueado
+        ? 'Faça login para completar'
+        : perfilCompleto
+          ? 'Perfil completo'
+          : `Falta: ${perfilItens.join(' e ')}`,
       delay: 100,
+      onPress: bloqueado ? null : () => navigation.navigate('EditProfile', { perfil, onSalvar: () => {} }),
+      labelCTA: 'Completar',
     },
     {
       id: 'onboarding-carteira',
       Icon: Wallet,
       titulo: 'Criar carteira Solana',
-      descricao: 'Vincule seu endereço de carteira Phantom',
+      descricao: 'Crie ou vincule sua carteira CNB na Solana',
       pontos: '+1.000 pts',
       completo: !bloqueado && temWallet,
       bloqueado,
       progresso: bloqueado ? 0 : temWallet ? 1 : 0,
-      labelProgresso: temWallet ? 'Carteira vinculada' : 'Carteira não configurada',
+      labelProgresso: bloqueado
+        ? 'Faça login para criar'
+        : temWallet ? 'Carteira criada' : 'Carteira não criada',
       delay: 140,
+      onPress: bloqueado ? null : () => navigation.navigate('Wallet', { user }),
+      labelCTA: 'Criar carteira',
     },
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  ], [bloqueado, temAvatarURL, temWallet]);
+  ], [bloqueado, perfilCompleto, temAvatarURL, temNome, temWallet]);
 
   const onboardingCompleto = MISSOES_ONBOARDING.every(m => m.completo);
 
@@ -345,6 +386,7 @@ export default function MissoesScreen({ route, navigation }) {
       progresso: loginHojeOk ? 1 : 0,
       labelProgresso: loginHojeOk ? '1/1 — sessão ativa' : '0/1 — abra o app hoje',
       delay: 160,
+      // Sem CTA: o ato de abrir o app já registra o login
     },
     {
       id: 'diaria-carregar',
@@ -357,6 +399,8 @@ export default function MissoesScreen({ route, navigation }) {
       progresso: bloqueado ? 0 : hojeOk ? 1 : 0,
       labelProgresso: hojeOk ? 'Concluído hoje' : 'Nenhum carregamento hoje',
       delay: 200,
+      onPress: bloqueado ? null : () => navigation.navigate('Carregar'),
+      labelCTA: 'Carregar agora',
     },
   ]), [bloqueado, hojeOk, loginHojeOk]);
 
@@ -375,6 +419,8 @@ export default function MissoesScreen({ route, navigation }) {
         ? '0/1.000 pts'
         : `${semanaTotal.toLocaleString('pt-BR')}/1.000 pts`,
       delay: 280,
+      onPress: bloqueado ? null : () => navigation.navigate('Carregar'),
+      labelCTA: 'Carregar agora',
     },
     {
       id: 'semanal-amigo',
@@ -387,6 +433,8 @@ export default function MissoesScreen({ route, navigation }) {
       progresso: bloqueado ? 0 : Math.min(referidos, 1),
       labelProgresso: bloqueado ? '0/1 amigo' : `${Math.min(referidos, 1)}/1 amigo`,
       delay: 320,
+      onPress: bloqueado ? null : () => navigation.navigate('Perfil'),
+      labelCTA: 'Convidar amigo',
     },
     {
       id: 'semanal-streak',
@@ -399,6 +447,8 @@ export default function MissoesScreen({ route, navigation }) {
       progresso: bloqueado ? 0 : Math.min(consec / 3, 1),
       labelProgresso: bloqueado ? '0/3 dias' : `${Math.min(consec, 3)}/3 dias`,
       delay: 360,
+      onPress: bloqueado ? null : () => navigation.navigate('Carregar'),
+      labelCTA: 'Carregar agora',
     },
   ]), [bloqueado, semanaTotal, referidos, consec]);
 
@@ -467,7 +517,9 @@ export default function MissoesScreen({ route, navigation }) {
           />
           {onboardingCompleto
             ? <BannerOnboardingCompleto animStyle={a1} />
-            : MISSOES_ONBOARDING.map(m => <MissionCard key={m.id} {...m} />)
+            : MISSOES_ONBOARDING.map(m => (
+                <MissionCard key={m.id} {...m} onPress={m.onPress} labelCTA={m.labelCTA} />
+              ))
           }
 
           <View style={{ height: 8 }} />
@@ -480,7 +532,7 @@ export default function MissoesScreen({ route, navigation }) {
             animStyle={a2}
           />
           {MISSOES_DIARIAS.map(m => (
-            <MissionCard key={m.id} {...m} />
+            <MissionCard key={m.id} {...m} onPress={m.onPress} labelCTA={m.labelCTA} />
           ))}
 
           <View style={{ height: 8 }} />
@@ -493,7 +545,7 @@ export default function MissoesScreen({ route, navigation }) {
             animStyle={a3}
           />
           {MISSOES_SEMANAIS.map(m => (
-            <MissionCard key={m.id} {...m} />
+            <MissionCard key={m.id} {...m} onPress={m.onPress} labelCTA={m.labelCTA} />
           ))}
 
         </ScrollView>

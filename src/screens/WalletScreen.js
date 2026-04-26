@@ -12,7 +12,7 @@ import {
   getMnemonic, restoreWalletFromMnemonic, validarMnemonic,
 } from '../services/walletService';
 import { useTheme } from '../context/ThemeContext';
-import { Zap, Lock, AlertCircle, Eye, EyeOff, RefreshCw } from 'lucide-react-native';
+import { Zap, Lock, AlertCircle, Eye, EyeOff, RefreshCw, ArrowLeft } from 'lucide-react-native';
 
 const EXPLORER = (addr) =>
   `https://explorer.solana.com/address/${addr}`;
@@ -22,7 +22,7 @@ function shorten(addr) {
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 }
 
-export default function WalletScreen({ route }) {
+export default function WalletScreen({ route, navigation }) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { user } = route.params || {};
@@ -256,6 +256,18 @@ export default function WalletScreen({ route }) {
           </View>
         </View>
       </Modal>
+
+      <TouchableOpacity
+        onPress={() => navigation.goBack()}
+        activeOpacity={0.7}
+        style={{
+          flexDirection: 'row', alignItems: 'center', gap: 6,
+          paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4,
+        }}
+      >
+        <ArrowLeft size={18} color="rgba(255,255,255,0.6)" />
+        <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>Voltar</Text>
+      </TouchableOpacity>
 
       <ScrollView
         contentContainerStyle={styles.scroll}

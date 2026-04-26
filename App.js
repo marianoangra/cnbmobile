@@ -288,7 +288,7 @@ function AppNavigator({ user, perfil, onAtualizar, atualizarPerfil }) {
       />
       <Stack.Screen
         name="Wallet" component={WalletScreen}
-        options={{ headerShown: true, title: 'Minha Carteira', headerStyle, headerTintColor, headerBackTitle: 'Voltar' }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name="DePINInfo" component={DePINInfoScreen}
