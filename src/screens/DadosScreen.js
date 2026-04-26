@@ -97,7 +97,8 @@ function useEntrada(delayMs = 0) {
   }));
 }
 
-function PermissaoCard({ item, valor, onChange, anim }) {
+function PermissaoCard({ item, valor, onChange, delay }) {
+  const anim = useEntrada(delay);
   const { Icon, titulo, desc, obrigatorio, cor, bonus } = item;
 
   return (
@@ -363,7 +364,7 @@ export default function DadosScreen({ navigation }) {
                 item={item}
                 valor={consentimentos[item.id]}
                 onChange={() => toggle(item.id)}
-                anim={useEntrada(120 + i * 40)}
+                delay={120 + i * 40}
               />
             ))}
           </Animated.View>

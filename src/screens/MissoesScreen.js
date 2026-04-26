@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { diaKey } from '../utils/date';
+import { diaKey, diaKeyDe } from '../utils/date';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -284,12 +284,13 @@ export default function MissoesScreen({ route, navigation }) {
   const semanaTotal = ptsSemana(atividadeDias);
   const consec      = diasConsecutivos(atividadeDias);
 
-  // BUG-03 — Login diário: usa perfil.ultimoLogin (campo server-side) para
-  // verificar se houve login real hoje. Se o campo ainda não existir no backend,
-  // considera completo para qualquer usuário logado (comportamento anterior).
-  const loginHojeOk = !bloqueado && (
-    perfil?.ultimoLogin ? perfil.ultimoLogin === diaKey(0) : true
-  );
+  // Login diário: ultimoLogin é um Firestore Timestamp, converte para diaKey
+  // antes de comparar com a chave do dia de hoje.
+  const loginHojeOk = !bloqueado && (() => {
+    if (!perfil?.ultimoLogin) return true; // campo ainda não existe → considera ok
+    const d = perfil.ultimoLogin.toDate?.() ?? new Date(perfil.ultimoLogin);
+    return diaKeyDe(d) === diaKey(0);
+  })();
 
   const a0 = useEntrada(0);
   const a1 = useEntrada(60);
