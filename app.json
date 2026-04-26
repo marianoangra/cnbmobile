@@ -32,7 +32,7 @@
     },
     "android": {
       "package": "com.cnb.cnbappv2",
-      "versionCode": 183,
+      "versionCode": 184,
       "permissions": [
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_DATA_SYNC"
