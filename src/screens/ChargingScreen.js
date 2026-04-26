@@ -510,29 +510,6 @@ function StarField({ carregando, phase, offsetX, offsetY, bateria, pontosGanhos 
         </Text>
       </View>
 
-      {/* ── Pontos acumulados — rodapé do campo estelar ── */}
-      <View
-        style={{
-          position: 'absolute', bottom: 18,
-          width: '100%', alignItems: 'center',
-        }}
-        pointerEvents="none"
-      >
-        <Text style={{
-          fontSize: 28, fontWeight: '400', letterSpacing: -0.5,
-          color: carregando ? NEON : 'rgba(255,255,255,0.20)',
-        }}>
-          +{pontosGanhos.toLocaleString('pt-BR')}
-        </Text>
-        <Text style={{
-          fontSize: 8, letterSpacing: 3.5,
-          color: 'rgba(255,255,255,0.16)',
-          textTransform: 'uppercase', marginTop: 3,
-        }}>
-          pontos on-chain
-        </Text>
-      </View>
-
     </View>
   );
 }
