@@ -1,9 +1,11 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, Animated } from 'react-native';
+import { View, Text, Animated, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Defs, RadialGradient, Stop, Rect } from 'react-native-svg';
 import { Zap } from 'lucide-react-native';
 
 const PRIMARY = '#c6ff4a';
+const { width: W, height: H } = Dimensions.get('window');
 
 export default function WelcomeScreen({ nome }) {
   const scale   = useRef(new Animated.Value(0.7)).current;
@@ -32,13 +34,16 @@ export default function WelcomeScreen({ nome }) {
       locations={[0, 0.55, 1]}
       style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
     >
-      {/* Halo de fundo */}
-      <View style={{
-        position: 'absolute',
-        width: 280, height: 280, borderRadius: 140,
-        backgroundColor: PRIMARY,
-        opacity: 0.06,
-      }} pointerEvents="none" />
+      {/* Halo de fundo — SVG RadialGradient para fade suave sem borda */}
+      <Svg style={{ position: 'absolute', top: 0, left: 0 }} width={W} height={H} pointerEvents="none">
+        <Defs>
+          <RadialGradient id="halo" cx={W / 2} cy={H / 2} r={160} gradientUnits="userSpaceOnUse">
+            <Stop offset="0%"  stopColor={PRIMARY} stopOpacity="0.13" />
+            <Stop offset="60%" stopColor={PRIMARY} stopOpacity="0" />
+          </RadialGradient>
+        </Defs>
+        <Rect x="0" y="0" width={W} height={H} fill="url(#halo)" />
+      </Svg>
 
       {/* Logo */}
       <Animated.View style={{ transform: [{ scale }], opacity, alignItems: 'center' }}>

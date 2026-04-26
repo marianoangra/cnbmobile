@@ -14,7 +14,7 @@ import Svg, { Defs, RadialGradient, Stop, Rect } from 'react-native-svg';
 import * as Battery from 'expo-battery';
 import {
   Bell, ArrowUpRight, ArrowDownLeft,
-  QrCode, Wallet, Activity, BarChart3, Zap, Database,
+  QrCode, Wallet, Activity, Zap, Database,
 } from 'lucide-react-native';
 import Avatar from '../components/Avatar';
 import { diaKey, diaKeyDe } from '../utils/date';

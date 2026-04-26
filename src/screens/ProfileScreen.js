@@ -671,7 +671,13 @@ export default function ProfileScreen({ route, navigation }) {
                   }}>
                     <View style={{ flex: 1, marginRight: 12 }}>
                       <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{formatarData(s.criadoEm)}</Text>
-                      <Text style={{ fontSize: 13, color: '#fff', marginTop: 2 }} numberOfLines={1}>{s.chavePix}</Text>
+                      <Text style={{ fontSize: 13, color: '#fff', marginTop: 2 }} numberOfLines={1}>
+                        {s.chavePix
+                          ? s.chavePix
+                          : s.walletAddress
+                            ? `${s.walletAddress.slice(0, 4)}…${s.walletAddress.slice(-4)}`
+                            : 'Resgate'}
+                      </Text>
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
                       <Text style={{ fontSize: 13, fontWeight: '700', color: '#FF4444' }}>
