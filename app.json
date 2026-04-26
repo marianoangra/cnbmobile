@@ -16,13 +16,15 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.cnb.cnbappv2",
-      "buildNumber": "166",
+      "buildNumber": "169",
       "usesAppleSignIn": true,
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
-        "NSCameraUsageDescription": "Usada para foto de perfil.",
+        "NSCameraUsageDescription": "Usada para foto de perfil e para a visualização de realidade aumentada do céu estrelado.",
         "NSPhotoLibraryUsageDescription": "Usada para selecionar foto de perfil.",
         "NSUserTrackingUsageDescription": "Usamos dados de análise para melhorar sua experiência no app.",
+        "NSLocationWhenInUseUsageDescription": "Usada para calcular a posição dos astros no céu com base na sua localização.",
+        "NSMotionUsageDescription": "Usada para detectar a orientação do dispositivo e exibir o céu em realidade aumentada.",
         "UIBackgroundModes": [
           "fetch",
           "remote-notification"
@@ -32,10 +34,13 @@
     },
     "android": {
       "package": "com.cnb.cnbappv2",
-      "versionCode": 184,
+      "versionCode": 189,
       "permissions": [
         "android.permission.FOREGROUND_SERVICE",
-        "android.permission.FOREGROUND_SERVICE_DATA_SYNC"
+        "android.permission.FOREGROUND_SERVICE_DATA_SYNC",
+        "android.permission.CAMERA",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",

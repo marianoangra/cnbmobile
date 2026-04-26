@@ -9,9 +9,11 @@ import Animated, {
   useSharedValue, useAnimatedStyle, withTiming, withDelay, Easing,
 } from 'react-native-reanimated';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db, auth } from '../services/firebase';
 import {
   ArrowLeft, MapPin, Users, Clock, Smartphone,
-  Camera, Wifi, BarChart3, CheckCircle2, Info,
+  Camera, Wifi, BarChart3, CheckCircle2, Info, Mic, Download, ChevronRight,
 } from 'lucide-react-native';
 
 const PRIMARY   = '#c6ff4a';
@@ -70,6 +72,15 @@ const PERMISSOES = [
     desc: 'Leitura de QR Code e atualização de foto de perfil.',
     obrigatorio: false,
     cor: '#FF8A65',
+    bonus: 100,
+  },
+  {
+    id: 'som',
+    Icon: Mic,
+    titulo: 'Som',
+    desc: 'Áudio do microfone para validação de presença e missões de campo.',
+    obrigatorio: false,
+    cor: '#F06292',
     bonus: 100,
   },
   {
@@ -196,6 +207,42 @@ function PermissaoCard({ item, valor, onChange, delay }) {
   );
 }
 
+function SecaoConta({ navigation, delay }) {
+  const anim = useEntrada(delay);
+  return (
+    <Animated.View style={[{ marginTop: 24, marginBottom: 4 }, anim]}>
+      <Text style={{ fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.35)', letterSpacing: 1, marginBottom: 10 }}>
+        CONTA
+      </Text>
+      <TouchableOpacity
+        onPress={() => navigation.navigate('RelatorioConta')}
+        activeOpacity={0.75}
+        style={{
+          backgroundColor: 'rgba(255,255,255,0.03)',
+          borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
+          borderRadius: 16, padding: 16,
+          flexDirection: 'row', alignItems: 'center', gap: 12,
+        }}
+      >
+        <View style={{
+          width: 40, height: 40, borderRadius: 20,
+          backgroundColor: 'rgba(100,160,255,0.12)',
+          alignItems: 'center', justifyContent: 'center',
+        }}>
+          <Download size={18} color="#64A0FF" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 14, fontWeight: '600', color: '#fff' }}>Baixar meus Dados</Text>
+          <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
+            Solicite um relatório completo da sua conta
+          </Text>
+        </View>
+        <ChevronRight size={16} color="rgba(255,255,255,0.25)" />
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
 export default function DadosScreen({ navigation }) {
   const [consentimentos, setConsentimentos] = useState(
     Object.fromEntries(PERMISSOES.map(p => [p.id, p.obrigatorio]))
@@ -234,6 +281,13 @@ export default function DadosScreen({ navigation }) {
   async function handleSalvar() {
     try {
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(consentimentos));
+
+      // Sincroniza com Firestore para que o backend respeite os consentimentos
+      const uid = auth.currentUser?.uid;
+      if (uid) {
+        await updateDoc(doc(db, 'usuarios', uid), { consentimentos });
+      }
+
       setSalvo(true);
       Alert.alert(
         'Preferências salvas',
@@ -369,8 +423,11 @@ export default function DadosScreen({ navigation }) {
             ))}
           </Animated.View>
 
+          {/* Seção Conta */}
+          <SecaoConta navigation={navigation} delay={220} />
+
           {/* Rodapé legal */}
-          <Animated.View style={[{ marginTop: 8, marginBottom: 20 }, aBtn]}>
+          <Animated.View style={[{ marginTop: 24, marginBottom: 20 }, aBtn]}>
             <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', lineHeight: 17, textAlign: 'center' }}>
               Seus dados nunca são vendidos a terceiros. Para mais informações, consulte nossa{' '}
               <Text style={{ color: 'rgba(198,255,74,0.6)' }}>Política de Privacidade</Text>.

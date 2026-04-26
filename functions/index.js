@@ -877,6 +877,121 @@ exports.resgatarPrivado = onCall(
   }
 );
 
+// ─── Relatório de dados pessoais (LGPD) ──────────────────────────────────────
+// Callable pelo usuário autenticado. Coleta dados do perfil + histórico de
+// resgates + consentimentos e envia um e-mail para o endereço cadastrado.
+exports.solicitarRelatorio = onCall(
+  { secrets: [smtpUser, smtpPass], region: 'us-central1' },
+  async (request) => {
+    if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
+
+    const uid = request.auth.uid;
+    const db = getFirestore();
+
+    // Busca dados do perfil
+    const usuarioSnap = await db.collection('usuarios').doc(uid).get();
+    if (!usuarioSnap.exists) throw new HttpsError('not-found', 'Usuário não encontrado.');
+    const perfil = usuarioSnap.data();
+
+    const email = request.auth.token?.email;
+    if (!email) throw new HttpsError('failed-precondition', 'E-mail não encontrado na conta.');
+
+    // Busca histórico de resgates CNB
+    const resgatesSnap = await db.collection('resgates_cnb')
+      .where('uid', '==', uid)
+      .orderBy('criadoEm', 'desc')
+      .limit(50)
+      .get();
+
+    let linhasResgates = '';
+    resgatesSnap.forEach(d => {
+      const r = d.data();
+      const data = r.criadoEm?.toDate
+        ? r.criadoEm.toDate().toLocaleDateString('pt-BR')
+        : '—';
+      linhasResgates += `<tr>
+        <td style="padding:6px 10px;border-bottom:1px solid #1a2a1a;">${data}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #1a2a1a;">${(r.quantidade ?? 0).toLocaleString('pt-BR')} CNB</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #1a2a1a;font-size:11px;">${r.walletAddress ?? '—'}</td>
+      </tr>`;
+    });
+
+    // Formata consentimentos
+    const consentimentos = perfil.consentimentos ?? {};
+    const linhasConsent = Object.entries(consentimentos).map(([id, ativo]) =>
+      `<tr>
+        <td style="padding:6px 10px;border-bottom:1px solid #1a2a1a;">${id}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #1a2a1a;color:${ativo ? '#00FF88' : '#ff6464'};">
+          ${ativo ? 'Ativo' : 'Revogado'}
+        </td>
+      </tr>`
+    ).join('');
+
+    const criadoEm = perfil.criadoEm?.toDate
+      ? perfil.criadoEm.toDate().toLocaleDateString('pt-BR')
+      : '—';
+
+    const html = `
+      <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;background:#0A0F1E;color:#fff;border-radius:12px;overflow:hidden;">
+        <div style="background:#0d1f0d;padding:24px 28px;border-bottom:2px solid #00FF88;">
+          <h1 style="margin:0;color:#00FF88;font-size:20px;">Relatório de Dados — CNB Mobile</h1>
+          <p style="margin:6px 0 0;color:#8a9a8a;font-size:13px;">Gerado em ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</p>
+        </div>
+        <div style="padding:24px 28px;font-size:13px;line-height:1.6;">
+
+          <h2 style="color:#c6ff4a;font-size:15px;margin-bottom:10px;">Perfil</h2>
+          <table style="width:100%;border-collapse:collapse;margin-bottom:24px;">
+            <tr><td style="padding:6px 10px;color:#8a9a8a;width:40%;">Nome</td><td style="padding:6px 10px;">${perfil.nome ?? '—'}</td></tr>
+            <tr style="background:rgba(255,255,255,0.03)"><td style="padding:6px 10px;color:#8a9a8a;">E-mail</td><td style="padding:6px 10px;">${email}</td></tr>
+            <tr><td style="padding:6px 10px;color:#8a9a8a;">Membro desde</td><td style="padding:6px 10px;">${criadoEm}</td></tr>
+            <tr style="background:rgba(255,255,255,0.03)"><td style="padding:6px 10px;color:#8a9a8a;">Pontos atuais</td><td style="padding:6px 10px;">${(perfil.pontos ?? 0).toLocaleString('pt-BR')}</td></tr>
+            <tr><td style="padding:6px 10px;color:#8a9a8a;">Minutos carregados</td><td style="padding:6px 10px;">${(perfil.minutos ?? 0).toLocaleString('pt-BR')}</td></tr>
+            <tr style="background:rgba(255,255,255,0.03)"><td style="padding:6px 10px;color:#8a9a8a;">Código de indicação</td><td style="padding:6px 10px;">${perfil.codigo ?? '—'}</td></tr>
+          </table>
+
+          <h2 style="color:#c6ff4a;font-size:15px;margin-bottom:10px;">Preferências de Privacidade</h2>
+          ${linhasConsent ? `<table style="width:100%;border-collapse:collapse;margin-bottom:24px;">
+            <thead><tr style="background:rgba(255,255,255,0.05);color:#8a9a8a;">
+              <th style="padding:6px 10px;text-align:left;">Consentimento</th>
+              <th style="padding:6px 10px;text-align:left;">Status</th>
+            </tr></thead>
+            <tbody>${linhasConsent}</tbody>
+          </table>` : '<p style="color:#8a9a8a;margin-bottom:24px;">Nenhuma preferência registrada.</p>'}
+
+          <h2 style="color:#c6ff4a;font-size:15px;margin-bottom:10px;">Histórico de Resgates CNB</h2>
+          ${linhasResgates ? `<table style="width:100%;border-collapse:collapse;margin-bottom:24px;">
+            <thead><tr style="background:rgba(255,255,255,0.05);color:#8a9a8a;">
+              <th style="padding:6px 10px;text-align:left;">Data</th>
+              <th style="padding:6px 10px;text-align:left;">Valor</th>
+              <th style="padding:6px 10px;text-align:left;">Carteira</th>
+            </tr></thead>
+            <tbody>${linhasResgates}</tbody>
+          </table>` : '<p style="color:#8a9a8a;margin-bottom:24px;">Nenhum resgate realizado.</p>'}
+
+          <p style="font-size:11px;color:#555;margin-top:20px;">
+            Este relatório foi gerado a pedido do titular dos dados, conforme a Lei Geral de Proteção de Dados (LGPD).
+            Para solicitações adicionais, entre em contato: contato@rafaelmariano.com.br
+          </p>
+        </div>
+      </div>`;
+
+    const transporter = nodemailer.createTransport({
+      host: 'smtp.gmail.com', port: 465, secure: true,
+      auth: { user: smtpUser.value(), pass: smtpPass.value() },
+    });
+
+    await transporter.sendMail({
+      from: `"CNB Mobile" <${smtpUser.value()}>`,
+      to: email,
+      subject: 'Seus dados no CNB Mobile — Relatório completo',
+      html,
+    });
+
+    console.log(`[RelatorioLGPD] Relatório enviado para ${email} (uid: ${uid})`);
+    return { enviado: true };
+  }
+);
+
 // ─── Envio de push notification para todos os usuários ───────────────────────
 // Só admins podem chamar. Tokens ficam em /push_tokens/{uid}.
 const ADMIN_UIDS = ['X619NYBpp5OqXKTBomuFTISuQGY2'];

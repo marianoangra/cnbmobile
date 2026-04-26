@@ -201,7 +201,7 @@ export async function adicionarPontos(uid, quantidade, minutosCarregando = 0) {
  * garantindo que sessões fragmentadas (30 min + 30 min) acumulem para o bônus.
  * Retorna true se o bônus de hora foi concedido neste minuto.
  */
-export async function adicionarMinutoComBonus(uid) {
+export async function adicionarMinutoComBonus(uid, incluirHorarios = true) {
   let bonusConcedido = false;
   let minutosAoCompletar = 0;
   await runTransaction(db, async (t) => {
@@ -213,13 +213,16 @@ export async function adicionarMinutoComBonus(uid) {
     const bonus = Math.floor(novoMinutos / 60) > Math.floor(minutosAtual / 60) ? 50 : 0;
     bonusConcedido = bonus > 0;
     minutosAoCompletar = novoMinutos;
-    const d = new Date();
-    const diaKey = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
-    t.update(ref, {
+    const update = {
       pontos: increment(10 + bonus),
       minutos: increment(1),
-      [`atividadeDias.${diaKey}`]: increment(10 + bonus),
-    });
+    };
+    if (incluirHorarios) {
+      const d = new Date();
+      const diaKey = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+      update[`atividadeDias.${diaKey}`] = increment(10 + bonus);
+    }
+    t.update(ref, update);
   });
   if (bonusConcedido) logBonusHora(minutosAoCompletar);
   return bonusConcedido;

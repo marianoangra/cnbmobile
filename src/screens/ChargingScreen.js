@@ -1,275 +1,565 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
-  useSharedValue, useAnimatedStyle, useAnimatedProps,
-  withTiming, withDelay, withRepeat, withSequence, withSpring,
+  useSharedValue, useAnimatedStyle,
+  withTiming, withRepeat, withSequence, withSpring,
   Easing, cancelAnimation, runOnJS,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Svg, { Circle, Ellipse, Defs, RadialGradient, Stop } from 'react-native-svg';
+import Svg, { Circle, G, Line } from 'react-native-svg';
 import * as Battery from 'expo-battery';
 import { Zap, Plug, TrendingUp } from 'lucide-react-native';
 import { useCarregamento } from '../hooks/useCarregamento';
 import { calcularAtividadeDiaria } from '../services/pontos';
+import SkyARView from '../components/SkyARView';
 
 // ── Constantes ────────────────────────────────────────────────────────────────
-const NEON         = '#00FF7F';  // spring green — cor base da esfera
-const NEON_TRIGGER = '#39FF14';  // lime elétrico — ativado ao atingir zona de disparo
-const NEON_DARK    = '#00994D';  // sombra da esfera
-const PRIMARY      = '#c6ff4a';  // mantido para seção inferior (consistência com o app)
-const PULL_TRIGGER = 150;        // px para disparar atualização
-const SZ           = 290;        // tamanho do container da esfera
-const CC           = SZ / 2;     // centro
+const NEON         = '#00FF7F';
+const NEON_TRIGGER = '#39FF14';
+const PRIMARY      = '#c6ff4a';
+const PULL_TRIGGER = 130;
 
-const AnimatedEllipse = Animated.createAnimatedComponent(Ellipse);
+const { width: SW } = Dimensions.get('window');
+const OFFSET   = 90;               // canvas se extende além dos limites para o parallax
+const CANVAS_W = SW + OFFSET * 2;
+const CANVAS_H = 720;
 
-// ── Anel orbital ──────────────────────────────────────────────────────────────
-function OrbitalRing({ rx, ry, period, dashArray, color, strokeOpacity = 0.45, strokeWidth = 1.2, delay = 0, reverse = false }) {
-  const rot = useSharedValue(0);
-
-  useEffect(() => {
-    rot.value = withDelay(
-      delay,
-      withRepeat(
-        withTiming(reverse ? -360 : 360, { duration: period, easing: Easing.linear }),
-        -1, false,
-      ),
-    );
-    return () => cancelAnimation(rot);
-  }, []);
-
-  const rotStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${rot.value}deg` }],
-  }));
-
-  return (
-    <Animated.View
-      style={[{ position: 'absolute', width: SZ, height: SZ }, rotStyle]}
-      pointerEvents="none"
-    >
-      <Svg width={SZ} height={SZ}>
-        <Ellipse
-          cx={CC} cy={CC} rx={rx} ry={ry}
-          stroke={color} strokeWidth={strokeWidth}
-          fill="none" strokeOpacity={strokeOpacity}
-          strokeDasharray={dashArray}
-        />
-      </Svg>
-    </Animated.View>
-  );
+// ── Gerador pseudo-aleatório (seeded) ─────────────────────────────────────────
+function seededRand(seed) {
+  let s = (Math.abs(seed) * 9301 + 49297) % 233280;
+  return () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
 }
 
-// ── Partícula orbital ─────────────────────────────────────────────────────────
-// Orbita em torno do centro, percorrendo o anel principal
-function OrbitalParticle({ color, period, radius }) {
-  const rot = useSharedValue(0);
+// Paleta de cores estelares reais — tipo espectral O/B (azul-branca), F/G (amarela), K (laranja), M (vermelha)
+const STAR_PALETTE = [
+  '#ffffff', '#ffffff', '#ffffff', '#ffffff', '#ffffff', // brancas — maioria
+  '#c8d8ff',  // azul-branca  (tipo O/B — Rigel, Spica)
+  '#c8d8ff',
+  '#e8f0ff',  // azul leve    (tipo A — Sirius, Vega)
+  '#fff8e0',  // amarelo suave (tipo F/G — como o Sol)
+  '#ffe5b0',  // laranja tênue (tipo K — Arcturus)
+  '#ffe0e0',  // vermelho leve (tipo M — Betelgeuse)
+  '#f0f8ff',  // branco-azulado tênue
+];
+
+function genStars(count, seed, rMin, rMax, opMin, opMax, clusterOpts) {
+  const rand = seededRand(seed);
+  return Array.from({ length: count }, () => {
+    let x = rand() * CANVAS_W;
+    let y = rand() * CANVAS_H;
+    // Bias para faixa diagonal — simula concentração da Via Láctea
+    if (clusterOpts && rand() < clusterOpts.bias) {
+      const t = rand();
+      x = CANVAS_W * (0.12 + t * 0.76) + (rand() - 0.5) * clusterOpts.spreadX;
+      y = CANVAS_H * (0.04 + t * 0.60) + (rand() - 0.5) * clusterOpts.spreadY;
+    }
+    return {
+      x:  Math.max(0, Math.min(CANVAS_W, x)),
+      y:  Math.max(0, Math.min(CANVAS_H, y)),
+      r:  rMin + rand() * (rMax - rMin),
+      // Curva de potência: mais estrelas tênues do que brilhantes (como no céu real)
+      op: opMin + Math.pow(rand(), 2.0) * (opMax - opMin),
+      c:  STAR_PALETTE[Math.floor(rand() * STAR_PALETTE.length)],
+      tw: Math.floor(rand() * 3), // grupo de cintilação independente: 0, 1 ou 2
+    };
+  });
+}
+
+// Camadas — computadas uma vez no carregamento do módulo
+const MW = { bias: 0.52, spreadX: 300, spreadY: 110 }; // faixa Via Láctea
+const STARS_DEEP   = genStars(110, 9999, 0.18, 0.55, 0.02, 0.14, MW);   // fundíssimo — quase invisível
+const STARS_FAR    = genStars(65,  1,    0.30, 0.85, 0.06, 0.28, { bias: 0.22, spreadX: 200, spreadY: 90 });
+const STARS_MID    = genStars(42,  500,  0.55, 1.40, 0.14, 0.52);
+const STARS_NEAR   = genStars(24,  1200, 0.85, 1.90, 0.26, 0.70);
+const STARS_BRIGHT = genStars(10,  2000, 2.00, 3.40, 0.88, 1.00);
+const STARS_NEON   = genStars(14,  3000, 0.65, 1.30, 0.38, 0.68);
+
+// ── Estrela cadente ───────────────────────────────────────────────────────────
+function ShootingStar({ triggerKey }) {
+  const progress = useSharedValue(0);
+  const opacity  = useSharedValue(0);
+
+  // Trajetória fixa mas com variação por triggerKey
+  const seed  = (triggerKey * 7919) % 1;
+  const rand  = seededRand(triggerKey + 1);
+  const startX = rand() * SW * 0.6;           // origem no terço esquerdo/central
+  const startY = rand() * 120 + 30;           // origem no topo
+  const len    = 90 + rand() * 60;            // comprimento do risco
+  const angle  = 28 + rand() * 20;            // ângulo diagonal (28–48°)
+  const rad    = (angle * Math.PI) / 180;
+  const dx     = Math.cos(rad) * len;
+  const dy     = Math.sin(rad) * len;
 
   useEffect(() => {
-    rot.value = withRepeat(
-      withTiming(360, { duration: period, easing: Easing.linear }),
-      -1, false,
+    if (triggerKey === 0) return;
+    progress.value = 0;
+    opacity.value  = 0;
+
+    // Fade in → viagem → fade out
+    opacity.value = withSequence(
+      withTiming(1,   { duration: 80  }),
+      withTiming(1,   { duration: 340 }),
+      withTiming(0,   { duration: 180 }),
     );
-    return () => cancelAnimation(rot);
-  }, []);
+    progress.value = withTiming(1, { duration: 600, easing: Easing.out(Easing.quad) });
+
+    return () => { cancelAnimation(progress); cancelAnimation(opacity); };
+  }, [triggerKey]);
 
   const style = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${rot.value}deg` }],
+    opacity: opacity.value,
+    transform: [{ translateX: progress.value * dx }, { translateY: progress.value * dy }],
   }));
 
+  if (triggerKey === 0) return null;
+
   return (
-    <Animated.View
-      pointerEvents="none"
-      style={[{ position: 'absolute', width: SZ, height: SZ }, style]}
-    >
-      <Svg width={SZ} height={SZ}>
-        {/* ponto brilhante */}
-        <Circle cx={CC + radius} cy={CC} r={5}   fill={color} opacity={0.9} />
-        <Circle cx={CC + radius} cy={CC} r={9}   fill={color} opacity={0.35} />
-        <Circle cx={CC + radius} cy={CC} r={14}  fill={color} opacity={0.12} />
+    <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, style]}>
+      <Svg width={SW} height={300} style={{ position: 'absolute', left: 0, top: 0 }}>
+        {/* Cauda difusa */}
+        <Line
+          x1={startX} y1={startY}
+          x2={startX - dx * 0.5} y2={startY - dy * 0.5}
+          stroke="white" strokeWidth={1.5} strokeOpacity={0.18}
+          strokeLinecap="round"
+        />
+        {/* Risco principal */}
+        <Line
+          x1={startX} y1={startY}
+          x2={startX - dx * 0.25} y2={startY - dy * 0.25}
+          stroke="white" strokeWidth={1.8} strokeOpacity={0.7}
+          strokeLinecap="round"
+        />
+        {/* Ponta brilhante */}
+        <Circle cx={startX} cy={startY} r={1.8} fill="white" fillOpacity={0.95} />
+        <Circle cx={startX} cy={startY} r={3.5} fill="white" fillOpacity={0.18} />
       </Svg>
     </Animated.View>
   );
 }
 
-// ── Esfera Futurista ──────────────────────────────────────────────────────────
-function EsferaFuturista({ carregando, pullY, phase }) {
-  // Animações internas
-  const floatY    = useSharedValue(0);   // flutuação idle
-  const pulse     = useSharedValue(1);   // escala pulsante
-  const glowAlpha = useSharedValue(0.12);
-  const flashAnim = useSharedValue(0);   // flash de sucesso
-  const ringAlpha = useSharedValue(0.45);
+// ── Satélite em órbita ────────────────────────────────────────────────────────
+function Satellite({ triggerKey }) {
+  const progress = useSharedValue(0);
+  const opacity  = useSharedValue(0);
+  const blinkAmt = useSharedValue(1);
 
-  // ── Idle float (sempre ativo) ─────────────────────────────────────────────
+  const rand = seededRand(triggerKey * 3571 + 17);
+
+  // Trajetória: maioria entra pela esquerda, alguns pelo topo
+  const fromLeft   = rand() > 0.28;
+  const angle      = (8 + rand() * 28) * (Math.PI / 180); // 8–36° de inclinação
+  const duration   = 14000 + rand() * 8000;                // 14–22 s para cruzar
+  const brightness = 0.32 + rand() * 0.30;                 // 0.32–0.62 (varia como satélites reais)
+  const blinkPd    = 2800 + rand() * 3400;                 // período de rotação 2.8–6.2 s
+
+  const pad = 30;
+  let x0, y0, x1, y1;
+  if (fromLeft) {
+    x0 = -pad;
+    y0 = rand() * CANVAS_H * 0.62 + 50;
+    x1 = CANVAS_W + pad;
+    y1 = y0 + (CANVAS_W + pad * 2) * Math.tan(angle);
+  } else {
+    x0 = rand() * SW * 0.65 + SW * 0.12;
+    y0 = -pad;
+    x1 = x0 + CANVAS_H * Math.sin(angle + 0.5);
+    y1 = CANVAS_H + pad;
+  }
+
   useEffect(() => {
-    floatY.value = withRepeat(
-      withSequence(
-        withTiming(-9, { duration: 1800, easing: Easing.inOut(Easing.sin) }),
-        withTiming(9,  { duration: 1800, easing: Easing.inOut(Easing.sin) }),
-      ),
-      -1, true,
+    if (triggerKey === 0) return;
+    progress.value = 0;
+    opacity.value  = 0;
+
+    opacity.value = withSequence(
+      withTiming(brightness, { duration: 2400, easing: Easing.in(Easing.quad) }),
+      withTiming(brightness, { duration: duration - 4200 }),
+      withTiming(0,          { duration: 1800, easing: Easing.out(Easing.quad) }),
     );
-    return () => cancelAnimation(floatY);
+    progress.value = withTiming(1, { duration, easing: Easing.linear });
+
+    // Pulso suave — reflexo solar ao girar
+    blinkAmt.value = withRepeat(withSequence(
+      withTiming(0.68, { duration: blinkPd / 2, easing: Easing.inOut(Easing.sin) }),
+      withTiming(1.00, { duration: blinkPd / 2, easing: Easing.inOut(Easing.sin) }),
+    ), -1, true);
+
+    return () => {
+      cancelAnimation(progress);
+      cancelAnimation(opacity);
+      cancelAnimation(blinkAmt);
+    };
+  }, [triggerKey]);
+
+  const satStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value * blinkAmt.value,
+    transform: [
+      { translateX: x0 + progress.value * (x1 - x0) },
+      { translateY: y0 + progress.value * (y1 - y0) },
+    ],
+  }));
+
+  if (triggerKey === 0) return null;
+
+  return (
+    <Animated.View pointerEvents="none" style={[{ position: 'absolute', left: 0, top: 0 }, satStyle]}>
+      <Svg width={10} height={10}>
+        <Circle cx={5} cy={5} r={2.6} fill="white" fillOpacity={0.08} />
+        <Circle cx={5} cy={5} r={1.1} fill="white" fillOpacity={0.96} />
+      </Svg>
+    </Animated.View>
+  );
+}
+
+// ── Campo estelar ─────────────────────────────────────────────────────────────
+function StarField({ carregando, phase, offsetX, offsetY, bateria, pontosGanhos }) {
+  const twinkleA    = useSharedValue(0.8);
+  const twinkleB    = useSharedValue(0.5);
+  const twinkleC    = useSharedValue(1.0);
+  const nebulaAlpha = useSharedValue(0);
+  const centerGlow  = useSharedValue(0.0);
+
+  // Deriva idle — movimento sutil e autônomo das camadas
+  const driftX = useSharedValue(0);
+  const driftY = useSharedValue(0);
+
+  // Estrela cadente — incrementa a cada sucesso
+  const [shootKey, setShootKey] = useState(0);
+
+  // Satélite — aparece a cada 45–90 s aleatoriamente
+  const [satKey, setSatKey] = useState(0);
+  useEffect(() => {
+    let timer;
+    function schedule() {
+      timer = setTimeout(() => {
+        setSatKey(k => k + 1);
+        schedule();
+      }, 45000 + Math.random() * 45000);
+    }
+    schedule();
+    return () => clearTimeout(timer);
   }, []);
 
-  // ── Animação de carregamento ──────────────────────────────────────────────
+  // ── Três ritmos de cintilação independentes ───────────────────────────────
+  useEffect(() => {
+    twinkleA.value = withRepeat(withSequence(
+      withTiming(1.0,  { duration: 2600, easing: Easing.inOut(Easing.sin) }),
+      withTiming(0.42, { duration: 3400, easing: Easing.inOut(Easing.sin) }),
+    ), -1, true);
+    twinkleB.value = withRepeat(withSequence(
+      withTiming(0.38, { duration: 2000, easing: Easing.inOut(Easing.sin) }),
+      withTiming(1.0,  { duration: 3000, easing: Easing.inOut(Easing.sin) }),
+    ), -1, true);
+    twinkleC.value = withRepeat(withSequence(
+      withTiming(0.58, { duration: 3800, easing: Easing.inOut(Easing.sin) }),
+      withTiming(1.0,  { duration: 2200, easing: Easing.inOut(Easing.sin) }),
+    ), -1, true);
+    return () => { cancelAnimation(twinkleA); cancelAnimation(twinkleB); cancelAnimation(twinkleC); };
+  }, []);
+
+  // ── Deriva idle — o céu "respira" quando não há interação ────────────────
+  useEffect(() => {
+    driftX.value = withRepeat(withSequence(
+      withTiming( 8, { duration: 7000, easing: Easing.inOut(Easing.sin) }),
+      withTiming(-8, { duration: 7000, easing: Easing.inOut(Easing.sin) }),
+    ), -1, true);
+    driftY.value = withRepeat(withSequence(
+      withTiming( 5, { duration: 9000, easing: Easing.inOut(Easing.sin) }),
+      withTiming(-5, { duration: 9000, easing: Easing.inOut(Easing.sin) }),
+    ), -1, true);
+    return () => { cancelAnimation(driftX); cancelAnimation(driftY); };
+  }, []);
+
+  // ── Animações de carregamento ─────────────────────────────────────────────
   useEffect(() => {
     if (carregando) {
-      // Pulsação da esfera
-      pulse.value = withRepeat(
-        withSequence(
-          withTiming(1.08, { duration: 820, easing: Easing.inOut(Easing.quad) }),
-          withTiming(0.95, { duration: 820, easing: Easing.inOut(Easing.quad) }),
-        ),
-        -1, true,
-      );
-      // Glow pulsante
-      glowAlpha.value = withRepeat(
-        withSequence(
-          withTiming(0.72, { duration: 680 }),
-          withTiming(0.22, { duration: 680 }),
-        ),
-        -1, true,
-      );
-      // Anéis ficam mais vivos
-      ringAlpha.value = withTiming(0.65, { duration: 500 });
+      nebulaAlpha.value = withRepeat(withSequence(
+        withTiming(1.0,  { duration: 1600, easing: Easing.inOut(Easing.quad) }),
+        withTiming(0.42, { duration: 1600, easing: Easing.inOut(Easing.quad) }),
+      ), -1, true);
+      centerGlow.value = withRepeat(withSequence(
+        withTiming(1.0, { duration: 1400 }),
+        withTiming(0.4, { duration: 1400 }),
+      ), -1, true);
     } else {
-      cancelAnimation(pulse);
-      cancelAnimation(glowAlpha);
-      pulse.value     = withSpring(1, { damping: 12, stiffness: 180 });
-      glowAlpha.value = withTiming(0.12, { duration: 600 });
-      ringAlpha.value = withTiming(0.45, { duration: 400 });
+      cancelAnimation(nebulaAlpha);
+      cancelAnimation(centerGlow);
+      nebulaAlpha.value = withTiming(0, { duration: 1200 }); // some completamente
+      centerGlow.value  = withTiming(0, { duration: 800  });
     }
   }, [carregando]);
 
-  // ── Animação de sucesso (flash + contração) ───────────────────────────────
+  // ── Estrela cadente ao soltar o pull-to-refresh ───────────────────────────
   useEffect(() => {
     if (phase === 'success') {
-      flashAnim.value = withSequence(
-        withTiming(0.85, { duration: 90  }),
-        withTiming(0,    { duration: 550 }),
-      );
-      pulse.value = withSequence(
-        withTiming(1.40,  { duration: 100 }),
-        withTiming(0.82,  { duration: 180 }),
-        withSpring(1.0, { damping: 14, stiffness: 200 }),
-      );
+      setShootKey(k => k + 1);
     }
   }, [phase]);
 
   const isTriggered = phase === 'triggered' || phase === 'refreshing' || phase === 'success';
-  const neon     = isTriggered ? NEON_TRIGGER : NEON;
-  const neonDark = isTriggered ? '#00AA00'    : NEON_DARK;
+  const neon        = isTriggered ? NEON_TRIGGER : NEON;
 
-  // ── Estilo animado da esfera (responde ao pull) ───────────────────────────
-  const sphereStyle = useAnimatedStyle(() => {
-    const pY       = pullY.value;
-    const pullMove = Math.min(pY * 0.52, 108);
-    const pullScl  = 1 + Math.min(pY / PULL_TRIGGER, 1) * 0.11;
-    return {
-      transform: [
-        { translateY: floatY.value + pullMove },
-        { scale: pulse.value * pullScl },
-      ],
-    };
-  });
+  // ── Estilos da camada profunda — 3 grupos de cintilação independente ────────
+  const deepStyleA = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: offsetX.value * 0.025 + driftX.value * 0.02 },
+      { translateY: offsetY.value * 0.025 + driftY.value * 0.02 },
+    ],
+    opacity: twinkleA.value * 0.62 + centerGlow.value * 0.10,
+  }));
+  const deepStyleB = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: offsetX.value * 0.025 + driftX.value * 0.02 },
+      { translateY: offsetY.value * 0.025 + driftY.value * 0.02 },
+    ],
+    opacity: twinkleB.value * 0.62 + centerGlow.value * 0.10,
+  }));
+  const deepStyleC = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: offsetX.value * 0.025 + driftX.value * 0.02 },
+      { translateY: offsetY.value * 0.025 + driftY.value * 0.02 },
+    ],
+    opacity: twinkleC.value * 0.62 + centerGlow.value * 0.10,
+  }));
 
-  const glowStyle = useAnimatedStyle(() => ({ opacity: glowAlpha.value }));
-  const flashStyle = useAnimatedStyle(() => ({ opacity: flashAnim.value }));
+  // ── Estilos de parallax + deriva idle + boost de brilho ao carregar ───────
+  const layer1Style = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: offsetX.value * 0.07 + driftX.value * 0.06 },
+      { translateY: offsetY.value * 0.07 + driftY.value * 0.06 },
+    ],
+    opacity: twinkleA.value * 0.72 + centerGlow.value * 0.18,
+  }));
+  const layer2Style = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: offsetX.value * 0.22 + driftX.value * 0.18 },
+      { translateY: offsetY.value * 0.22 + driftY.value * 0.18 },
+    ],
+    opacity: twinkleB.value * 0.88 + centerGlow.value * 0.12,
+  }));
+  const layer3Style = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: offsetX.value * 0.46 + driftX.value * 0.38 },
+      { translateY: offsetY.value * 0.46 + driftY.value * 0.38 },
+    ],
+    opacity: Math.min(1, twinkleC.value + centerGlow.value * 0.22),
+  }));
+  const brightStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: offsetX.value * 0.65 + driftX.value * 0.55 },
+      { translateY: offsetY.value * 0.65 + driftY.value * 0.55 },
+    ],
+    opacity: Math.min(1, twinkleA.value * 0.55 + twinkleC.value * 0.45 + centerGlow.value * 0.30),
+  }));
+  const neonStarStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: offsetX.value * 0.38 + driftX.value * 0.30 },
+      { translateY: offsetY.value * 0.38 + driftY.value * 0.30 },
+    ],
+    opacity: Math.min(1, twinkleB.value * 0.42 + nebulaAlpha.value * 0.58 + centerGlow.value * 0.12),
+  }));
 
-  // ── Texto dinâmico ────────────────────────────────────────────────────────
-  const textLabel = (() => {
+  const glowStyle  = useAnimatedStyle(() => ({ opacity: centerGlow.value * 0.38 }));
+  const dustStyle  = useAnimatedStyle(() => ({ opacity: nebulaAlpha.value * 0.22 }));
+
+  const label = (() => {
     if (phase === 'triggered')  return { text: 'Solte para atualizar', color: NEON_TRIGGER };
-    if (phase === 'pulling')    return { text: 'Puxe para atualizar',  color: NEON };
-    if (phase === 'refreshing') return { text: 'Atualizando...',       color: NEON_TRIGGER };
+    if (phase === 'pulling')    return { text: 'Puxe para atualizar',  color: 'rgba(255,255,255,0.35)' };
+    if (phase === 'refreshing') return { text: 'Atualizando',          color: NEON_TRIGGER };
     if (phase === 'success')    return { text: 'Atualizado',           color: NEON_TRIGGER };
-    if (carregando)             return { text: 'Carregando ativo',     color: NEON };
-    return { text: 'Em pausa', color: 'rgba(255,255,255,0.3)' };
+    if (carregando)             return { text: 'Carregando',           color: neon };
+    return                             { text: 'Em pausa',             color: 'rgba(255,255,255,0.12)' };
   })();
 
   return (
-    <View style={{ width: SZ, height: SZ, alignItems: 'center', justifyContent: 'center' }}>
+    <View style={{ flex: 1, overflow: 'hidden' }}>
 
-      {/* Glow externo difuso */}
-      <Animated.View
-        pointerEvents="none"
-        style={[{
-          position: 'absolute',
-          width: 230, height: 230, borderRadius: 115,
-          backgroundColor: neon,
-        }, glowStyle]}
+      {/* Fundo — gradiente escuro verde-espaço */}
+      <LinearGradient
+        colors={['#010e05', '#000902', '#000000']}
+        style={StyleSheet.absoluteFill}
       />
 
-      {/* Anéis orbitais — giram independentemente */}
-      <OrbitalRing
-        rx={106} ry={24}  period={13500} dashArray="4 11"
-        color={neon} strokeOpacity={isTriggered ? 0.65 : 0.4}
-        delay={0}
-      />
-      <OrbitalRing
-        rx={90}  ry={32}  period={8400}  dashArray="2 8"
-        color={neon} strokeOpacity={isTriggered ? 0.7 : 0.5} strokeWidth={1.4}
-        delay={300} reverse
-      />
-      <OrbitalRing
-        rx={120} ry={14}  period={22000} dashArray="1 16"
-        color={neon} strokeOpacity={isTriggered ? 0.4 : 0.2}
-        delay={700}
-      />
-
-      {/* Partícula orbital no anel principal */}
-      <OrbitalParticle color={neon} period={4200} radius={106} />
-
-      {/* Esfera + texto dinâmico */}
-      <Animated.View style={[{ alignItems: 'center' }, sphereStyle]}>
-
-        {/* SVG da esfera com gradiente radial 3D */}
-        <Svg width={144} height={144}>
-          <Defs>
-            <RadialGradient id="sphGrad" cx="36%" cy="32%" r="64%">
-              <Stop offset="0%"   stopColor="#ffffff"  stopOpacity="0.95" />
-              <Stop offset="18%"  stopColor={neon}     stopOpacity="1" />
-              <Stop offset="62%"  stopColor={neonDark} stopOpacity="1" />
-              <Stop offset="100%" stopColor="#001508"  stopOpacity="1" />
-            </RadialGradient>
-            <RadialGradient id="auraGrad" cx="50%" cy="50%" r="50%">
-              <Stop offset="0%"   stopColor={neon} stopOpacity="0.32" />
-              <Stop offset="100%" stopColor={neon} stopOpacity="0" />
-            </RadialGradient>
-          </Defs>
-          {/* Aura suave ao redor */}
-          <Circle cx={72} cy={72} r={70}  fill="url(#auraGrad)" />
-          {/* Esfera principal */}
-          <Circle cx={72} cy={72} r={54}  fill="url(#sphGrad)" />
-          {/* Reflexo difuso */}
-          <Circle cx={54} cy={50} r={13}  fill="rgba(255,255,255,0.18)" />
-          {/* Ponto especular nítido */}
-          <Circle cx={49} cy={45} r={5}   fill="rgba(255,255,255,0.58)" />
-          <Circle cx={44} cy={41} r={2}   fill="rgba(255,255,255,0.85)" />
-        </Svg>
-
-        {/* Texto de estado */}
-        <Text style={{
-          marginTop: 14,
-          fontSize: 9, letterSpacing: 2.8, textTransform: 'uppercase', fontWeight: '700',
-          color: textLabel.color,
-        }}>
-          {textLabel.text}
-        </Text>
+      {/* ── Poeira cósmica — dispersa pelo céu ao carregar ── */}
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, dustStyle]}>
+        <LinearGradient
+          colors={['rgba(0,255,127,0.09)', 'rgba(0,180,80,0.04)', 'rgba(0,0,0,0)']}
+          start={{ x: 0.0, y: 0.0 }} end={{ x: 0.7, y: 0.8 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <LinearGradient
+          colors={['rgba(0,0,0,0)', 'rgba(0,120,55,0.03)', 'rgba(0,220,100,0.06)']}
+          start={{ x: 0.6, y: 0.2 }} end={{ x: 1.0, y: 1.0 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <LinearGradient
+          colors={['rgba(0,0,0,0)', 'rgba(0,200,80,0.04)', 'rgba(0,0,0,0)']}
+          start={{ x: 0.3, y: 1.0 }} end={{ x: 0.8, y: 0.0 }}
+          style={StyleSheet.absoluteFill}
+        />
       </Animated.View>
 
-      {/* Flash de sucesso */}
-      <Animated.View
+      {/* ── Camada profunda — Via Láctea (3 grupos cintilam independente) ── */}
+      {[deepStyleA, deepStyleB, deepStyleC].map((style, tw) => (
+        <Animated.View key={`deep${tw}`} style={[StyleSheet.absoluteFill, style]} pointerEvents="none">
+          <Svg width={CANVAS_W} height={CANVAS_H} style={{ position: 'absolute', left: -OFFSET, top: -OFFSET }}>
+            {STARS_DEEP.filter(s => s.tw === tw).map((s, i) => (
+              <Circle key={i} cx={s.x} cy={s.y} r={s.r} fill={s.c} fillOpacity={s.op} />
+            ))}
+          </Svg>
+        </Animated.View>
+      ))}
+
+      {/* ── Camada 1 — estrelas distantes ── */}
+      <Animated.View style={[StyleSheet.absoluteFill, layer1Style]} pointerEvents="none">
+        <Svg width={CANVAS_W} height={CANVAS_H} style={{ position: 'absolute', left: -OFFSET, top: -OFFSET }}>
+          {STARS_FAR.map((s, i) => (
+            <Circle key={i} cx={s.x} cy={s.y} r={s.r} fill={s.c} fillOpacity={s.op} />
+          ))}
+        </Svg>
+      </Animated.View>
+
+      {/* ── Camada 2 — plano médio ── */}
+      <Animated.View style={[StyleSheet.absoluteFill, layer2Style]} pointerEvents="none">
+        <Svg width={CANVAS_W} height={CANVAS_H} style={{ position: 'absolute', left: -OFFSET, top: -OFFSET }}>
+          {STARS_MID.map((s, i) => (
+            <Circle key={i} cx={s.x} cy={s.y} r={s.r} fill={s.c} fillOpacity={s.op} />
+          ))}
+        </Svg>
+      </Animated.View>
+
+      {/* ── Camada 3 — plano próximo, mais visível ── */}
+      <Animated.View style={[StyleSheet.absoluteFill, layer3Style]} pointerEvents="none">
+        <Svg width={CANVAS_W} height={CANVAS_H} style={{ position: 'absolute', left: -OFFSET, top: -OFFSET }}>
+          {STARS_NEAR.map((s, i) => (
+            <Circle key={i} cx={s.x} cy={s.y} r={s.r} fill={s.c} fillOpacity={s.op} />
+          ))}
+        </Svg>
+      </Animated.View>
+
+      {/* ── Estrelas verdes — acento da identidade visual ── */}
+      <Animated.View style={[StyleSheet.absoluteFill, neonStarStyle]} pointerEvents="none">
+        <Svg width={CANVAS_W} height={CANVAS_H} style={{ position: 'absolute', left: -OFFSET, top: -OFFSET }}>
+          {STARS_NEON.map((s, i) => (
+            <G key={i}>
+              <Circle cx={s.x} cy={s.y} r={s.r * 4}   fill={neon} fillOpacity={0.05} />
+              <Circle cx={s.x} cy={s.y} r={s.r * 1.8} fill={neon} fillOpacity={0.14} />
+              <Circle cx={s.x} cy={s.y} r={s.r}       fill={neon} fillOpacity={s.op} />
+            </G>
+          ))}
+        </Svg>
+      </Animated.View>
+
+      {/* ── Estrelas brilhantes — primeiro plano, com halo cromático ── */}
+      <Animated.View style={[StyleSheet.absoluteFill, brightStyle]} pointerEvents="none">
+        <Svg width={CANVAS_W} height={CANVAS_H} style={{ position: 'absolute', left: -OFFSET, top: -OFFSET }}>
+          {STARS_BRIGHT.map((s, i) => (
+            <G key={i}>
+              <Circle cx={s.x} cy={s.y} r={s.r * 7}   fill={s.c}   fillOpacity={0.028} />
+              <Circle cx={s.x} cy={s.y} r={s.r * 3.5} fill={s.c}   fillOpacity={0.08}  />
+              <Circle cx={s.x} cy={s.y} r={s.r * 1.5} fill="white" fillOpacity={0.22}  />
+              <Circle cx={s.x} cy={s.y} r={s.r}       fill="white" fillOpacity={s.op}  />
+            </G>
+          ))}
+        </Svg>
+      </Animated.View>
+
+      {/* ── Véu estelar — brilho verde difuso ao carregar ── */}
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, glowStyle]}>
+        <LinearGradient
+          colors={['rgba(0,255,127,0.05)', 'rgba(0,140,60,0.025)', 'rgba(0,0,0,0)']}
+          locations={[0, 0.55, 1]}
+          start={{ x: 0.5, y: 0.0 }} end={{ x: 0.5, y: 1.0 }}
+          style={StyleSheet.absoluteFill}
+        />
+      </Animated.View>
+
+      {/* ── Estrela cadente — disparada ao soltar o pull-to-refresh ── */}
+      <ShootingStar triggerKey={shootKey} />
+
+      {/* ── Satélite — passa a cada 45–90 s ── */}
+      <Satellite triggerKey={satKey} />
+
+      {/* ── Valor da bateria — centralizado, flutua nas estrelas ── */}
+      <View
+        style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}
         pointerEvents="none"
-        style={[{
-          position: 'absolute',
-          width: 180, height: 180, borderRadius: 90,
-          backgroundColor: neon,
-        }, flashStyle]}
-      />
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+          <Text style={{
+            fontSize: 88, fontWeight: '100',
+            color: '#ffffff', letterSpacing: -5, lineHeight: 94,
+          }}>
+            {bateria > 0 ? bateria : '--'}
+          </Text>
+          {bateria > 0 && (
+            <Text style={{
+              fontSize: 30, fontWeight: '200',
+              color: 'rgba(255,255,255,0.36)', marginTop: 24,
+            }}>%</Text>
+          )}
+        </View>
+        <Text style={{
+          fontSize: 8, letterSpacing: 5,
+          color: label.color, textTransform: 'uppercase',
+          marginTop: 2,
+        }}>
+          {label.text}
+        </Text>
+      </View>
+
+      {/* ── Pontos acumulados — rodapé do campo estelar ── */}
+      <View
+        style={{
+          position: 'absolute', bottom: 18,
+          width: '100%', alignItems: 'center',
+        }}
+        pointerEvents="none"
+      >
+        <Text style={{
+          fontSize: 28, fontWeight: '400', letterSpacing: -0.5,
+          color: carregando ? NEON : 'rgba(255,255,255,0.20)',
+        }}>
+          +{pontosGanhos.toLocaleString('pt-BR')}
+        </Text>
+        <Text style={{
+          fontSize: 8, letterSpacing: 3.5,
+          color: 'rgba(255,255,255,0.16)',
+          textTransform: 'uppercase', marginTop: 3,
+        }}>
+          pontos on-chain
+        </Text>
+      </View>
+
     </View>
+  );
+}
+
+// ── Botão "Ver o Céu" ─────────────────────────────────────────────────────────
+function SkyButton({ onPress }) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.85}
+      style={{
+        position: 'absolute', bottom: 22, right: 18,
+        flexDirection: 'row', alignItems: 'center', gap: 6,
+        backgroundColor: 'rgba(0,255,127,0.10)',
+        borderWidth: 1, borderColor: 'rgba(0,255,127,0.30)',
+        borderRadius: 99, paddingHorizontal: 14, paddingVertical: 8,
+      }}
+    >
+      <Text style={{ fontSize: 14 }}>🔭</Text>
+      <Text style={{
+        fontSize: 12, fontWeight: '600',
+        color: NEON, letterSpacing: 0.3,
+      }}>
+        Ver o Céu
+      </Text>
+    </TouchableOpacity>
   );
 }
 
@@ -314,23 +604,19 @@ function ProgressoHora({ segundosRestantes, carregando }) {
   );
 }
 
-// ── Bar chart 10 dias ──────────────────────────────────────────────────────────
+// ── Bar chart 10 dias ─────────────────────────────────────────────────────────
 const STATIC_BARS = [28, 42, 35, 58, 40, 72, 55, 68, 85, 78];
-
 function BarChart({ heights }) {
   const bars = heights.every(h => h === 0) ? STATIC_BARS : heights;
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 3, height: 52 }}>
       {bars.map((h, i) => (
-        <View
-          key={i}
-          style={{
-            width: 6, borderRadius: 3,
-            height: (h / 100) * 52,
-            backgroundColor: PRIMARY,
-            opacity: 0.3 + (h / 100) * 0.7,
-          }}
-        />
+        <View key={i} style={{
+          width: 6, borderRadius: 3,
+          height: (h / 100) * 52,
+          backgroundColor: PRIMARY,
+          opacity: 0.3 + (h / 100) * 0.7,
+        }} />
       ))}
     </View>
   );
@@ -341,9 +627,9 @@ export default function ChargingScreen({ route, navigation }) {
   const { user, uid, perfil, onAtualizar } = route?.params || {};
   const { carregando, pontosGanhos, segundosRestantes } = useCarregamento(uid, onAtualizar);
 
-  const [bateria, setBateria] = useState(0);
-  const [phase, setPhase]     = useState('idle');
-  // 'idle' | 'pulling' | 'triggered' | 'refreshing' | 'success'
+  const [bateria,  setBateria]  = useState(0);
+  const [phase,    setPhase]    = useState('idle');
+  const [arMode,   setArMode]   = useState(false);
 
   useEffect(() => {
     Battery.getBatteryLevelAsync()
@@ -355,11 +641,11 @@ export default function ChargingScreen({ route, navigation }) {
     return () => sub?.remove();
   }, []);
 
-  // ── Animação de entrada ──────────────────────────────────────────────────
+  // Entrada
   const entrada  = useSharedValue(0);
-  const entradaY = useSharedValue(24);
+  const entradaY = useSharedValue(20);
   useEffect(() => {
-    const cfg = { duration: 520, easing: Easing.out(Easing.cubic) };
+    const cfg = { duration: 500, easing: Easing.out(Easing.cubic) };
     entrada.value  = withTiming(1, cfg);
     entradaY.value = withTiming(0, cfg);
   }, []);
@@ -368,8 +654,9 @@ export default function ChargingScreen({ route, navigation }) {
     transform: [{ translateY: entradaY.value }],
   }));
 
-  // ── Pull-to-refresh ──────────────────────────────────────────────────────
-  const pullY = useSharedValue(0);
+  // ── Parallax offset — compartilhado com StarField ──────────────────────────
+  const offsetX = useSharedValue(0);
+  const offsetY = useSharedValue(0);
 
   async function handleRefresh() {
     setPhase('refreshing');
@@ -383,34 +670,36 @@ export default function ChargingScreen({ route, navigation }) {
     setTimeout(() => setPhase('idle'), 1200);
   }
 
+  // Gesto de pan — parallax em todas as direções + pull-to-refresh para baixo
   const panGesture = Gesture.Pan()
-    .onUpdate((event) => {
-      if (event.translationY > 0) {
-        pullY.value = Math.min(event.translationY * 0.58, 200);
-        if (pullY.value >= PULL_TRIGGER) {
-          runOnJS(setPhase)('triggered');
-        } else if (pullY.value > 8) {
-          runOnJS(setPhase)('pulling');
-        }
+    .onUpdate((e) => {
+      // Parallax — limita a ±OFFSET para não sair do canvas
+      offsetX.value = Math.max(-OFFSET, Math.min(OFFSET, e.translationX * 0.85));
+      offsetY.value = Math.max(-OFFSET, Math.min(OFFSET, e.translationY * 0.85));
+
+      // Pull-to-refresh — detecta arrasto para baixo
+      if (e.translationY > 0) {
+        const pull = e.translationY * 0.58;
+        if (pull >= PULL_TRIGGER) runOnJS(setPhase)('triggered');
+        else if (pull > 8)        runOnJS(setPhase)('pulling');
       }
     })
-    .onEnd(() => {
-      const didTrigger = pullY.value >= PULL_TRIGGER;
-      pullY.value = withSpring(0, { damping: 20, stiffness: 220 });
-      if (didTrigger) {
-        runOnJS(handleRefresh)();
-      } else {
-        runOnJS(setPhase)('idle');
-      }
+    .onEnd((e) => {
+      const didTrigger = e.translationY > 0 && e.translationY * 0.58 >= PULL_TRIGGER;
+      // Mola de retorno ao centro
+      offsetX.value = withSpring(0, { damping: 20, stiffness: 130 });
+      offsetY.value = withSpring(0, { damping: 20, stiffness: 130 });
+      if (didTrigger) runOnJS(handleRefresh)();
+      else            runOnJS(setPhase)('idle');
     });
 
   const podeSacar  = (perfil?.pontos ?? 0) >= 100000;
   const barHeights = calcularAtividadeDiaria(perfil?.atividadeDias);
 
-  // ── Gate de login ─────────────────────────────────────────────────────────
+  // Gate de login
   if (!user) {
     return (
-      <LinearGradient colors={['#0A0F1E', '#040810', '#000000']} locations={[0, 0.6, 1]} style={{ flex: 1 }}>
+      <LinearGradient colors={['#010e05', '#000902', '#000000']} locations={[0, 0.5, 1]} style={{ flex: 1 }}>
         <SafeAreaView style={{ flex: 1 }} edges={['top']}>
           <Animated.View style={[{
             flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32,
@@ -446,57 +735,36 @@ export default function ChargingScreen({ route, navigation }) {
   }
 
   return (
-    <LinearGradient colors={['#0A0F1E', '#040810', '#000000']} locations={[0, 0.6, 1]} style={{ flex: 1 }}>
+    <LinearGradient colors={['#010e05', '#000902', '#000000']} locations={[0, 0.5, 1]} style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         <Animated.View style={[{ flex: 1 }, entradaStyle]}>
 
-          {/* ── Área da esfera com gesto de pull ── */}
+          {/* ── Campo estelar interativo — ocupa toda a área superior ── */}
           <GestureDetector gesture={panGesture}>
-            <Animated.View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-              <EsferaFuturista
+            <View style={{ flex: 1 }}>
+              <StarField
                 carregando={carregando}
-                pullY={pullY}
                 phase={phase}
+                offsetX={offsetX}
+                offsetY={offsetY}
+                bateria={bateria}
+                pontosGanhos={pontosGanhos}
               />
-
-              {/* Pontos + bateria abaixo da esfera */}
-              <View style={{ alignItems: 'center', marginTop: 4 }}>
-                <Text style={{
-                  fontSize: 38, fontWeight: '600', letterSpacing: -0.5,
-                  color: carregando ? NEON : 'rgba(255,255,255,0.55)',
-                }}>
-                  +{pontosGanhos.toLocaleString('pt-BR')}
-                </Text>
-                <Text style={{ fontSize: 10, letterSpacing: 3, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', marginTop: 2 }}>
-                  pontos on-chain
-                </Text>
-                {bateria > 0 && (
-                  <View style={{
-                    marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 5,
-                    backgroundColor: 'rgba(255,255,255,0.05)',
-                    borderRadius: 99, paddingHorizontal: 10, paddingVertical: 4,
-                    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
-                  }}>
-                    <Zap size={10} color="rgba(255,255,255,0.35)" />
-                    <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>
-                      Bateria {bateria}%
-                    </Text>
-                  </View>
-                )}
-              </View>
-            </Animated.View>
+              {/* Botão AR — sobreposto ao campo estelar */}
+              <SkyButton onPress={() => setArMode(true)} />
+            </View>
           </GestureDetector>
 
           {/* ── Seção inferior ── */}
           <View style={{ paddingHorizontal: 20, paddingBottom: 120, gap: 10 }}>
 
-            {/* Card de recompensa + bar chart */}
+            {/* Card recompensa + bar chart */}
             <LinearGradient
-              colors={['#0d1a24', '#080f18']}
+              colors={['#0a1a0c', '#060f08']}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
               style={{
                 borderRadius: 16, padding: 16,
-                borderWidth: 1, borderColor: 'rgba(0,255,127,0.14)',
+                borderWidth: 1, borderColor: 'rgba(0,255,127,0.10)',
                 flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
               }}
             >
@@ -531,9 +799,9 @@ export default function ChargingScreen({ route, navigation }) {
             {/* Badge de estado */}
             <View style={{
               flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-              backgroundColor: carregando ? 'rgba(0,255,127,0.07)' : 'rgba(255,255,255,0.04)',
+              backgroundColor: carregando ? 'rgba(0,255,127,0.06)' : 'rgba(255,255,255,0.03)',
               borderWidth: 1,
-              borderColor: carregando ? 'rgba(0,255,127,0.18)' : 'rgba(255,255,255,0.08)',
+              borderColor: carregando ? 'rgba(0,255,127,0.14)' : 'rgba(255,255,255,0.06)',
               borderRadius: 99, paddingHorizontal: 14, paddingVertical: 7,
             }}>
               {carregando ? (
@@ -545,21 +813,30 @@ export default function ChargingScreen({ route, navigation }) {
                 </>
               ) : (
                 <>
-                  <Plug size={12} color="rgba(255,255,255,0.35)" />
-                  <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>
+                  <Plug size={12} color="rgba(255,255,255,0.3)" />
+                  <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>
                     Conecte o USB para começar
                   </Text>
                 </>
               )}
             </View>
 
-            <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', textAlign: 'center' }}>
-              Saque disponível a partir de 100.000 pontos.
+            <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.18)', textAlign: 'center' }}>
+              Saque disponível a partir de 100.000 pontos
             </Text>
           </View>
 
         </Animated.View>
       </SafeAreaView>
+
+      {/* ── Modo AR — fullscreen sobre tudo ── */}
+      {arMode && (
+        <SkyARView
+          onClose={() => setArMode(false)}
+          pontosGanhos={pontosGanhos}
+          segundosRestantes={segundosRestantes}
+        />
+      )}
     </LinearGradient>
   );
 }

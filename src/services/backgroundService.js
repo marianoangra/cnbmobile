@@ -1,6 +1,7 @@
 import * as Battery from 'expo-battery';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { adicionarMinutoComBonus, calcularPontosTotal } from './pontos';
+import { lerConsentimentos } from '../utils/consentimentos';
 
 export const SESSAO_KEY = 'cnb_sessao_carregamento';
 
@@ -86,6 +87,13 @@ async function tarefaCarregamento(taskData) {
       }
     } catch {}
 
+    // Lê consentimentos a cada ciclo para refletir revogações em tempo real
+    const consentimentos = await lerConsentimentos().catch(() => ({}));
+    const incluirHorarios = consentimentos.horarios !== false;
+    // Stubs para features futuras:
+    // const incluirLocalizacao = consentimentos.localizacao !== false;
+    // const incluirRede        = consentimentos.rede !== false;
+
     minutos++;
     pendingMinutes++;
 
@@ -93,7 +101,7 @@ async function tarefaCarregamento(taskData) {
     let flushed = 0;
     while (flushed < pendingMinutes) {
       try {
-        const bonusConcedido = await adicionarMinutoComBonus(uid);
+        const bonusConcedido = await adicionarMinutoComBonus(uid, incluirHorarios);
         if (bonusConcedido) console.log(`[BackgroundService] Bônus de hora concedido! (min ${minutos})`);
         flushed++;
       } catch {
