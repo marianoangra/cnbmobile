@@ -402,11 +402,15 @@ export default function HomeScreen({ route, navigation }) {
   const [atividades, setAtividades]           = useState([]);
   const [loadingAtividades, setLoadingAtiv]   = useState(false);
   const [refreshing, setRefreshing]           = useState(false);
-  const [pontosGanhosSessao, setPontosGanhosSessao] = useState(0);
-
-  // Sincroniza pontos do carregamento em tempo real
+  // Sincroniza pontos com o Firestore a cada tick do carregamento.
+  // Aguarda 2s após o evento para garantir que o serviço já escreveu no Firestore.
   useEffect(() => {
-    return onPontosUpdate(pts => setPontosGanhosSessao(pts));
+    let timer;
+    const unsub = onPontosUpdate(() => {
+      clearTimeout(timer);
+      timer = setTimeout(() => onAtualizarRef.current?.(), 2000);
+    });
+    return () => { unsub(); clearTimeout(timer); };
   }, []);
 
   const [focused, setFocused] = useState(true);
@@ -465,7 +469,7 @@ export default function HomeScreen({ route, navigation }) {
       .finally(() => setLoadingAtiv(false));
   }, [perfil?.uid, perfil?.pontos]);
 
-  const pontos    = (perfil?.pontos ?? 0) + pontosGanhosSessao;
+  const pontos    = perfil?.pontos ?? 0;
   const progresso = Math.min(pontos / META, 1);
   const faltam    = Math.max(META - pontos, 0);
   const podeSacar = pontos >= META;
@@ -562,27 +566,27 @@ export default function HomeScreen({ route, navigation }) {
                 activeOpacity={0.85}
                 style={{
                   flexDirection: 'row', alignItems: 'center', gap: 16,
-                  backgroundColor: 'rgba(198,255,74,0.04)',
-                  borderWidth: 1.5, borderColor: 'rgba(198,255,74,0.22)',
+                  backgroundColor: 'rgba(192,132,252,0.04)',
+                  borderWidth: 1.5, borderColor: 'rgba(192,132,252,0.28)',
                   borderRadius: 20, padding: 18, marginBottom: 12,
                 }}
               >
                 <View style={{
                   width: 52, height: 52, borderRadius: 26,
-                  backgroundColor: 'rgba(198,255,74,0.10)',
+                  backgroundColor: 'rgba(192,132,252,0.10)',
                   alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                 }}>
-                  <Zap size={24} color={PRIMARY} />
+                  <Zap size={24} color="#c084fc" />
                 </View>
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 5 }}>
                     <Text style={{ fontSize: 17, fontWeight: '700', color: '#fff' }}>Lite</Text>
                     <View style={{
-                      backgroundColor: 'rgba(198,255,74,0.12)',
+                      backgroundColor: 'rgba(192,132,252,0.12)',
                       borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2,
-                      borderWidth: 1, borderColor: 'rgba(198,255,74,0.28)',
+                      borderWidth: 1, borderColor: 'rgba(192,132,252,0.30)',
                     }}>
-                      <Text style={{ fontSize: 9, fontWeight: '800', color: PRIMARY, letterSpacing: 1.2 }}>LITE</Text>
+                      <Text style={{ fontSize: 9, fontWeight: '800', color: '#c084fc', letterSpacing: 1.2 }}>LITE</Text>
                     </View>
                   </View>
                   <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', lineHeight: 18 }}>
@@ -597,27 +601,27 @@ export default function HomeScreen({ route, navigation }) {
                 activeOpacity={0.85}
                 style={{
                   flexDirection: 'row', alignItems: 'center', gap: 16,
-                  backgroundColor: 'rgba(100,130,255,0.04)',
-                  borderWidth: 1.5, borderColor: 'rgba(100,130,255,0.28)',
+                  backgroundColor: 'rgba(198,255,74,0.04)',
+                  borderWidth: 1.5, borderColor: 'rgba(198,255,74,0.22)',
                   borderRadius: 20, padding: 18,
                 }}
               >
                 <View style={{
                   width: 52, height: 52, borderRadius: 26,
-                  backgroundColor: 'rgba(100,130,255,0.10)',
+                  backgroundColor: 'rgba(198,255,74,0.10)',
                   alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                 }}>
-                  <Cpu size={24} color="#6482FF" />
+                  <Cpu size={24} color={PRIMARY} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 5 }}>
                     <Text style={{ fontSize: 17, fontWeight: '700', color: '#fff' }}>Tech</Text>
                     <View style={{
-                      backgroundColor: 'rgba(100,130,255,0.12)',
+                      backgroundColor: 'rgba(198,255,74,0.12)',
                       borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2,
-                      borderWidth: 1, borderColor: 'rgba(100,130,255,0.32)',
+                      borderWidth: 1, borderColor: 'rgba(198,255,74,0.28)',
                     }}>
-                      <Text style={{ fontSize: 9, fontWeight: '800', color: '#6482FF', letterSpacing: 1.2 }}>TECH</Text>
+                      <Text style={{ fontSize: 9, fontWeight: '800', color: PRIMARY, letterSpacing: 1.2 }}>TECH</Text>
                     </View>
                   </View>
                   <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', lineHeight: 18 }}>

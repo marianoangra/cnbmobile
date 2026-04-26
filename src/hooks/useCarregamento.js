@@ -5,7 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { iniciarForegroundService, pararForegroundService, servicoRodando, SESSAO_KEY } from '../services/backgroundService';
 import { logInicioCarregamento, logFimCarregamento, logSessaoOnChain } from '../services/analytics';
-import { calcularPontosTotal } from '../services/pontos';
+import { calcularPontosTotal, adicionarPontos } from '../services/pontos';
 import { emitPontosUpdate } from '../services/chargeEvents';
 
 function estaCarregando(state) {
@@ -28,6 +28,9 @@ export function useCarregamento(uid, onPontosAdicionados) {
   // Mutex: evita chamadas concorrentes de iniciar/parar sessão
   const iniciandoSessaoRef = useRef(false);
   const parandoSessaoRef = useRef(false);
+
+  // Rastreia se o serviço nativo chegou a rodar nesta sessão
+  const servicoIniciadoRef = useRef(false);
 
   // Debounce: aguarda Android estabilizar o estado da bateria antes de agir
   const batteryDebounceRef = useRef(null);
@@ -94,8 +97,10 @@ export function useCarregamento(uid, onPontosAdicionados) {
       // Inicia o Foreground Service — roda em background e escreve no Firestore
       try {
         await iniciarForegroundService(uidRef.current);
+        servicoIniciadoRef.current = servicoRodando();
       } catch (e) {
         console.warn('[Carregar] Erro ao iniciar serviço:', e?.message);
+        servicoIniciadoRef.current = false;
       }
     } finally {
       iniciandoSessaoRef.current = false;
@@ -117,6 +122,32 @@ export function useCarregamento(uid, onPontosAdicionados) {
         setSegundosRestantes(3600);
       }
       emitPontosUpdate(0);
+      // Fallback de salvamento: garante que minutos não gravados pelo serviço
+      // sejam persistidos no Firestore antes de encerrar a sessão.
+      if (uidRef.current && minutos > 0) {
+        try {
+          if (!servicoIniciadoRef.current) {
+            // Serviço nunca rodou (módulo nativo indisponível ou falhou ao iniciar).
+            // Nenhum adicionarMinutoComBonus foi chamado — salva tudo agora.
+            await adicionarPontos(uidRef.current, calcularPontosTotal(minutos), minutos);
+            console.log(`[Carregar] Serviço indisponível — salvos ${minutos} min direto no Firestore`);
+          } else {
+            // Serviço rodou, mas pode ter minutos pendentes (offline).
+            const raw = await AsyncStorage.getItem(SESSAO_KEY);
+            if (raw) {
+              const { pendingMinutes: pending = 0 } = JSON.parse(raw);
+              if (pending > 0) {
+                await adicionarPontos(uidRef.current, pending * 10, pending);
+                console.log(`[Carregar] Salvos ${pending} min pendentes (offline) no Firestore`);
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('[Carregar] Erro ao salvar minutos pendentes:', e?.message);
+        }
+      }
+      servicoIniciadoRef.current = false;
+
       // Limpa AsyncStorage aqui: se o serviço foi morto pelo SO, ele nunca
       // executa removeItem, e a próxima sessão carregaria os minutos antigos.
       await AsyncStorage.removeItem(SESSAO_KEY).catch(() => {});
