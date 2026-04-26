@@ -158,12 +158,7 @@ async function buscarAtividades(uid, atividadeDias) {
 
 // ─── Componentes internos ─────────────────────────────────────────────────────
 
-function AvatarHeader({ user, perfil }) {
-  if (user && perfil?.avatarURL) {
-    return <Avatar uri={perfil.avatarURL} nome={perfil.nome} size={40} borderColor={PRIMARY} />;
-  }
-
-  // Sem foto: logo oficial CNB dentro de um círculo com borda verde
+function AvatarHeader() {
   return (
     <View style={{
       width: 40, height: 40, borderRadius: 20,
