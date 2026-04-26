@@ -3,6 +3,7 @@ import './src/i18n'; // inicializa i18n antes de tudo
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Alert, Platform, Modal, Text, TouchableOpacity, StyleSheet, Linking, AppState, StatusBar, Animated } from 'react-native';
 import * as Battery from 'expo-battery';
+import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -39,12 +40,12 @@ import ChargingScreen from './src/screens/ChargingScreen';
 import RankingScreen from './src/screens/RankingScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import WithdrawScreen from './src/screens/WithdrawScreen';
-import RankingDetailScreen from './src/screens/RankingDetailScreen';
 import EditProfileScreen from './src/screens/EditProfileScreen';
 import WalletScreen from './src/screens/WalletScreen';
 import DePINInfoScreen from './src/screens/DePINInfoScreen';
 import BuyTokensScreen from './src/screens/BuyTokensScreen';
 import DadosScreen from './src/screens/DadosScreen';
+import RelatorioContaScreen from './src/screens/RelatorioContaScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -155,6 +156,7 @@ function FloatingTabBar({ state, descriptors, navigation }) {
             const Icon = TAB_ICONS[route.name] ?? Zap;
 
             function onPress() {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               const event = navigation.emit({
                 type: 'tabPress',
                 target: route.key,
@@ -281,10 +283,6 @@ function AppNavigator({ user, perfil, onAtualizar, atualizarPerfil }) {
         options={{ headerShown: false }}
       />
       <Stack.Screen
-        name="RankingDetail" component={RankingDetailScreen}
-        options={{ headerShown: true, title: 'Detalhes', headerStyle, headerTintColor }}
-      />
-      <Stack.Screen
         name="EditProfile" component={EditProfileScreen}
         options={{ headerShown: true, title: 'Editar Perfil', headerStyle, headerTintColor, headerBackTitle: 'Retornar' }}
       />
@@ -302,6 +300,10 @@ function AppNavigator({ user, perfil, onAtualizar, atualizarPerfil }) {
       />
       <Stack.Screen
         name="Dados" component={DadosScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="RelatorioConta" component={RelatorioContaScreen}
         options={{ headerShown: false }}
       />
     </Stack.Navigator>

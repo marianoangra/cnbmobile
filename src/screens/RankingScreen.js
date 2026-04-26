@@ -13,16 +13,43 @@ import { Trophy, Users, Flame, Crown, AlertCircle, Clock } from 'lucide-react-na
 import { getRanking, getRankingIndicacoes, getPosicaoRanking } from '../services/pontos';
 import Avatar from '../components/Avatar';
 
-// ─── Helper: soma pontos dos últimos 7 dias a partir de atividadeDias ──────────
-function pontosSemanais(atividadeDias = {}) {
-  let total = 0;
-  const hoje = new Date();
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(hoje);
-    d.setDate(hoje.getDate() - i);
-    const key = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
-    total += atividadeDias?.[key] ?? 0;
+// ─── Helper: início da semana atual (domingo 00:30 local) ────────────────────
+function inicioSemanaAtual() {
+  const agora  = new Date();
+  const dow    = agora.getDay();          // 0 = domingo … 6 = sábado
+  const inicio = new Date(agora);
+
+  // Volta ao domingo desta semana
+  inicio.setDate(agora.getDate() - dow);
+  inicio.setHours(0, 30, 0, 0);          // domingo às 00:30:00
+
+  // Se ainda não chegamos às 00:30 deste domingo, usa o domingo anterior
+  if (agora < inicio) {
+    inicio.setDate(inicio.getDate() - 7);
   }
+
+  return inicio;
+}
+
+// ─── Helper: soma pontos desde domingo 00:30 até agora ───────────────────────
+function pontosSemanais(atividadeDias = {}) {
+  const inicio = inicioSemanaAtual();
+  const agora  = new Date();
+  let   total  = 0;
+
+  // Itera cada dia do período (inclusive início e hoje)
+  const cursor = new Date(inicio);
+  cursor.setHours(0, 0, 0, 0);
+
+  while (cursor <= agora) {
+    const key =
+      `${cursor.getFullYear()}` +
+      `${String(cursor.getMonth() + 1).padStart(2, '0')}` +
+      `${String(cursor.getDate()).padStart(2, '0')}`;
+    total += atividadeDias?.[key] ?? 0;
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
   return total;
 }
 
@@ -46,7 +73,7 @@ const PODIUM_VISUAL = [
   { dataIdx: 2, rank: 3, gradient: ['#f59e0b', '#b45309'], barH: 51 },
 ];
 
-function PodiumItem({ item, rank, gradient, barH, uid, modo, onPress }) {
+function PodiumItem({ item, rank, gradient, barH, uid, modo }) {
   const isMe = item?.uid === uid;
   const big  = rank === 1;
   const sz   = big ? 64 : 48;
@@ -57,11 +84,7 @@ function PodiumItem({ item, rank, gradient, barH, uid, modo, onPress }) {
       : (item?.pontos ?? 0).toLocaleString('pt-BR');
 
   return (
-    <TouchableOpacity
-      activeOpacity={0.8}
-      onPress={() => onPress?.(item, isMe)}
-      style={{ alignItems: 'center', flex: 1 }}
-    >
+    <View style={{ alignItems: 'center', flex: 1 }}>
       {/* Crown acima do 1º */}
       {big && (
         <View style={{ marginBottom: 4 }}>
@@ -120,11 +143,11 @@ function PodiumItem({ item, rank, gradient, barH, uid, modo, onPress }) {
           fontWeight: '700', fontSize: 13,
         }}>{rank}</Text>
       </View>
-    </TouchableOpacity>
+    </View>
   );
 }
 
-function Podium({ lista, uid, modo, onPressItem }) {
+function Podium({ lista, uid, modo }) {
   if (lista.length < 3) return null;
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 8, marginBottom: 20 }}>
@@ -137,7 +160,6 @@ function Podium({ lista, uid, modo, onPressItem }) {
           barH={p.barH}
           uid={uid}
           modo={modo}
-          onPress={onPressItem}
         />
       ))}
     </View>
@@ -147,7 +169,7 @@ function Podium({ lista, uid, modo, onPressItem }) {
 // ─── Item de lista ────────────────────────────────────────────────────────────
 const ITEM_HEIGHT = 68;
 
-function RankingItem({ item, uid, index, modo, onPress }) {
+function RankingItem({ item, uid, index, modo }) {
   const isMe = item.uid === uid;
 
   const opacity    = useSharedValue(0);
@@ -166,9 +188,7 @@ function RankingItem({ item, uid, index, modo, onPress }) {
 
   return (
     <Animated.View style={animStyle}>
-      <TouchableOpacity
-        activeOpacity={0.75}
-        onPress={() => onPress?.(item, isMe)}
+      <View
         style={{
           flexDirection: 'row', alignItems: 'center', gap: 10,
           padding: 12, marginBottom: 6, borderRadius: 14,
@@ -223,13 +243,13 @@ function RankingItem({ item, uid, index, modo, onPress }) {
             </Text>
           </View>
         )}
-      </TouchableOpacity>
+      </View>
     </Animated.View>
   );
 }
 
 // ─── Tela principal ───────────────────────────────────────────────────────────
-export default function RankingScreen({ route, navigation }) {
+export default function RankingScreen({ route }) {
   const { uid } = route?.params || {};
   const [modo, setModo]                     = useState('global');
   const [ranking, setRanking]               = useState([]);
@@ -268,10 +288,6 @@ export default function RankingScreen({ route, navigation }) {
 
   // Top-3 apenas para o pódio (lista começa no 4º abaixo)
   const listaAbaixoPodium = dadosAtivos.slice(3);
-
-  function handlePressItem(item, isMe) {
-    navigation.navigate('RankingDetail', { item, isMe });
-  }
 
   // ── Loading ──
   if (loading) return (
@@ -328,22 +344,9 @@ export default function RankingScreen({ route, navigation }) {
                 <View>
                   <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>Ranking</Text>
                   <Text style={{ fontSize: 24, fontWeight: '600', color: '#fff', letterSpacing: -0.5, marginTop: 2 }}>
-                    {modo === 'semanal' ? 'Semanal' : modo === 'indicacoes' ? 'Indicações' : 'Global'}
+                    {modo === 'semanal' ? 'Semanal' : modo === 'indicacoes' ? 'Indicações' : 'Geral'}
                   </Text>
                 </View>
-                <TouchableOpacity
-                  onPress={() => setModo(m => m === 'semanal' ? 'global' : 'semanal')}
-                  activeOpacity={0.75}
-                  style={{
-                    flexDirection: 'row', alignItems: 'center', gap: 4,
-                    backgroundColor: modo === 'semanal' ? 'rgba(198,255,74,0.20)' : 'rgba(198,255,74,0.10)',
-                    borderWidth: 1, borderColor: modo === 'semanal' ? 'rgba(198,255,74,0.60)' : 'rgba(198,255,74,0.30)',
-                    borderRadius: 99, paddingHorizontal: 10, paddingVertical: 5,
-                  }}
-                >
-                  <Flame size={12} color={PRIMARY} />
-                  <Text style={{ fontSize: 10, color: PRIMARY, fontWeight: modo === 'semanal' ? '700' : '400' }}>Semanal</Text>
-                </TouchableOpacity>
               </View>
 
               {/* Tabs — Global / Indicações */}
@@ -354,7 +357,7 @@ export default function RankingScreen({ route, navigation }) {
                 borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
               }}>
                 {[
-                  { id: 'global',     label: 'Global',    Icon: Trophy },
+                  { id: 'global',     label: 'Geral',     Icon: Trophy },
                   { id: 'indicacoes', label: 'Indicações', Icon: Users  },
                   { id: 'semanal',    label: 'Semanal',    Icon: Clock  },
                 ].map(({ id, label, Icon }) => (
@@ -441,7 +444,7 @@ export default function RankingScreen({ route, navigation }) {
               )}
 
               {/* Pódio */}
-              {dadosAtivos.length >= 3 && <Podium lista={dadosAtivos} uid={uid} modo={modo} onPressItem={handlePressItem} />}
+              {dadosAtivos.length >= 3 && <Podium lista={dadosAtivos} uid={uid} modo={modo} />}
 
               {/* Espaçador antes da lista */}
               {listaAbaixoPodium.length > 0 && <View style={{ marginBottom: 10 }} />}
@@ -459,7 +462,7 @@ export default function RankingScreen({ route, navigation }) {
             </View>
           }
           renderItem={({ item, index }) => (
-            <RankingItem item={item} uid={uid} index={index} modo={modo} onPress={handlePressItem} />
+            <RankingItem item={item} uid={uid} index={index} modo={modo} />
           )}
         />
       </SafeAreaView>
