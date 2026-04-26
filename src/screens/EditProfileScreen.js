@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput,
   Alert, ActivityIndicator, Animated, ScrollView,
+  KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
@@ -78,7 +79,17 @@ export default function EditProfileScreen({ route, navigation }) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
+      >
+      <ScrollView
+        contentContainerStyle={styles.container}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+      >
 
         <Animated.View style={[styles.content, { opacity, transform: [{ translateY }] }]}>
 
@@ -126,14 +137,14 @@ export default function EditProfileScreen({ route, navigation }) {
             <View style={styles.themeRow}>
               <TouchableOpacity
                 style={[styles.themeBtn, isDark && styles.themeBtnAtivo]}
-                onPress={() => !isDark && toggleTheme()}
+                onPress={() => { if (!isDark) { toggleTheme(); setAlterado(true); } }}
                 activeOpacity={0.8}>
                 <Text style={styles.themeBtnIcon}>🌙</Text>
                 <Text style={[styles.themeBtnText, isDark && styles.themeBtnTextAtivo]}>Dark</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.themeBtn, !isDark && styles.themeBtnAtivo]}
-                onPress={() => isDark && toggleTheme()}
+                onPress={() => { if (isDark) { toggleTheme(); setAlterado(true); } }}
                 activeOpacity={0.8}>
                 <Text style={styles.themeBtnIcon}>☀️</Text>
                 <Text style={[styles.themeBtnText, !isDark && styles.themeBtnTextAtivo]}>Light</Text>
@@ -158,6 +169,7 @@ export default function EditProfileScreen({ route, navigation }) {
 
         </Animated.View>
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

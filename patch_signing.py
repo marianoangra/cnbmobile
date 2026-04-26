@@ -3,8 +3,9 @@ Garante, antes de cada build Android:
   1. versionCode e versionName em sincronia com app.json
   2. android/keystore.properties gerado a partir de credentials.json
      (credentials.json é gitignored — senhas nunca ficam no repo)
+  3. build.gradle usa signingConfigs.release (não debug) para o release build
+     (o prebuild --clean pode resetar isso para signingConfigs.debug)
 
-O build.gradle lê as senhas de android/keystore.properties.
 Executado automaticamente pelo build.sh.
 """
 import json
@@ -66,6 +67,60 @@ def gerar_keystore_properties():
     print(f'✓ keystore.properties gerado a partir de credentials.json')
 
 
+SIGNING_BLOCK = '''    def keystorePropsFile = rootProject.file("keystore.properties")
+    def keystoreProps = new Properties()
+    if (keystorePropsFile.exists()) {
+        keystoreProps.load(new FileInputStream(keystorePropsFile))
+    }
+
+    signingConfigs {
+        debug {
+            storeFile file(\'debug.keystore\')
+            storePassword \'android\'
+            keyAlias \'androiddebugkey\'
+            keyPassword \'android\'
+        }
+        release {
+            storeFile file(keystoreProps[\'CNBMOBILE_UPLOAD_STORE_FILE\'] ?: \'cnbmobile-upload.keystore\')
+            storePassword keystoreProps[\'CNBMOBILE_UPLOAD_STORE_PASSWORD\'] ?: \'\'
+            keyAlias keystoreProps[\'CNBMOBILE_UPLOAD_KEY_ALIAS\'] ?: \'cnbmobile\'
+            keyPassword keystoreProps[\'CNBMOBILE_UPLOAD_KEY_PASSWORD\'] ?: \'\'
+        }
+    }'''
+
+RELEASE_SIGNING = 'signingConfig signingConfigs.release'
+
+
+def garantir_signing_release():
+    with open(GRADLE, 'r') as f:
+        content = f.read()
+
+    # Se o bloco de signingConfigs.release já existe, só garante que o buildType release o usa
+    if 'signingConfigs.release' not in content:
+        # Substitui o bloco signingConfigs gerado pelo prebuild pelo bloco correto
+        content = re.sub(
+            r'signingConfigs \{.*?debug \{.*?storeFile file\(\'debug\.keystore\'\).*?\}\s*\}',
+            SIGNING_BLOCK.strip(),
+            content,
+            flags=re.DOTALL,
+        )
+        print('✓ signingConfigs.release adicionado ao build.gradle')
+    else:
+        print('✓ signingConfigs.release já presente')
+
+    # Garante que o buildType release usa signingConfigs.release (não debug)
+    content = re.sub(
+        r'(buildTypes \{.*?release \{.*?)signingConfig signingConfigs\.debug',
+        r'\1' + RELEASE_SIGNING,
+        content,
+        flags=re.DOTALL,
+    )
+
+    with open(GRADLE, 'w') as f:
+        f.write(content)
+
+
 if __name__ == '__main__':
     sync_version()
     gerar_keystore_properties()
+    garantir_signing_release()

@@ -13,7 +13,6 @@ import * as Battery from 'expo-battery';
 import { Zap, Plug, TrendingUp } from 'lucide-react-native';
 import { useCarregamento } from '../hooks/useCarregamento';
 import { calcularAtividadeDiaria } from '../services/pontos';
-import SkyARView from '../components/SkyARView';
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 const NEON         = '#00FF7F';
@@ -538,30 +537,6 @@ function StarField({ carregando, phase, offsetX, offsetY, bateria, pontosGanhos 
   );
 }
 
-// ── Botão "Ver o Céu" ─────────────────────────────────────────────────────────
-function SkyButton({ onPress }) {
-  return (
-    <TouchableOpacity
-      onPress={onPress}
-      activeOpacity={0.85}
-      style={{
-        position: 'absolute', bottom: 22, right: 18,
-        flexDirection: 'row', alignItems: 'center', gap: 6,
-        backgroundColor: 'rgba(0,255,127,0.10)',
-        borderWidth: 1, borderColor: 'rgba(0,255,127,0.30)',
-        borderRadius: 99, paddingHorizontal: 14, paddingVertical: 8,
-      }}
-    >
-      <Text style={{ fontSize: 14 }}>🔭</Text>
-      <Text style={{
-        fontSize: 12, fontWeight: '600',
-        color: NEON, letterSpacing: 0.3,
-      }}>
-        Ver o Céu
-      </Text>
-    </TouchableOpacity>
-  );
-}
 
 // ── Barra de progresso 1 hora ─────────────────────────────────────────────────
 function ProgressoHora({ segundosRestantes, carregando }) {
@@ -627,9 +602,8 @@ export default function ChargingScreen({ route, navigation }) {
   const { user, uid, perfil, onAtualizar } = route?.params || {};
   const { carregando, pontosGanhos, segundosRestantes } = useCarregamento(uid, onAtualizar);
 
-  const [bateria,  setBateria]  = useState(0);
-  const [phase,    setPhase]    = useState('idle');
-  const [arMode,   setArMode]   = useState(false);
+  const [bateria, setBateria] = useState(0);
+  const [phase,   setPhase]   = useState('idle');
 
   useEffect(() => {
     Battery.getBatteryLevelAsync()
@@ -750,8 +724,6 @@ export default function ChargingScreen({ route, navigation }) {
                 bateria={bateria}
                 pontosGanhos={pontosGanhos}
               />
-              {/* Botão AR — sobreposto ao campo estelar */}
-              <SkyButton onPress={() => setArMode(true)} />
             </View>
           </GestureDetector>
 
@@ -829,14 +801,6 @@ export default function ChargingScreen({ route, navigation }) {
         </Animated.View>
       </SafeAreaView>
 
-      {/* ── Modo AR — fullscreen sobre tudo ── */}
-      {arMode && (
-        <SkyARView
-          onClose={() => setArMode(false)}
-          pontosGanhos={pontosGanhos}
-          segundosRestantes={segundosRestantes}
-        />
-      )}
     </LinearGradient>
   );
 }
