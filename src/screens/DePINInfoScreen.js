@@ -4,6 +4,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Defs, RadialGradient, Stop, Rect } from 'react-native-svg';
 import { Zap, Shield, Activity, ArrowLeft } from 'lucide-react-native';
 
 const PRIMARY = '#c6ff4a';
@@ -67,11 +68,20 @@ export default function DePINInfoScreen({ navigation }) {
             {/* Logo + nome */}
             <View style={{ alignItems: 'center', marginTop: 24, marginBottom: 32 }}>
               {/* Halo */}
-              <View style={{
-                position: 'absolute', top: -20,
-                width: 200, height: 200, borderRadius: 100,
-                backgroundColor: 'rgba(198,255,74,0.07)',
-              }} />
+              <Svg
+                style={{ position: 'absolute', top: -60 }}
+                width={220}
+                height={220}
+                pointerEvents="none"
+              >
+                <Defs>
+                  <RadialGradient id="haloDepin" cx="50%" cy="50%" r="50%" gradientUnits="objectBoundingBox">
+                    <Stop offset="0%"  stopColor={PRIMARY} stopOpacity="0.14" />
+                    <Stop offset="60%" stopColor={PRIMARY} stopOpacity="0" />
+                  </RadialGradient>
+                </Defs>
+                <Rect x="0" y="0" width="220" height="220" fill="url(#haloDepin)" />
+              </Svg>
               <Image
                 source={require('../../assets/icon.png')}
                 style={{
