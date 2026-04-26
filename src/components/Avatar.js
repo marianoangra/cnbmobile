@@ -1,19 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { View, Image } from 'react-native';
+import { View, Text, Image } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
-
-const CNB_LOGO = require('../../assets/cnb-logo.png');
 
 export default function Avatar({ uri, nome, size = 56, borderColor, style }) {
   const { colors } = useTheme();
   const [erro, setErro] = useState(false);
 
+  // Sempre que o URI muda (ex: upload de nova foto), tenta carregar de novo
   useEffect(() => { setErro(false); }, [uri]);
-
+  const inicial = (nome ?? 'U')[0].toUpperCase();
+  const fontSize = size * 0.38;
   const borderRadius = size / 2;
   const bc = borderColor ?? colors.border;
 
-  // Avatar real do usuário
   if (uri && !erro) {
     return (
       <Image
@@ -25,18 +24,14 @@ export default function Avatar({ uri, nome, size = 56, borderColor, style }) {
     );
   }
 
-  // Fallback: logo CNB com borda
   return (
     <View style={[{
       width: size, height: size, borderRadius,
+      backgroundColor: colors.card,
       borderWidth: 2, borderColor: bc,
-      overflow: 'hidden',
+      alignItems: 'center', justifyContent: 'center',
     }, style]}>
-      <Image
-        source={CNB_LOGO}
-        style={{ width: '100%', height: '100%' }}
-        resizeMode="cover"
-      />
+      <Text style={{ fontSize, fontWeight: 'bold', color: colors.primary }}>{inicial}</Text>
     </View>
   );
 }

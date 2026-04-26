@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useCallback, useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, Alert,
+  View, Text, Image, ScrollView, TouchableOpacity, Alert,
   ActivityIndicator, RefreshControl, Modal, Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -159,25 +159,27 @@ async function buscarAtividades(uid, atividadeDias) {
 // ─── Componentes internos ─────────────────────────────────────────────────────
 
 function AvatarHeader({ user, perfil }) {
-  const inicial = (perfil?.nome ?? 'U').charAt(0).toUpperCase();
-
   if (user && perfil?.avatarURL) {
     return <Avatar uri={perfil.avatarURL} nome={perfil.nome} size={40} borderColor={PRIMARY} />;
   }
 
+  // Sem foto: logo oficial CNB dentro de um círculo com borda verde
   return (
-    <LinearGradient
-      colors={['#a6ff3d', '#2ecc71']}
-      start={{ x: 0.13, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' }}
-    >
-      <Text style={{ color: '#000', fontWeight: '700', fontSize: 16 }}>{inicial}</Text>
-    </LinearGradient>
+    <View style={{
+      width: 40, height: 40, borderRadius: 20,
+      borderWidth: 2, borderColor: PRIMARY,
+      overflow: 'hidden',
+    }}>
+      <Image
+        source={require('../../assets/cnb-logo.png')}
+        style={{ width: '100%', height: '100%' }}
+        resizeMode="cover"
+      />
+    </View>
   );
 }
 
-function CardPontos({ pontos, progresso, faltam, user, estaCarregando, onSaque, onPix, barStyle, pontosHoje }) {
+function CardPontos({ pontos, progresso, faltam, user, estaCarregando, onSaque, onPix, barStyle, pontosHoje, variacaoDia }) {
   const pct = Math.round(progresso * 100);
   return (
     <LinearGradient
@@ -226,14 +228,16 @@ function CardPontos({ pontos, progresso, faltam, user, estaCarregando, onSaque, 
             <Zap size={10} color={PRIMARY} strokeWidth={2.5} />
             <Text style={{ fontSize: 10, color: PRIMARY, fontWeight: '600' }}>Ativo</Text>
           </View>
-        ) : user ? (
+        ) : user && variacaoDia !== null ? (
           <View style={{
-            flexDirection: 'row', alignItems: 'center', gap: 2,
-            backgroundColor: 'rgba(255,255,255,0.07)',
+            flexDirection: 'row', alignItems: 'center', gap: 4,
+            backgroundColor: 'rgba(198,255,74,0.1)',
             paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99,
           }}>
-            <Text style={{ fontSize: 10, color: PRIMARY, fontWeight: '700' }}>{pct}%</Text>
-            <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}> da meta</Text>
+            <Text style={{ fontSize: 10, color: PRIMARY, fontWeight: '700' }}>
+              +{Math.abs(parseFloat(variacaoDia)).toFixed(1)}%
+            </Text>
+            <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>vs ontem</Text>
           </View>
         ) : null}
       </View>
@@ -463,7 +467,12 @@ export default function HomeScreen({ route, navigation }) {
 
   // Badge dinâmico: pontos ganhos hoje vs ontem
   const _hoje = new Date();
-  const pontosHoje = perfil?.atividadeDias?.[diaKeyDe(_hoje)] ?? 0;
+  const _ontem = new Date(_hoje); _ontem.setDate(_ontem.getDate() - 1);
+  const pontosHoje   = perfil?.atividadeDias?.[diaKeyDe(_hoje)]  ?? 0;
+  const pontosOntem  = perfil?.atividadeDias?.[diaKeyDe(_ontem)] ?? 0;
+  const variacaoDia  = pontosOntem > 0
+    ? (Math.abs(pontosHoje - pontosOntem) / pontosOntem * 100).toFixed(1)
+    : null;
 
   // Barra de progresso animada
   const barWidth = useSharedValue(0);
@@ -637,6 +646,7 @@ export default function HomeScreen({ route, navigation }) {
               onPix={handlePrivado}
               barStyle={barStyle}
               pontosHoje={pontosHoje}
+              variacaoDia={variacaoDia}
             />
           </Animated.View>
 
