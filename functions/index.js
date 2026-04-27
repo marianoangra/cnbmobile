@@ -129,8 +129,12 @@ exports.processarComissaoSaque = onDocumentCreated(
 // ─── Creditar indicador quando novo usuário aplica um código ─────────────────
 // Dispara ao criar referral_events/{uid} (via processarIndicacao no cliente).
 // Usa Admin SDK — bypassa regras do Firestore.
+// IMPORTANTE: sem secrets no config para garantir que a função seja implantada
+// mesmo que SOLANA_PRIVATE_KEY não esteja configurado no Secret Manager.
+// A prova on-chain de indicações é feita separadamente via referrals_onchain
+// quando o secret estiver disponível.
 exports.onReferralCreated = onDocumentCreated(
-  { document: 'referral_events/{uid}', region: 'us-central1', secrets: [solanaPrivateKey] },
+  { document: 'referral_events/{uid}', region: 'us-central1' },
   async (event) => {
     const data = event.data?.data();
     if (!data) return;
@@ -150,64 +154,16 @@ exports.onReferralCreated = onDocumentCreated(
       return;
     }
 
+    // Credita +100 pts ao indicador
     await db.doc(`usuarios/${referrerUid}`).update({
       pontos: FieldValue.increment(100),
       referidos: FieldValue.increment(1),
     });
 
-    // Registra prova on-chain na Solana (não-bloqueante — falha silenciosa)
-    try {
-      const { Connection, PublicKey, Transaction, TransactionInstruction } = require('@solana/web3.js');
-      const MEMO_PROGRAM = new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr');
-      const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
-      const projectKeypair = carregarKeypair(solanaPrivateKey.value());
-
-      // Hashs dos UIDs para preservar privacidade na blockchain pública
-      const referrerHash = crypto.createHash('sha256').update(referrerUid).digest('hex').slice(0, 16);
-      const referredHash = crypto.createHash('sha256').update(newUserUid).digest('hex').slice(0, 16);
-
-      const memo = JSON.stringify({
-        app: 'CNB Mobile',
-        event: 'referral',
-        referrerHash,
-        referredHash,
-        timestamp: new Date().toISOString(),
-      });
-
-      const transaction = new Transaction();
-      transaction.add(new TransactionInstruction({
-        keys: [{ pubkey: projectKeypair.publicKey, isSigner: true, isWritable: false }],
-        programId: MEMO_PROGRAM,
-        data: Buffer.from(memo, 'utf8'),
-      }));
-
-      const { blockhash } = await connection.getLatestBlockhash();
-      transaction.recentBlockhash = blockhash;
-      transaction.feePayer = projectKeypair.publicKey;
-
-      const signature = await connection.sendTransaction(transaction, [projectKeypair]);
-      await connection.confirmTransaction(signature, 'confirmed');
-
-      // Salva prova no Firestore
-      await db.collection('referrals_onchain').add({
-        referrerUid,
-        newUserUid,
-        referrerHash,
-        referredHash,
-        signature,
-        solscanUrl: `https://solscan.io/tx/${signature}`,
-        criadoEm: FieldValue.serverTimestamp(),
-      });
-
-      console.log(`[ReferralProof] ${referrerHash} → ${referredHash} | sig: ${signature}`);
-    } catch (e) {
-      console.warn('[ReferralProof] Falha ao registrar on-chain (não crítico):', e.message);
-    }
-
     // Deleta o evento após processar (coleção é efêmera)
     await event.data.ref.delete();
 
-    console.log(`Indicação: ${newUserUid} indicado por ${referrerUid} (+100 pts)`);
+    console.log(`Indicação processada: ${newUserUid} → ${referrerUid} (+100 pts)`);
   }
 );
 
@@ -1033,5 +989,87 @@ exports.enviarNotificacaoGlobal = onCall(
 
     console.log(`[Push] Notificação enviada para ${total} dispositivos`);
     return { enviado: total };
+  }
+);
+
+// ─── Backfill: credita pontos de indicação perdidos por bug do onReferralCreated ─
+// Só admin pode chamar. Roda UMA vez. Compara o campo `referidos` com a contagem
+// real de usuários que têm `referidoPor` apontando para o referrer.
+// Crédito = (diferença) × 100 pts por referral perdida.
+exports.backfillReferralPoints = onCall(
+  { region: 'us-central1', invoker: 'public' },
+  async (request) => {
+    if (!request.auth || !ADMIN_UIDS.includes(request.auth.uid)) {
+      throw new HttpsError('permission-denied', 'Não autorizado.');
+    }
+
+    const db = getFirestore();
+
+    // 1. Busca todos os usuários que foram indicados por alguém
+    const referredSnap = await db.collection('usuarios')
+      .where('referidoPor', '!=', null)
+      .get();
+
+    // 2. Conta quantas indicações reais cada referrer tem
+    const contagemReal = {}; // referrerUid -> número real de indicados
+    referredSnap.forEach(doc => {
+      const ref = doc.data().referidoPor;
+      if (ref && ref !== doc.id) {
+        contagemReal[ref] = (contagemReal[ref] ?? 0) + 1;
+      }
+    });
+
+    const referrerUids = Object.keys(contagemReal);
+    if (referrerUids.length === 0) {
+      return { creditados: 0, pontosTotais: 0, detalhes: [] };
+    }
+
+    // 3. Busca os perfis dos referrers e calcula a diferença
+    const resultados = [];
+    let totalCreditados = 0;
+    let totalPontos = 0;
+
+    // Processa em lotes de 20 (limite de reads paralelos razoável)
+    const LOTE = 20;
+    for (let i = 0; i < referrerUids.length; i += LOTE) {
+      const lote = referrerUids.slice(i, i + LOTE);
+      const snaps = await Promise.all(lote.map(uid => db.doc(`usuarios/${uid}`).get()));
+
+      const batch = db.batch();
+      let temEscrita = false;
+
+      snaps.forEach((snap, idx) => {
+        if (!snap.exists) return;
+        const uid = lote[idx];
+        const dados = snap.data();
+        const referidosRegistrado = dados.referidos ?? 0;
+        const referidosReal = contagemReal[uid];
+        const diferenca = referidosReal - referidosRegistrado;
+
+        if (diferenca > 0) {
+          const pontosDevidos = diferenca * 100;
+          batch.update(db.doc(`usuarios/${uid}`), {
+            pontos: FieldValue.increment(pontosDevidos),
+            referidos: referidosReal, // corrige para o valor real
+          });
+          resultados.push({
+            uid,
+            nome: dados.nome ?? '—',
+            referidosRegistrado,
+            referidosReal,
+            diferenca,
+            pontosDevidos,
+          });
+          totalCreditados++;
+          totalPontos += pontosDevidos;
+          temEscrita = true;
+        }
+      });
+
+      if (temEscrita) await batch.commit();
+    }
+
+    console.log(`[BackfillReferral] ${totalCreditados} referrers creditados | ${totalPontos} pts totais`);
+    return { creditados: totalCreditados, pontosTotais: totalPontos, detalhes: resultados };
   }
 );

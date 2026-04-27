@@ -8,9 +8,9 @@ import * as Clipboard from 'expo-clipboard';
 import { ArrowLeft, Copy, CheckCircle, AlertCircle, Zap } from 'lucide-react-native';
 
 // ─── CONFIGURAÇÕES DO TIME CNB ────────────────────────────────────────────────
-const PIX_KEY       = 'cnb@cnbtoken.io';     // ← Substituir pela chave PIX real
-const PIX_KEY_TYPE  = 'E-mail';              // ← Tipo: E-mail / CNPJ / CPF / Telefone
-const CONTATO_EMAIL = 'contato@cnbtoken.io'; // ← E-mail que recebe os comprovantes
+const PIX_KEY       = 'contato@criptonobolso.com.br';
+const PIX_KEY_TYPE  = 'E-mail';
+const CONTATO_EMAIL = 'contato@criptonobolso.com.br';
 const CNB_POR_REAL  = 100;                   // ← 1 BRL = 100 CNB (ajustar conforme cotação)
 // ──────────────────────────────────────────────────────────────────────────────
 

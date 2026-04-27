@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.cnb.cnbappv2",
-      "buildNumber": "172",
+      "buildNumber": "173",
       "usesAppleSignIn": true,
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
@@ -32,7 +32,7 @@
     },
     "android": {
       "package": "com.cnb.cnbappv2",
-      "versionCode": 194,
+      "versionCode": 195,
       "permissions": [
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_DATA_SYNC"
