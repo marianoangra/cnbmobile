@@ -142,6 +142,23 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ── Lista de espera (waitlist) — público, sem auth ───────────────────────
+    // Inserções vêm do site cnbmobile.com (visitantes anônimos).
+    // Doc ID = email sanitizado → 2º submit do mesmo email é bloqueado pelo
+    // currentDocument.exists=false no SDK web (no-op silencioso).
+    match /leads/{leadId} {
+      allow create: if
+        request.resource.data.email is string
+        && request.resource.data.email.matches('^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$')
+        && request.resource.data.email.size() > 5
+        && request.resource.data.email.size() < 200
+        && request.resource.data.locale in ['pt', 'en', 'es']
+        && request.resource.data.source is string
+        && request.resource.data.source.size() < 50
+        && request.resource.data.keys().hasOnly(['email', 'locale', 'source', 'createdAt']);
+      allow read, update, delete: if false;
+    }
+
   }
 }
 

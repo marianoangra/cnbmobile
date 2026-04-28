@@ -159,6 +159,69 @@ exports.notificarSolicitacaoCompra = onDocumentCreated(
   }
 );
 
+// ─── Notificação de novo lead na lista de espera ────────────────────────────
+// Disparada quando o site (cnbmobile.com) insere um doc em /leads.
+exports.notificarNovoLead = onDocumentCreated(
+  {
+    document: 'leads/{leadId}',
+    secrets: [smtpUser, smtpPass],
+    region: 'us-central1',
+  },
+  async (event) => {
+    const lead = event.data?.data();
+    if (!lead) return;
+
+    const { email, locale, source } = lead;
+    const id = event.params.leadId;
+    const data = lead.createdAt?.toDate
+      ? lead.createdAt.toDate().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+      : new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+
+    // Total de leads acumulados na fila
+    const db = getFirestore();
+    let total = 0;
+    try {
+      const countSnap = await db.collection('leads').count().get();
+      total = countSnap.data().count;
+    } catch {}
+
+    const localeFlag = { pt: '🇧🇷', en: '🇺🇸', es: '🇪🇸' }[locale] || '🌐';
+
+    const transporter = nodemailer.createTransport({
+      host: 'smtp.gmail.com', port: 465, secure: true,
+      auth: { user: smtpUser.value(), pass: smtpPass.value() },
+    });
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #c6ff4a; background: #0A0F1E; padding: 20px; border-radius: 8px;">
+          ✉️ Novo lead na lista de espera CNB
+        </h2>
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr style="background: #f5f5f5;"><td style="padding:10px;font-weight:bold;width:30%;">E-mail</td><td style="padding:10px;font-size:16px;"><a href="mailto:${email}">${email}</a></td></tr>
+          <tr><td style="padding:10px;font-weight:bold;">Idioma</td><td style="padding:10px;">${localeFlag} ${locale}</td></tr>
+          <tr style="background: #f5f5f5;"><td style="padding:10px;font-weight:bold;">Origem</td><td style="padding:10px;">${source ?? '—'}</td></tr>
+          <tr><td style="padding:10px;font-weight:bold;">Data/Hora</td><td style="padding:10px;">${data}</td></tr>
+          <tr style="background: #f5f5f5;"><td style="padding:10px;font-weight:bold;">Total na fila</td><td style="padding:10px;font-size:16px;font-weight:bold;color:#00AA55;">${total} ${total === 1 ? 'lead' : 'leads'}</td></tr>
+        </table>
+        <p style="margin-top: 24px; color: #666; font-size: 12px;">
+          Ver lista completa:
+          <a href="https://console.firebase.google.com/project/cnbmobile-2053c/firestore/data/~2Fleads">Firestore → /leads</a>
+        </p>
+      </div>
+    `;
+
+    await transporter.sendMail({
+      from: `"CNB Mobile" <${smtpUser.value()}>`,
+      to: DESTINATARIO,
+      subject: `✉️ Novo lead: ${email}${total > 0 ? ` (#${total})` : ''}`,
+      html,
+    });
+
+    console.log(`[Lead] notificação enviada para ${DESTINATARIO} — ${id}`);
+  }
+);
+
 // ─── 1% de comissão para o indicador quando o indicado faz um saque ─────────
 // Ex: saque de 100.000 pts → indicador recebe +1.000 pts automaticamente.
 exports.processarComissaoSaque = onDocumentCreated(
