@@ -445,7 +445,7 @@ export default function ProfileScreen({ route, navigation }) {
               if (!isLite) {
                 items.push({
                   Icon: Wallet, title: 'Carteira Solana',
-                  sub: 'Phantom · ' + (perfilLocal?.walletAddress ? perfilLocal.walletAddress.slice(0,4) + '…' + perfilLocal.walletAddress.slice(-3) : '—'),
+                  sub: perfilLocal?.walletAddress ? perfilLocal.walletAddress.slice(0,4) + '…' + perfilLocal.walletAddress.slice(-3) : '—',
                   onPress: () => navigation.navigate('Wallet', { user: perfilLocal }),
                 });
               }
