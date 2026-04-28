@@ -32,7 +32,7 @@
     },
     "android": {
       "package": "com.cnb.cnbappv2",
-      "versionCode": 195,
+      "versionCode": 196,
       "permissions": [
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_DATA_SYNC"
@@ -52,6 +52,8 @@
       "./plugins/withIOSFixes",
       "expo-web-browser",
       "@react-native-firebase/app",
+      "@react-native-firebase/perf",
+      "@react-native-firebase/crashlytics",
       "expo-localization",
       "expo-apple-authentication",
       [
@@ -62,7 +64,12 @@
           "defaultChannel": "default"
         }
       ],
-      "expo-build-properties",
+      [
+        "expo-build-properties",
+        {
+          "ios": { "useFrameworks": "static" }
+        }
+      ],
       "expo-secure-store"
     ],
     "extra": {

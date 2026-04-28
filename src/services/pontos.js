@@ -47,6 +47,7 @@ export async function criarPerfil(uid, nome, email, codigoIndicacao = null) {
     referidoPor: null,
     referidos: 0,
     ultimoLogin: null,
+    modo: null, // novo usuário escolhe na tela ModoEscolha; null = ainda não escolheu
     criadoEm: serverTimestamp(),
   };
   const batch = writeBatch(db);
@@ -186,6 +187,15 @@ export async function excluirConta(uid, authUser) {
 
 export function calcularPontosTotal(minutos) {
   return minutos * 10 + Math.floor(minutos / 60) * 50;
+}
+
+/**
+ * Persiste a escolha do usuário entre 'lite' e 'tech'.
+ * Default visual quando ausente é 'tech' (decidido no consumidor).
+ */
+export async function atualizarModo(uid, modo) {
+  if (modo !== 'lite' && modo !== 'tech') throw new Error('modo inválido');
+  await updateDoc(doc(db, 'usuarios', uid), { modo });
 }
 
 export async function adicionarPontos(uid, quantidade, minutosCarregando = 0) {

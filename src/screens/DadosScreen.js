@@ -72,7 +72,7 @@ const PERMISSOES = [
     desc: 'Leitura de QR Code e atualização de foto de perfil.',
     obrigatorio: false,
     cor: '#FF8A65',
-    bonus: 100,
+    bonus: 1000,
   },
   {
     id: 'som',
@@ -81,7 +81,7 @@ const PERMISSOES = [
     desc: 'Áudio do microfone para validação de presença e missões de campo.',
     obrigatorio: false,
     cor: '#F06292',
-    bonus: 100,
+    bonus: 1000,
   },
   {
     id: 'analiticos',

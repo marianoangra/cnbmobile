@@ -11,7 +11,8 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from './src/services/firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { auth, db } from './src/services/firebase';
 import { registrarSessao, limparSessao, escutarSessao } from './src/services/session';
 import * as Notifications from 'expo-notifications';
 import { registrarTokenPush, agendarLembreteCarregamento } from './src/services/notificacoes';
@@ -26,7 +27,9 @@ Notifications.setNotificationHandler({
 import { getPerfil, criarPerfil, registrarLoginDiario } from './src/services/pontos';
 import { getConfiguracaoApp } from './src/services/config';
 import { setUsuarioId, resetUsuarioId, logLoginDiario } from './src/services/analytics';
+import { setUsuarioCrash } from './src/services/crashlytics';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
+import { AccentProvider, useAccent } from './src/context/AccentContext';
 import ErrorBoundary from './src/components/ErrorBoundary';
 import { Home, Zap, Trophy, User, Target } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -46,6 +49,7 @@ import DePINInfoScreen from './src/screens/DePINInfoScreen';
 import BuyTokensScreen from './src/screens/BuyTokensScreen';
 import DadosScreen from './src/screens/DadosScreen';
 import RelatorioContaScreen from './src/screens/RelatorioContaScreen';
+import ModoEscolhaScreen from './src/screens/ModoEscolhaScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -62,6 +66,7 @@ const TAB_ICONS = {
 
 function FloatingTabBar({ state, descriptors, navigation }) {
   const insets = useSafeAreaInsets();
+  const centerColor = useAccent();
 
   // ── Estado de carregamento para animação do botão central ──
   const [charging, setCharging] = useState(false);
@@ -183,16 +188,16 @@ function FloatingTabBar({ state, descriptors, navigation }) {
                       style={{
                         position: 'absolute',
                         width: 70, height: 70, borderRadius: 35,
-                        backgroundColor: PRIMARY,
+                        backgroundColor: centerColor,
                         opacity: glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 0.25] }),
                       }}
                     />
                     {/* Botão principal animado */}
                     <Animated.View style={{
                       width: 54, height: 54, borderRadius: 27,
-                      backgroundColor: PRIMARY,
+                      backgroundColor: centerColor,
                       alignItems: 'center', justifyContent: 'center',
-                      shadowColor: PRIMARY,
+                      shadowColor: centerColor,
                       shadowOffset: { width: 0, height: 4 },
                       shadowOpacity: 0.6,
                       shadowRadius: 14,
@@ -214,13 +219,13 @@ function FloatingTabBar({ state, descriptors, navigation }) {
                 style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 8 }}>
                 <Icon
                   size={20}
-                  color={focused ? PRIMARY : 'rgba(255,255,255,0.40)'}
+                  color={focused ? centerColor : 'rgba(255,255,255,0.40)'}
                   strokeWidth={focused ? 2.4 : 2.0}
                 />
                 <Text style={{
                   fontSize: 9,
                   fontWeight: focused ? '700' : '500',
-                  color: focused ? PRIMARY : 'rgba(255,255,255,0.40)',
+                  color: focused ? centerColor : 'rgba(255,255,255,0.40)',
                   marginTop: 4,
                   letterSpacing: 0.2,
                 }}>{label}</Text>
@@ -263,6 +268,26 @@ function AppNavigator({ user, perfil, onAtualizar, atualizarPerfil }) {
   const headerStyle = { backgroundColor: colors.card };
   const headerTintColor = colors.white;
 
+  // Primeiro login: perfil.modo ainda null → tela de escolha bloqueia o resto.
+  const precisaEscolherModo = perfil && (perfil.modo === null || perfil.modo === undefined);
+  const modo = perfil?.modo ?? 'tech';
+  const isTech = modo === 'tech';
+
+  if (precisaEscolherModo) {
+    return (
+      <Stack.Navigator screenOptions={{ headerShown: false, gestureEnabled: false }}>
+        <Stack.Screen name="ModoEscolha">
+          {(props) => (
+            <ModoEscolhaScreen
+              {...props}
+              route={{ ...props.route, params: { uid: user?.uid, currentMode: null, atualizarPerfil } }}
+            />
+          )}
+        </Stack.Screen>
+      </Stack.Navigator>
+    );
+  }
+
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="MainTabs">
@@ -286,26 +311,38 @@ function AppNavigator({ user, perfil, onAtualizar, atualizarPerfil }) {
         name="EditProfile" component={EditProfileScreen}
         options={{ headerShown: true, title: 'Editar Perfil', headerStyle, headerTintColor, headerBackTitle: 'Retornar' }}
       />
-      <Stack.Screen
-        name="Wallet" component={WalletScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="DePINInfo" component={DePINInfoScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="BuyTokens" component={BuyTokensScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="Dados" component={DadosScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="RelatorioConta" component={RelatorioContaScreen}
-        options={{ headerShown: false }}
-      />
+      <Stack.Screen name="ModoEscolha">
+        {(props) => (
+          <ModoEscolhaScreen
+            {...props}
+            route={{ ...props.route, params: { uid: user?.uid, currentMode: modo, atualizarPerfil } }}
+          />
+        )}
+      </Stack.Screen>
+      {isTech && (
+        <>
+          <Stack.Screen
+            name="Wallet" component={WalletScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="DePINInfo" component={DePINInfoScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="BuyTokens" component={BuyTokensScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="Dados" component={DadosScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="RelatorioConta" component={RelatorioContaScreen}
+            options={{ headerShown: false }}
+          />
+        </>
+      )}
     </Stack.Navigator>
   );
 }
@@ -410,6 +447,20 @@ function AppContent() {
     } catch { /* ignora */ }
   }
 
+  useEffect(() => {
+    if (!user?.uid) return;
+    const unsub = onSnapshot(
+      doc(db, 'usuarios', user.uid),
+      (snap) => {
+        if (snap.exists()) {
+          setPerfil(prev => ({ ...(prev ?? {}), ...snap.data(), uid: user.uid }));
+        }
+      },
+      (err) => console.warn('[Perfil snapshot] erro:', err)
+    );
+    return unsub;
+  }, [user?.uid]);
+
   function atualizarPerfilDireto(updates) {
     setPerfil(prev => prev ? { ...prev, ...updates } : prev);
   }
@@ -454,6 +505,7 @@ function AppContent() {
           if (novoToken) iniciarEscutaSessao(u.uid, novoToken);
           setUser(u);
           setUsuarioId(u.uid);
+          setUsuarioCrash(u.uid);
           await carregarPerfil(u);
           registrarTokenPush(u.uid).catch(() => {});
         } else {
@@ -462,6 +514,7 @@ function AppContent() {
           setUser(null);
           setPerfil(null);
           resetUsuarioId();
+          setUsuarioCrash(null);
         }
 
         if (mounted) setPronto(true);
@@ -511,14 +564,16 @@ function AppContent() {
       </Modal>
 
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-      <NavigationContainer ref={navigationRef}>
-        <AppNavigator
-          user={user}
-          perfil={perfil}
-          onAtualizar={onAtualizar}
-          atualizarPerfil={atualizarPerfilDireto}
-        />
-      </NavigationContainer>
+      <AccentProvider modo={perfil?.modo}>
+        <NavigationContainer ref={navigationRef}>
+          <AppNavigator
+            user={user}
+            perfil={perfil}
+            onAtualizar={onAtualizar}
+            atualizarPerfil={atualizarPerfilDireto}
+          />
+        </NavigationContainer>
+      </AccentProvider>
     </SafeAreaProvider>
   );
 }

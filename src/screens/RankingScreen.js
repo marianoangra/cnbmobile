@@ -12,6 +12,7 @@ import Animated, {
 import { Trophy, Users, Flame, Crown, AlertCircle, Clock } from 'lucide-react-native';
 import { getRanking, getRankingIndicacoes, getPosicaoRanking } from '../services/pontos';
 import Avatar from '../components/Avatar';
+import { useAccent } from '../context/AccentContext';
 
 // ─── Helper: início da semana atual (domingo 00:30 local) ────────────────────
 function inicioSemanaAtual() {
@@ -31,33 +32,20 @@ function inicioSemanaAtual() {
   return inicio;
 }
 
-// ─── Helper: soma pontos desde domingo 00:30 até agora ───────────────────────
-function pontosSemanais(atividadeDias = {}) {
-  const inicio = inicioSemanaAtual();
-  const agora  = new Date();
-  let   total  = 0;
-
-  // Itera cada dia do período (inclusive início e hoje)
-  const cursor = new Date(inicio);
-  cursor.setHours(0, 0, 0, 0);
-
-  while (cursor <= agora) {
-    const key =
-      `${cursor.getFullYear()}` +
-      `${String(cursor.getMonth() + 1).padStart(2, '0')}` +
-      `${String(cursor.getDate()).padStart(2, '0')}`;
-    total += atividadeDias?.[key] ?? 0;
-    cursor.setDate(cursor.getDate() + 1);
-  }
-
-  return total;
+// ─── Helper: pontos ganhos desde o último snapshot (domingo 00:30) ────────────
+// Cloud Function `snapshotInicioSemana` salva pontosInicioSemana toda semana.
+// O delta atual - snapshot captura TODAS as fontes (charging, login, indicação,
+// milestone, comissão). Math.max evita negativos por saque mid-semana.
+function pontosSemanais(perfil) {
+  const atual  = perfil?.pontos ?? 0;
+  const inicio = perfil?.pontosInicioSemana;
+  if (inicio === undefined || inicio === null) return 0; // sem snapshot ainda
+  return Math.max(0, atual - inicio);
 }
 
-// Gera ranking semanal a partir do ranking global já carregado
 function buildRankingSemanal(lista) {
   return lista
-    .map(u => ({ ...u, pontosSemana: pontosSemanais(u.atividadeDias) }))
-    .filter(u => u.pontosSemana > 0)
+    .map(u => ({ ...u, pontosSemana: pontosSemanais(u) }))
     .sort((a, b) => b.pontosSemana - a.pontosSemana)
     .map((u, i) => ({ ...u, posicao: i + 1 }));
 }
@@ -74,6 +62,7 @@ const PODIUM_VISUAL = [
 ];
 
 function PodiumItem({ item, rank, gradient, barH, uid, modo }) {
+  const PRIMARY = useAccent();
   const isMe = item?.uid === uid;
   const big  = rank === 1;
   const sz   = big ? 64 : 48;
@@ -170,6 +159,7 @@ function Podium({ lista, uid, modo }) {
 const ITEM_HEIGHT = 68;
 
 function RankingItem({ item, uid, index, modo }) {
+  const PRIMARY = useAccent();
   const isMe = item.uid === uid;
 
   const opacity    = useSharedValue(0);
@@ -250,8 +240,9 @@ function RankingItem({ item, uid, index, modo }) {
 
 // ─── Tela principal ───────────────────────────────────────────────────────────
 export default function RankingScreen({ route }) {
-  const { uid } = route?.params || {};
-  const [modo, setModo]                     = useState('global');
+  const PRIMARY = useAccent();
+  const { uid, perfil } = route?.params || {};
+  const [modo, setModo]                     = useState('semanal');
   const [ranking, setRanking]               = useState([]);
   const [rankingInd, setRankingInd]         = useState([]);
   const [loading, setLoading]               = useState(true);
@@ -286,8 +277,9 @@ export default function RankingScreen({ route }) {
   const minhaEntradaInd = rankingInd.find(u => u.uid === uid);
   const minhaEntradaSemanal = rankingSemanal.find(u => u.uid === uid);
 
-  // Top-3 apenas para o pódio (lista começa no 4º abaixo)
-  const listaAbaixoPodium = dadosAtivos.slice(3);
+  // No modo "global" não há pódio — lista mostra todos desde o 1º.
+  const mostrarPodium = modo !== 'global';
+  const listaAbaixoPodium = mostrarPodium ? dadosAtivos.slice(3) : dadosAtivos;
 
   // ── Loading ──
   if (loading) return (
@@ -357,9 +349,9 @@ export default function RankingScreen({ route }) {
                 borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
               }}>
                 {[
-                  { id: 'global',     label: 'Geral',     Icon: Trophy },
-                  { id: 'indicacoes', label: 'Indicações', Icon: Users  },
                   { id: 'semanal',    label: 'Semanal',    Icon: Clock  },
+                  { id: 'global',     label: 'Geral',      Icon: Trophy },
+                  { id: 'indicacoes', label: 'Indicações', Icon: Users  },
                 ].map(({ id, label, Icon }) => (
                   <TouchableOpacity
                     key={id}
@@ -400,7 +392,7 @@ export default function RankingScreen({ route }) {
                 </View>
               )}
 
-              {modo === 'indicacoes' && minhaEntradaInd && (
+              {modo === 'indicacoes' && (
                 <View style={{
                   flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
                   backgroundColor: 'rgba(198,255,74,0.07)',
@@ -409,10 +401,10 @@ export default function RankingScreen({ route }) {
                 }}>
                   <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>Suas indicações</Text>
                   <Text style={{ fontSize: 20, fontWeight: '700', color: PRIMARY }}>
-                    {minhaEntradaInd.posicao}
+                    {minhaEntradaInd?.posicao ?? '—'}
                   </Text>
                   <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>
-                    {minhaEntradaInd.referidos ?? 0} indicações
+                    {minhaEntradaInd?.referidos ?? perfil?.referidos ?? 0} indicações
                   </Text>
                 </View>
               )}
@@ -444,7 +436,7 @@ export default function RankingScreen({ route }) {
               )}
 
               {/* Pódio */}
-              {dadosAtivos.length >= 3 && <Podium lista={dadosAtivos} uid={uid} modo={modo} />}
+              {mostrarPodium && dadosAtivos.length >= 3 && <Podium lista={dadosAtivos} uid={uid} modo={modo} />}
 
               {/* Espaçador antes da lista */}
               {listaAbaixoPodium.length > 0 && <View style={{ marginBottom: 10 }} />}

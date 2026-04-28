@@ -1,5 +1,5 @@
 const { onDocumentCreated, onDocumentUpdated } = require('firebase-functions/v2/firestore');
-const { onCall, HttpsError } = require('firebase-functions/v2/https');
+const { onCall, onRequest, HttpsError } = require('firebase-functions/v2/https');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { defineSecret } = require('firebase-functions/params');
 const { initializeApp } = require('firebase-admin/app');
@@ -94,6 +94,68 @@ exports.notificarSaque = onDocumentCreated(
     });
 
     console.log(`Notificação enviada para ${DESTINATARIO} — saque ${saqueId}`);
+  }
+);
+
+// ─── Notificação de SOLICITAÇÃO de compra de pontos ─────────────────────────
+// Disparada quando o cliente toca "copiar chave PIX" no BuyTokensScreen.
+// Email deixa explícito que é uma SOLICITAÇÃO (aguardando comprovante PIX).
+exports.notificarSolicitacaoCompra = onDocumentCreated(
+  {
+    document: 'solicitacoes_compra/{id}',
+    secrets: [smtpUser, smtpPass],
+    region: 'us-central1',
+  },
+  async (event) => {
+    const sol = event.data?.data();
+    if (!sol) return;
+
+    const { nome, email, valorBRL, cnbCalculado, uid, criadoEm } = sol;
+    const id = event.params.id;
+    const data = criadoEm?.toDate
+      ? criadoEm.toDate().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+      : new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+
+    const valorBRLFmt = Number(valorBRL ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+    const cnbFmt = Number(cnbCalculado ?? 0).toLocaleString('pt-BR');
+
+    const transporter = nodemailer.createTransport({
+      host: 'smtp.gmail.com', port: 465, secure: true,
+      auth: { user: smtpUser.value(), pass: smtpPass.value() },
+    });
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #c6ff4a; background: #0A0F1E; padding: 20px; border-radius: 8px;">
+          🛒 Nova SOLICITAÇÃO de compra CNB
+        </h2>
+        <p style="background: #fff8e1; border-left: 4px solid #f5a623; padding: 12px; margin: 16px 0; color: #5d4e00;">
+          <strong>Status:</strong> Aguardando pagamento via PIX. Aguarde o comprovante por e-mail antes de creditar os pontos.
+        </p>
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr style="background: #f5f5f5;"><td style="padding:10px;font-weight:bold;width:35%;">ID</td><td style="padding:10px;">${id}</td></tr>
+          <tr><td style="padding:10px;font-weight:bold;">Cliente</td><td style="padding:10px;">${nome ?? '—'}</td></tr>
+          <tr style="background: #f5f5f5;"><td style="padding:10px;font-weight:bold;">UID</td><td style="padding:10px;font-family:monospace;font-size:11px;">${uid ?? '—'}</td></tr>
+          <tr><td style="padding:10px;font-weight:bold;">E-mail</td><td style="padding:10px;">${email ?? '—'}</td></tr>
+          <tr style="background: #f5f5f5;"><td style="padding:10px;font-weight:bold;">Valor (R$)</td><td style="padding:10px;font-size:16px;font-weight:bold;">R$ ${valorBRLFmt}</td></tr>
+          <tr><td style="padding:10px;font-weight:bold;">Pontos solicitados</td><td style="padding:10px;font-size:18px;font-weight:bold;color:#00AA55;">${cnbFmt} pontos CNB</td></tr>
+          <tr style="background: #f5f5f5;"><td style="padding:10px;font-weight:bold;">Data/Hora</td><td style="padding:10px;">${data}</td></tr>
+        </table>
+        <p style="margin-top: 24px; color: #666; font-size: 12px;">
+          Para creditar manualmente após confirmação:
+          <a href="https://console.firebase.google.com/project/cnbmobile-2053c/firestore/data/usuarios/${uid}">Firestore → usuarios/${uid}</a>
+        </p>
+      </div>
+    `;
+
+    await transporter.sendMail({
+      from: `"CNB Mobile" <${smtpUser.value()}>`,
+      to: DESTINATARIO,
+      subject: `🛒 Solicitação de compra: ${nome ?? uid} — R$ ${valorBRLFmt}`,
+      html,
+    });
+
+    console.log(`[Solicitação] enviada para ${DESTINATARIO} — ${id}`);
   }
 );
 
@@ -989,6 +1051,135 @@ exports.enviarNotificacaoGlobal = onCall(
 
     console.log(`[Push] Notificação enviada para ${total} dispositivos`);
     return { enviado: total };
+  }
+);
+
+// ─── Snapshot semanal: pontosInicioSemana = pontos atuais ──────────────────
+// Roda todo domingo 00:30 (America/Sao_Paulo). Para cada usuário, salva
+// o `pontos` atual em `pontosInicioSemana`. O cliente calcula o ranking
+// semanal como `Math.max(0, pontos - pontosInicioSemana)` — captura todas
+// as fontes de crédito automaticamente (carregamento, login, indicação,
+// milestones, comissão de saque) sem precisar modificar cada caminho.
+// Limitação: saques mid-semana podem reduzir o delta — o Math.max no
+// cliente evita números negativos.
+async function executarSnapshotSemanal(db) {
+  const snap = await db.collection('usuarios').get();
+  const BATCH_LIMIT = 400;
+  let batch = db.batch();
+  let writes = 0;
+  let total = 0;
+
+  for (const doc of snap.docs) {
+    const pontos = doc.data().pontos ?? 0;
+    batch.update(doc.ref, {
+      pontosInicioSemana: pontos,
+      inicioSemana: FieldValue.serverTimestamp(),
+    });
+    writes++;
+    total++;
+
+    if (writes >= BATCH_LIMIT) {
+      await batch.commit();
+      batch = db.batch();
+      writes = 0;
+    }
+  }
+  if (writes > 0) await batch.commit();
+  return total;
+}
+
+exports.snapshotInicioSemana = onSchedule(
+  {
+    schedule: '30 0 * * 0',
+    timeZone: 'America/Sao_Paulo',
+    region: 'us-central1',
+  },
+  async () => {
+    const total = await executarSnapshotSemanal(getFirestore());
+    console.log(`[Snapshot] ${total} usuários atualizados`);
+  }
+);
+
+// Backfill manual: admin chama uma vez após o deploy para inicializar o
+// campo pontosInicioSemana em todos os perfis. Idempotente — pode rodar
+// quantas vezes quiser (sempre redefine para o pontos atual).
+exports.runSnapshotInicioSemana = onCall(
+  { region: 'us-central1' },
+  async (request) => {
+    if (!request.auth || !ADMIN_UIDS.includes(request.auth.uid)) {
+      throw new HttpsError('permission-denied', 'Não autorizado.');
+    }
+    const total = await executarSnapshotSemanal(getFirestore());
+    return { atualizados: total };
+  }
+);
+
+// ─── Crédito automático de 20k pts pra testers cadastrados via Forms ─────────
+// Disparada por Apps Script quando uma nova resposta do Forms entra.
+// Idempotente: doc do usuário ganha flag `bonusTesterCreditado: true` na 1ª chamada,
+// chamadas subsequentes pra mesmo email retornam `already_credited` sem efeito.
+// Auth: header `X-CNB-Secret` deve bater com o secret hardcoded abaixo.
+const TESTER_BONUS = 20000;
+const TESTER_SECRET = 'cnb_tester_2026_xK9mPq7nVw3jR8dF2aHyL6sBcE4uTzQ1';
+
+exports.creditarBonusTester = onRequest(
+  { region: 'us-central1', cors: true, invoker: 'public' },
+  async (req, res) => {
+    if (req.headers['x-cnb-secret'] !== TESTER_SECRET) {
+      res.status(401).json({ ok: false, reason: 'unauthorized' });
+      return;
+    }
+
+    const emailRaw = req.body?.email || req.query?.email || '';
+    const email = String(emailRaw).toLowerCase().trim();
+    if (!email || !email.includes('@')) {
+      res.status(400).json({ ok: false, reason: 'missing_email' });
+      return;
+    }
+
+    const db = getFirestore();
+
+    // Busca por email exato (lowercase) e variantes (capitalizado),
+    // já que perfis podem ter sido criados com casing diferente.
+    const variantes = [email, email[0].toUpperCase() + email.slice(1)];
+    let userDoc = null;
+    for (const v of variantes) {
+      const snap = await db.collection('usuarios').where('email', '==', v).limit(1).get();
+      if (!snap.empty) {
+        userDoc = snap.docs[0];
+        break;
+      }
+    }
+
+    if (!userDoc) {
+      res.json({ ok: false, reason: 'no_account', email });
+      return;
+    }
+
+    const data = userDoc.data();
+    if (data.bonusTesterCreditado === true) {
+      res.json({ ok: false, reason: 'already_credited', uid: userDoc.id });
+      return;
+    }
+
+    const update = {
+      pontos: FieldValue.increment(TESTER_BONUS),
+      bonusTesterCreditado: true,
+    };
+    // Mantém o ranking semanal neutro (bônus não é atividade).
+    if (data.pontosInicioSemana !== undefined) {
+      update.pontosInicioSemana = FieldValue.increment(TESTER_BONUS);
+    }
+
+    await userDoc.ref.update(update);
+
+    console.log(`[BonusTester] +${TESTER_BONUS}pts → ${email} (uid: ${userDoc.id})`);
+    res.json({
+      ok: true,
+      uid: userDoc.id,
+      pontosAntes: data.pontos ?? 0,
+      pontosDepois: (data.pontos ?? 0) + TESTER_BONUS,
+    });
   }
 );
 

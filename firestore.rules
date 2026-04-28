@@ -23,7 +23,7 @@ service cloud.firestore {
       allow update: if request.auth != null
         && request.auth.uid == uid
         && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['nome', 'avatarURL', 'sessionToken', 'codigoAfiliado']);
+            .hasOnly(['nome', 'avatarURL', 'sessionToken', 'codigoAfiliado', 'modo']);
 
       // Atualização 2 — referidoPor: pode ser definido uma única vez, nunca alterado
       allow update: if request.auth != null
@@ -38,11 +38,12 @@ service cloud.firestore {
       // Atualização 3 — acúmulo de pontos (carregamento + login diário)
       // Máximo 60 pts por chamada (10/min + 50 bônus = 60 no pior caso).
       // Inclui ultimoLogin para cobrir registrarLoginDiario().
+      // atividadeDias é mapa diário (chave YYYYMMDD) usado pelo ranking semanal.
       // minutos só pode aumentar 1 por operação quando presente.
       allow update: if request.auth != null
         && request.auth.uid == uid
         && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['pontos', 'minutos', 'ultimoLogin'])
+            .hasOnly(['pontos', 'minutos', 'ultimoLogin', 'atividadeDias'])
         && request.resource.data.diff(resource.data).affectedKeys().hasAny(['pontos'])
         && request.resource.data.pontos > resource.data.pontos
         && request.resource.data.pontos <= resource.data.pontos + 60
@@ -73,6 +74,17 @@ service cloud.firestore {
       allow delete: if request.auth != null
                     && resource.data.uid == request.auth.uid;
       allow update: if false;
+    }
+
+    // ── Solicitações de compra de pontos via PIX ─────────────────────────────
+    // Cliente cria 1 doc ao tocar "copiar chave PIX" — Cloud Function dispara
+    // email para o admin com os detalhes (nome, valor, pontos solicitados).
+    match /solicitacoes_compra/{id} {
+      allow create: if request.auth != null
+        && request.auth.uid == request.resource.data.uid
+        && request.resource.data.valorBRL is number
+        && request.resource.data.valorBRL > 0;
+      allow read, update, delete: if false; // somente admin via Admin SDK
     }
 
     // ── Solicitações de saque ────────────────────────────────────────────────

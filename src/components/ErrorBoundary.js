@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { registrarErro, logCrash } from '../services/crashlytics';
 
 export default class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -13,6 +14,8 @@ export default class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, info) {
     console.error('ErrorBoundary capturou:', error, info);
+    if (info?.componentStack) logCrash(`componentStack: ${info.componentStack.slice(0, 500)}`);
+    registrarErro(error, 'ErrorBoundary');
   }
 
   render() {

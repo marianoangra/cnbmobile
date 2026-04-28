@@ -11,6 +11,7 @@ import {
   Zap, LogIn, User, Wallet, TrendingUp, UserPlus, Flame,
   CheckCircle, Lock, Clock,
 } from 'lucide-react-native';
+import { useAccent } from '../context/AccentContext';
 
 // ─── Constantes de estilo ──────────────────────────────────────────────────────
 const PRIMARY     = '#c6ff4a';
@@ -86,6 +87,7 @@ function useEntrada(delayMs = 0) {
 
 // ─── BarraProgresso ───────────────────────────────────────────────────────────
 function BarraProgresso({ progresso, completo }) {
+  const PRIMARY = useAccent();
   const width = useSharedValue(0);
   useEffect(() => {
     width.value = withDelay(300, withTiming(progresso, {
@@ -109,6 +111,7 @@ function BarraProgresso({ progresso, completo }) {
 
 // ─── Badges ───────────────────────────────────────────────────────────────────
 function BadgeCompleto() {
+  const PRIMARY = useAccent();
   return (
     <View style={{
       flexDirection: 'row', alignItems: 'center', gap: 4,
@@ -161,6 +164,7 @@ function CountdownDisplay({ getFn }) {
 
 // ─── MissionCard ──────────────────────────────────────────────────────────────
 function MissionCard({ Icon, titulo, descricao, pontos, completo, bloqueado, progresso, labelProgresso, delay, onPress, labelCTA }) {
+  const PRIMARY = useAccent();
   const animStyle = useEntrada(delay);
   const statusLabel = completo ? 'Completa' : bloqueado ? 'Bloqueada' : `Progresso: ${labelProgresso}`;
   return (
@@ -268,6 +272,7 @@ function Secao({ titulo, subtitulo, getCountdownFn, animStyle }) {
 // Exibido no lugar dos cards quando todas as tarefas de onboarding estão feitas,
 // evitando que a seção desapareça silenciosamente (corrige LOGICA-02).
 function BannerOnboardingCompleto({ animStyle }) {
+  const PRIMARY = useAccent();
   return (
     <Animated.View style={[animStyle, {
       flexDirection: 'row', alignItems: 'center', gap: 10,
@@ -298,6 +303,7 @@ function ordenarMissoes(missoes) {
 
 // ─── Tela principal ───────────────────────────────────────────────────────────
 export default function MissoesScreen({ route, navigation }) {
+  const PRIMARY = useAccent();
   const { user, perfil } = route?.params || {};
 
   const bloqueado     = !user;
@@ -352,24 +358,8 @@ export default function MissoesScreen({ route, navigation }) {
       onPress: bloqueado ? null : () => navigation.navigate('EditProfile', { perfil, onSalvar: () => {} }),
       labelCTA: 'Completar',
     },
-    {
-      id: 'onboarding-carteira',
-      Icon: Wallet,
-      titulo: 'Criar carteira Solana',
-      descricao: 'Crie ou vincule sua carteira CNB na Solana',
-      pontos: '+1.000 pts',
-      completo: !bloqueado && temWallet,
-      bloqueado,
-      progresso: bloqueado ? 0 : temWallet ? 1 : 0,
-      labelProgresso: bloqueado
-        ? 'Faça login para criar'
-        : temWallet ? 'Carteira criada' : 'Carteira não criada',
-      delay: 140,
-      onPress: bloqueado ? null : () => navigation.navigate('Wallet', { user }),
-      labelCTA: 'Criar carteira',
-    },
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  ], [bloqueado, perfilCompleto, temAvatarURL, temNome, temWallet]);
+  ], [bloqueado, perfilCompleto, temAvatarURL, temNome]);
 
   const onboardingCompleto = MISSOES_ONBOARDING.every(m => m.completo);
 
@@ -509,20 +499,24 @@ export default function MissoesScreen({ route, navigation }) {
             </Animated.View>
           )}
 
-          {/* ── Primeiros passos ── */}
-          <Secao
-            titulo="Primeiros passos"
-            subtitulo="Complete uma vez e ganhe bônus permanente"
-            animStyle={a1}
-          />
-          {onboardingCompleto
-            ? <BannerOnboardingCompleto animStyle={a1} />
-            : MISSOES_ONBOARDING.map(m => (
-                <MissionCard key={m.id} {...m} onPress={m.onPress} labelCTA={m.labelCTA} />
-              ))
-          }
+          {/* ── Primeiros passos (somente Tech) ── */}
+          {perfil?.modo !== 'lite' && (
+            <>
+              <Secao
+                titulo="Primeiros passos"
+                subtitulo="Complete uma vez e ganhe bônus permanente"
+                animStyle={a1}
+              />
+              {onboardingCompleto
+                ? <BannerOnboardingCompleto animStyle={a1} />
+                : MISSOES_ONBOARDING.map(m => (
+                    <MissionCard key={m.id} {...m} onPress={m.onPress} labelCTA={m.labelCTA} />
+                  ))
+              }
 
-          <View style={{ height: 8 }} />
+              <View style={{ height: 8 }} />
+            </>
+          )}
 
           {/* ── Missões diárias ── */}
           <Secao
@@ -537,14 +531,17 @@ export default function MissoesScreen({ route, navigation }) {
 
           <View style={{ height: 8 }} />
 
-          {/* ── Missões semanais ── */}
+          {/* ── Missões semanais — em Lite, só o streak de carregamento ── */}
           <Secao
             titulo="Semanais"
             subtitulo="Renovam toda segunda-feira"
             getCountdownFn={segsAteSegunda}
             animStyle={a3}
           />
-          {MISSOES_SEMANAIS.map(m => (
+          {(perfil?.modo === 'lite'
+            ? MISSOES_SEMANAIS.filter(m => m.id === 'semanal-streak')
+            : MISSOES_SEMANAIS
+          ).map(m => (
             <MissionCard key={m.id} {...m} onPress={m.onPress} labelCTA={m.labelCTA} />
           ))}
 

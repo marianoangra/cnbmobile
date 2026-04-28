@@ -191,10 +191,12 @@ export default function LoginScreen({ navigation }) {
 
           <Animated.View style={[styles.logoArea, { opacity, transform: [{ translateY }] }]}>
             <View style={styles.logoBox}>
-              <Zap size={22} color={colors.primary} strokeWidth={2.5} />
-              <Text style={styles.logoText}>CNB</Text>
+              <Image
+                source={require('../../assets/cnb-logo.png')}
+                style={styles.logoImage}
+                resizeMode="cover"
+              />
             </View>
-            <Text style={styles.logoSub}>M O B I L E</Text>
           </Animated.View>
 
           <Animated.View style={[styles.form, { opacity, transform: [{ translateY }] }]}>
@@ -304,12 +306,11 @@ function createStyles(colors) {
     container: { flexGrow: 1, justifyContent: 'center', padding: 24 },
     logoArea: { alignItems: 'center', marginBottom: 36 },
     logoBox: {
-      width: 80, height: 80, borderRadius: 22,
-      backgroundColor: colors.card, borderWidth: 2, borderColor: colors.primary,
-      alignItems: 'center', justifyContent: 'center', marginBottom: 10, gap: 1,
+      width: 96, height: 96, borderRadius: 24,
+      borderWidth: 2, borderColor: colors.primary,
+      overflow: 'hidden',
     },
-    logoText: { fontSize: 18, fontWeight: 'bold', color: colors.primary, letterSpacing: 2 },
-    logoSub: { fontSize: 12, color: colors.secondary, letterSpacing: 8 },
+    logoImage: { width: '100%', height: '100%' },
     form: {},
     title: { fontSize: 28, fontWeight: 'bold', color: colors.white, marginBottom: 4 },
     subtitle: { fontSize: 15, color: colors.secondary, marginBottom: 28 },

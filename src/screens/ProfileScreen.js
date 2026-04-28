@@ -20,11 +20,13 @@ import { registrarTokenPush } from '../services/notificacoes';
 import Avatar from '../components/Avatar';
 import {
   Wallet, Share2, Copy, LogOut,
-  ChevronRight, Shield, Bell, Settings, Award, User, Users, Database, Inbox,
+  ChevronRight, Shield, Bell, Settings, Award, User, Users, Database, Inbox, Cpu, Zap,
 } from 'lucide-react-native';
+import { useAccent } from '../context/AccentContext';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 const PRIMARY = '#c6ff4a';
+const PURPLE  = '#c084fc';
 
 const NIVEIS = [
   { min: 0,      label: 'Starter',   cor: '#8A9BB0' },
@@ -94,6 +96,7 @@ function StatBox({ label, value, cor }) {
 }
 
 function MenuItem({ Icon, title, sub, onPress, danger }) {
+  const PRIMARY = useAccent();
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -122,6 +125,7 @@ function MenuItem({ Icon, title, sub, onPress, danger }) {
 
 // ─── Tela principal ───────────────────────────────────────────────────────────
 export default function ProfileScreen({ route, navigation }) {
+  const PRIMARY = useAccent();
   const { user, perfil, onAtualizar, atualizarPerfil } = route?.params || {};
 
   const [saques, setSaques]               = useState([]);
@@ -243,7 +247,7 @@ export default function ProfileScreen({ route, navigation }) {
 
   async function handleCompartilharCodigo() {
     if (!afiliados.codigo) return;
-    const link = `https://play.google.com/store/apps/details?id=com.cnb.cnbappv2&referrer=${afiliados.codigo}`;
+    const link = `https://cnbmobile-2053c.web.app/r/${afiliados.codigo}`;
     try {
       await Share.share({
         message:
@@ -433,20 +437,43 @@ export default function ProfileScreen({ route, navigation }) {
             </LinearGradient>
           </Animated.View>
 
-          {/* ── Menu principal (4 itens do Figma) ── */}
+          {/* ── Menu principal — itens variam conforme modo (lite/tech) ── */}
           <Animated.View style={[{ gap: 8, marginBottom: 20 }, a2]}>
-            {[
-              { Icon: Wallet,   title: 'Carteira Solana',  sub: 'Phantom · ' + (perfilLocal?.walletAddress ? perfilLocal.walletAddress.slice(0,4) + '…' + perfilLocal.walletAddress.slice(-3) : '—'),
-                onPress: () => navigation.navigate('Wallet', { user: perfilLocal }) },
-              { Icon: Shield,   title: 'Privacidade ZK',   sub: 'Cloak ativo · saque sem rastro',
-                onPress: () => navigation.navigate('Withdraw', { perfil: perfilLocal, initialAba: 'privado' }) },
-              { Icon: Bell,     title: 'Notificações',     sub: notifAtivas ? 'Ativadas' : 'Desativadas',
-                onPress: handleNotificacoes },
-              { Icon: Settings,  title: 'Preferências',     sub: 'Editar perfil, tema',
-                onPress: handleEditarPerfil },
-              { Icon: Database, title: 'Dados',             sub: 'Gerencie seus consentimentos',
-                onPress: () => navigation.navigate('Dados') },
-            ].map(({ Icon, title, sub, onPress }) => (
+            {(() => {
+              const isLite = perfilLocal?.modo === 'lite';
+              const items = [];
+              if (!isLite) {
+                items.push({
+                  Icon: Wallet, title: 'Carteira Solana',
+                  sub: 'Phantom · ' + (perfilLocal?.walletAddress ? perfilLocal.walletAddress.slice(0,4) + '…' + perfilLocal.walletAddress.slice(-3) : '—'),
+                  onPress: () => navigation.navigate('Wallet', { user: perfilLocal }),
+                });
+              }
+              items.push({
+                Icon: Shield, title: 'Privacidade ZK', sub: 'Cloak ativo · saque sem rastro',
+                onPress: () => navigation.navigate('Withdraw', { perfil: perfilLocal, initialAba: 'privado' }),
+              });
+              items.push({
+                Icon: Bell, title: 'Notificações', sub: notifAtivas ? 'Ativadas' : 'Desativadas',
+                onPress: handleNotificacoes,
+              });
+              items.push({
+                Icon: Settings, title: 'Preferências', sub: 'Editar perfil, tema',
+                onPress: handleEditarPerfil,
+              });
+              if (!isLite) {
+                items.push({
+                  Icon: Database, title: 'Dados', sub: 'Gerencie seus consentimentos',
+                  onPress: () => navigation.navigate('Dados'),
+                });
+              }
+              items.push({
+                Icon: isLite ? Cpu : Zap, title: 'Modo do app', sub: isLite ? 'Lite · simplificado' : 'Tech · experiência completa',
+                accent: isLite ? PURPLE : PRIMARY,
+                onPress: () => navigation.navigate('ModoEscolha'),
+              });
+              return items;
+            })().map(({ Icon, title, sub, onPress, accent }) => (
               <TouchableOpacity
                 key={title}
                 onPress={onPress}
@@ -460,10 +487,10 @@ export default function ProfileScreen({ route, navigation }) {
               >
                 <View style={{
                   width: 36, height: 36, borderRadius: 18,
-                  backgroundColor: 'rgba(198,255,74,0.1)',
+                  backgroundColor: accent ? `${accent}1A` : 'rgba(198,255,74,0.1)',
                   alignItems: 'center', justifyContent: 'center',
                 }}>
-                  <Icon size={16} color={PRIMARY} />
+                  <Icon size={16} color={accent ?? PRIMARY} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 12, fontWeight: '500', color: '#fff' }}>{title}</Text>

@@ -1,13 +1,48 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, Image, ScrollView, TouchableOpacity, Animated,
+  View, Text, Image, ScrollView, TouchableOpacity, Animated, LayoutAnimation, Platform, UIManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Defs, RadialGradient, Stop, Rect } from 'react-native-svg';
-import { Zap, Shield, Activity, ArrowLeft } from 'lucide-react-native';
+import { Zap, Shield, Activity, ArrowLeft, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react-native';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 const PRIMARY = '#c6ff4a';
+
+const FAQ = [
+  {
+    q: 'O que é DePIN?',
+    a: 'DePIN (Decentralized Physical Infrastructure Network) é uma rede onde usuários comuns contribuem com infraestrutura física — no caso do CNB, o ato de carregar o celular — e são recompensados por isso de forma transparente e verificável on-chain.',
+  },
+  {
+    q: 'Como meus pontos são gerados?',
+    a: 'A cada minuto que seu celular permanece carregando, o app credita 10 pontos no seu perfil (com bônus de 50 pontos a cada hora completa). Esses pontos viram CNB tokens na hora do resgate.',
+  },
+  {
+    q: 'Para que serve a carteira Solana?',
+    a: 'A carteira Solana é onde você recebe os tokens CNB quando solicita resgate. Você pode usar uma carteira existente (Phantom, Solflare) ou criar uma nova diretamente no app.',
+  },
+  {
+    q: 'O que é a privacidade ZK?',
+    a: 'Zero-Knowledge Proofs permitem provar que sua atividade é real sem revelar quem você é. O CNB registra a prova on-chain usando seu UID hasheado — ninguém consegue identificar você a partir do registro público.',
+  },
+  {
+    q: 'Como funciona o resgate privado?',
+    a: 'Via Cloak Protocol, seus pontos viram SOL sem deixar nenhum link rastreável entre a carteira do projeto e a sua. É como um "PIX privado" para cripto: o destinatário recebe, mas o caminho não fica visível.',
+  },
+  {
+    q: 'Em quanto tempo recebo meus tokens?',
+    a: 'Saques PIX são processados manualmente pela equipe em até 24h úteis. Resgates de CNB tokens via carteira Solana são quase instantâneos (poucos segundos após confirmação na rede).',
+  },
+  {
+    q: 'Posso usar em mais de um aparelho?',
+    a: 'Sua conta é única por usuário, mas só pode estar logada em um aparelho por vez. Se logar em outro, a sessão antiga é encerrada automaticamente.',
+  },
+];
 
 const PILARES = [
   {
@@ -30,6 +65,12 @@ const PILARES = [
 export default function DePINInfoScreen({ navigation }) {
   const opacity    = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(32)).current;
+  const [faqAberto, setFaqAberto] = useState(null);
+
+  function alternarFaq(index) {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setFaqAberto(faqAberto === index ? null : index);
+  }
 
   useEffect(() => {
     Animated.parallel([
@@ -164,6 +205,57 @@ export default function DePINInfoScreen({ navigation }) {
                   </View>
                 </View>
               ))}
+            </View>
+
+            {/* FAQ */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+              <HelpCircle size={14} color={PRIMARY} />
+              <Text style={{
+                fontSize: 10, letterSpacing: 2,
+                color: 'rgba(255,255,255,0.4)',
+                textTransform: 'uppercase',
+              }}>
+                Perguntas frequentes
+              </Text>
+            </View>
+
+            <View style={{ gap: 8, marginBottom: 32 }}>
+              {FAQ.map(({ q, a }, i) => {
+                const aberto = faqAberto === i;
+                return (
+                  <View key={i} style={{
+                    backgroundColor: aberto ? 'rgba(198,255,74,0.04)' : 'rgba(255,255,255,0.03)',
+                    borderWidth: 1,
+                    borderColor: aberto ? 'rgba(198,255,74,0.18)' : 'rgba(255,255,255,0.07)',
+                    borderRadius: 14,
+                    overflow: 'hidden',
+                  }}>
+                    <TouchableOpacity
+                      onPress={() => alternarFaq(i)}
+                      activeOpacity={0.75}
+                      style={{
+                        flexDirection: 'row', alignItems: 'center', gap: 12,
+                        padding: 14,
+                      }}
+                    >
+                      <Text style={{ flex: 1, fontSize: 13, fontWeight: '600', color: '#fff' }}>
+                        {q}
+                      </Text>
+                      {aberto
+                        ? <ChevronUp size={18} color={PRIMARY} />
+                        : <ChevronDown size={18} color="rgba(255,255,255,0.4)" />
+                      }
+                    </TouchableOpacity>
+                    {aberto && (
+                      <View style={{ paddingHorizontal: 14, paddingBottom: 14 }}>
+                        <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', lineHeight: 19 }}>
+                          {a}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
             </View>
 
             {/* Rodapé */}

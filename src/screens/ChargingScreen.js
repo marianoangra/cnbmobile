@@ -13,6 +13,8 @@ import * as Battery from 'expo-battery';
 import { Zap, Plug, TrendingUp } from 'lucide-react-native';
 import { useCarregamento } from '../hooks/useCarregamento';
 import { calcularAtividadeDiaria } from '../services/pontos';
+import { useAccent } from '../context/AccentContext';
+import { useScreenTrace } from '../hooks/useScreenTrace';
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 const NEON         = '#00FF7F';
@@ -517,6 +519,7 @@ function StarField({ carregando, phase, offsetX, offsetY, bateria, pontosGanhos 
 
 // ── Barra de progresso 1 hora ─────────────────────────────────────────────────
 function ProgressoHora({ segundosRestantes, carregando }) {
+  const PRIMARY = useAccent();
   const progresso = (3600 - segundosRestantes) / 3600;
   const barWidth  = useSharedValue(progresso);
 
@@ -559,6 +562,7 @@ function ProgressoHora({ segundosRestantes, carregando }) {
 // ── Bar chart 10 dias ─────────────────────────────────────────────────────────
 const STATIC_BARS = [28, 42, 35, 58, 40, 72, 55, 68, 85, 78];
 function BarChart({ heights }) {
+  const PRIMARY = useAccent();
   const bars = heights.every(h => h === 0) ? STATIC_BARS : heights;
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 3, height: 52 }}>
@@ -576,6 +580,8 @@ function BarChart({ heights }) {
 
 // ── Tela principal ────────────────────────────────────────────────────────────
 export default function ChargingScreen({ route, navigation }) {
+  useScreenTrace('charging_screen');
+  const PRIMARY = useAccent();
   const { user, uid, perfil, onAtualizar } = route?.params || {};
   const { carregando, pontosGanhos, segundosRestantes } = useCarregamento(uid, onAtualizar);
 

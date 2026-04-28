@@ -6,12 +6,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
 import { ArrowLeft, Copy, CheckCircle, AlertCircle, Zap } from 'lucide-react-native';
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { db, auth } from '../services/firebase';
 
 // ─── CONFIGURAÇÕES DO TIME CNB ────────────────────────────────────────────────
 const PIX_KEY       = 'contato@criptonobolso.com.br';
 const PIX_KEY_TYPE  = 'E-mail';
 const CONTATO_EMAIL = 'contato@criptonobolso.com.br';
-const CNB_POR_REAL  = 100;                   // ← 1 BRL = 100 CNB (ajustar conforme cotação)
+const CNB_POR_REAL  = 10000;                 // ← 10 BRL = 100.000 CNB (= pontos)
 // ──────────────────────────────────────────────────────────────────────────────
 
 const PRIMARY = '#c6ff4a';
@@ -19,6 +21,22 @@ const PRIMARY = '#c6ff4a';
 function formatarCNB(valor) {
   if (!valor || isNaN(valor) || valor <= 0) return '—';
   return valor.toLocaleString('pt-BR', { maximumFractionDigits: 0 });
+}
+
+// Formata digitação em BRL: insere ponto de milhar e mantém vírgula decimal.
+// Aceita "1234" → "1.234" / "1234,5" → "1.234,5" / "1234567,89" → "1.234.567,89"
+function formatarBRL(raw) {
+  const cleaned = String(raw).replace(/[^\d,]/g, '');
+  const parts = cleaned.split(',');
+  const intPart = parts[0] || '';
+  const decPart = parts.length > 1 ? parts.slice(1).join('').slice(0, 2) : null;
+  const intFmt = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return decPart !== null ? `${intFmt},${decPart}` : intFmt;
+}
+
+function parseBRL(formatted) {
+  if (!formatted) return NaN;
+  return parseFloat(formatted.replace(/\./g, '').replace(',', '.'));
 }
 
 const PASSOS = [
@@ -44,17 +62,33 @@ const PASSOS = [
   },
 ];
 
-export default function BuyTokensScreen({ navigation }) {
+export default function BuyTokensScreen({ route, navigation }) {
+  const { perfil } = route?.params || {};
   const [valorBRL, setValorBRL] = useState('');
   const [copiado, setCopiado]   = useState(false);
 
-  const valorNumerico = parseFloat(valorBRL.replace(',', '.'));
+  const valorNumerico = parseBRL(valorBRL);
   const cnbCalculado  = valorNumerico * CNB_POR_REAL;
 
   async function copiarChavePIX() {
     await Clipboard.setStringAsync(PIX_KEY);
     setCopiado(true);
     setTimeout(() => setCopiado(false), 2500);
+
+    // Registra a SOLICITAÇÃO no Firestore — Cloud Function dispara email pra equipe.
+    // Fire-and-forget: não bloqueia a UX se o registro falhar.
+    const u = auth.currentUser;
+    if (u && valorNumerico > 0 && !isNaN(valorNumerico)) {
+      addDoc(collection(db, 'solicitacoes_compra'), {
+        uid: u.uid,
+        nome: perfil?.nome ?? u.displayName ?? null,
+        email: u.email ?? perfil?.email ?? null,
+        valorBRL: valorNumerico,
+        cnbCalculado,
+        status: 'aguardando_pagamento',
+        criadoEm: serverTimestamp(),
+      }).catch(err => console.warn('[Solicitação] erro:', err));
+    }
   }
 
   return (
@@ -114,7 +148,7 @@ export default function BuyTokensScreen({ navigation }) {
               <Text style={{ fontSize: 18, color: 'rgba(255,255,255,0.4)', marginRight: 6 }}>R$</Text>
               <TextInput
                 value={valorBRL}
-                onChangeText={setValorBRL}
+                onChangeText={(t) => setValorBRL(formatarBRL(t))}
                 keyboardType="decimal-pad"
                 placeholder="0,00"
                 placeholderTextColor="rgba(255,255,255,0.2)"
@@ -143,7 +177,7 @@ export default function BuyTokensScreen({ navigation }) {
             </View>
 
             <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 10, textAlign: 'center' }}>
-              Taxa: 1 BRL = {CNB_POR_REAL.toLocaleString('pt-BR')} CNB
+              R$ 10 = {(10 * CNB_POR_REAL).toLocaleString('pt-BR')} pontos CNB.
             </Text>
           </View>
 
@@ -181,7 +215,7 @@ export default function BuyTokensScreen({ navigation }) {
                 ? <CheckCircle size={18} color={PRIMARY} />
                 : <Copy size={18} color="#000" />}
               <Text style={{ fontSize: 14, fontWeight: '700', color: copiado ? PRIMARY : '#000' }}>
-                {copiado ? 'Copiado!' : 'Copiar chave PIX'}
+                {copiado ? 'Copiado!' : 'Solicitar e copiar chave PIX'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -220,7 +254,7 @@ export default function BuyTokensScreen({ navigation }) {
           }}>
             <AlertCircle size={16} color="#ffd000" style={{ marginTop: 1 }} />
             <Text style={{ flex: 1, fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 18 }}>
-              Processo manual. Após a confirmação do pagamento, a equipe CNB enviará os tokens para a carteira Solana vinculada à sua conta.
+              Processo manual. Após a confirmação do pagamento, a equipe CNB creditará os pontos na sua conta.
             </Text>
           </View>
 

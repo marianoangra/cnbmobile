@@ -24,8 +24,12 @@ import {
 } from '../services/notificacoes';
 
 import BannerCarousel from '../components/BannerCarousel';
-import { getSaques } from '../services/pontos';
+import { getSaques, atualizarModo } from '../services/pontos';
+import { useAccent } from '../context/AccentContext';
+
+const PURPLE = '#c084fc';
 import { onPontosUpdate } from '../services/chargeEvents';
+import { useScreenTrace } from '../hooks/useScreenTrace';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 const PRIMARY  = '#c6ff4a';
@@ -159,14 +163,15 @@ async function buscarAtividades(uid, atividadeDias) {
 
 // ─── Componentes internos ─────────────────────────────────────────────────────
 
-function AvatarHeader({ onPress }) {
+function AvatarHeader({ onPress, borderColor }) {
+  const PRIMARY = useAccent();
   return (
     <TouchableOpacity
       onPress={onPress}
       activeOpacity={0.8}
       style={{
         width: 40, height: 40, borderRadius: 20,
-        borderWidth: 2, borderColor: PRIMARY,
+        borderWidth: 2, borderColor: borderColor ?? PRIMARY,
         overflow: 'hidden',
       }}
     >
@@ -179,7 +184,8 @@ function AvatarHeader({ onPress }) {
   );
 }
 
-function CardPontos({ pontos, progresso, faltam, user, estaCarregando, onSaque, onPix, barStyle, pontosHoje, variacaoDia }) {
+function CardPontos({ pontos, progresso, faltam, user, estaCarregando, onSaque, onPix, barStyle, pontosHoje, variacaoDia, modo }) {
+  const PRIMARY = useAccent();
   const pct = Math.round(progresso * 100);
   return (
     <LinearGradient
@@ -293,26 +299,29 @@ function CardPontos({ pontos, progresso, faltam, user, estaCarregando, onSaque, 
           <Text style={{ color: '#000', fontSize: 12, fontWeight: '600' }}>Saque</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          onPress={onPix}
-          activeOpacity={0.85}
-          style={{
-            flex: 1,
-            backgroundColor: 'rgba(255,255,255,0.06)',
-            borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
-            borderRadius: 12, paddingVertical: 10,
-            flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-          }}
-        >
-          <Wallet size={14} color="rgba(255,255,255,0.8)" />
-          <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 12 }}>CNB Privado</Text>
-        </TouchableOpacity>
+        {modo !== 'lite' && (
+          <TouchableOpacity
+            onPress={onPix}
+            activeOpacity={0.85}
+            style={{
+              flex: 1,
+              backgroundColor: 'rgba(255,255,255,0.06)',
+              borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
+              borderRadius: 12, paddingVertical: 10,
+              flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+            }}
+          >
+            <Wallet size={14} color="rgba(255,255,255,0.8)" />
+            <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 12 }}>CNB Privado</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </LinearGradient>
   );
 }
 
 function Atalhos({ onPress }) {
+  const PRIMARY = useAccent();
   return (
     <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
       {ATALHOS.map(({ Icon, label, id }) => (
@@ -337,6 +346,7 @@ function Atalhos({ onPress }) {
 }
 
 function Atividades({ atividades, loading }) {
+  const PRIMARY = useAccent();
   return (
     <View>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -394,6 +404,8 @@ function Atividades({ atividades, loading }) {
 
 // ─── Tela principal ───────────────────────────────────────────────────────────
 export default function HomeScreen({ route, navigation }) {
+  useScreenTrace('home_screen');
+  const PRIMARY = useAccent();
   const { user, perfil, onAtualizar } = route?.params || {};
   const onAtualizarRef = useRef(onAtualizar);
   useEffect(() => { onAtualizarRef.current = onAtualizar; }, [onAtualizar]);
@@ -424,6 +436,12 @@ export default function HomeScreen({ route, navigation }) {
     const ativa = await notificacoesAtivas();
     setNotifAtiva(ativa);
     setModalNotif(true);
+  }
+
+  async function escolherModo(novo) {
+    if (!perfil?.uid) return;
+    try { await atualizarModo(perfil.uid, novo); } catch {}
+    setModalPerfil(false);
   }
 
   async function handleToggleNotif(valor) {
@@ -520,7 +538,7 @@ export default function HomeScreen({ route, navigation }) {
   }
 
   function handleAtalho(id) {
-    if (id === 'pix')    return navigation.navigate('BuyTokens');
+    if (id === 'pix')    return navigation.navigate('BuyTokens', { perfil });
     if (id === 'depin')  return navigation.navigate('DePINInfo');
     if (id === 'wallet') return navigation.navigate('Wallet', { user: perfil });
     if (id === 'dados')  return navigation.navigate('Dados');
@@ -562,12 +580,13 @@ export default function HomeScreen({ route, navigation }) {
 
               {/* ── LITE ── */}
               <TouchableOpacity
-                onPress={() => setModalPerfil(false)}
+                onPress={() => escolherModo('lite')}
                 activeOpacity={0.85}
                 style={{
                   flexDirection: 'row', alignItems: 'center', gap: 16,
                   backgroundColor: 'rgba(192,132,252,0.04)',
-                  borderWidth: 1.5, borderColor: 'rgba(192,132,252,0.28)',
+                  borderWidth: perfil?.modo === 'lite' ? 2 : 1.5,
+                  borderColor: perfil?.modo === 'lite' ? PURPLE : 'rgba(192,132,252,0.28)',
                   borderRadius: 20, padding: 18, marginBottom: 12,
                 }}
               >
@@ -576,7 +595,7 @@ export default function HomeScreen({ route, navigation }) {
                   backgroundColor: 'rgba(192,132,252,0.10)',
                   alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                 }}>
-                  <Zap size={24} color="#c084fc" />
+                  <Cpu size={24} color="#c084fc" />
                 </View>
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 5 }}>
@@ -597,12 +616,13 @@ export default function HomeScreen({ route, navigation }) {
 
               {/* ── TECH ── */}
               <TouchableOpacity
-                onPress={() => setModalPerfil(false)}
+                onPress={() => escolherModo('tech')}
                 activeOpacity={0.85}
                 style={{
                   flexDirection: 'row', alignItems: 'center', gap: 16,
                   backgroundColor: 'rgba(198,255,74,0.04)',
-                  borderWidth: 1.5, borderColor: 'rgba(198,255,74,0.22)',
+                  borderWidth: perfil?.modo === 'tech' ? 2 : 1.5,
+                  borderColor: perfil?.modo === 'tech' ? PRIMARY : 'rgba(198,255,74,0.22)',
                   borderRadius: 20, padding: 18,
                 }}
               >
@@ -611,7 +631,7 @@ export default function HomeScreen({ route, navigation }) {
                   backgroundColor: 'rgba(198,255,74,0.10)',
                   alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                 }}>
-                  <Cpu size={24} color={PRIMARY} />
+                  <Zap size={24} color={PRIMARY} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 5 }}>
@@ -721,7 +741,10 @@ export default function HomeScreen({ route, navigation }) {
             a0,
           ]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <AvatarHeader onPress={() => setModalPerfil(true)} />
+              <AvatarHeader
+                onPress={() => setModalPerfil(true)}
+                borderColor={perfil?.modo === 'lite' ? PURPLE : PRIMARY}
+              />
               <View>
                 <Text style={{ fontSize: 14, fontWeight: '600', color: '#fff' }}>
                   {saudacao()}, {nome}!
@@ -761,13 +784,16 @@ export default function HomeScreen({ route, navigation }) {
               barStyle={barStyle}
               pontosHoje={pontosHoje}
               variacaoDia={variacaoDia}
+              modo={perfil?.modo}
             />
           </Animated.View>
 
-          {/* ── Atalhos rápidos ── */}
-          <Animated.View style={a2}>
-            <Atalhos onPress={handleAtalho} />
-          </Animated.View>
+          {/* ── Atalhos rápidos (somente Tech) ── */}
+          {perfil?.modo !== 'lite' && (
+            <Animated.View style={a2}>
+              <Atalhos onPress={handleAtalho} />
+            </Animated.View>
+          )}
 
 
 
