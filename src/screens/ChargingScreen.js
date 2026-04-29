@@ -14,7 +14,6 @@ import { useCarregamento } from '../hooks/useCarregamento';
 import { calcularAtividadeDiaria } from '../services/pontos';
 import { useAccent } from '../context/AccentContext';
 import { useScreenTrace } from '../hooks/useScreenTrace';
-import LoadingMiniGame from '../components/LoadingMiniGame';
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 const NEON         = '#00FF7F';
@@ -548,7 +547,6 @@ export default function ChargingScreen({ route, navigation }) {
   const { carregando, pontosGanhos, segundosRestantes } = useCarregamento(uid, onAtualizar);
 
   const [bateria, setBateria] = useState(0);
-  const [gameArea, setGameArea] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
     Battery.getBatteryLevelAsync()
@@ -573,7 +571,7 @@ export default function ChargingScreen({ route, navigation }) {
     transform: [{ translateY: entradaY.value }],
   }));
 
-  // ── Offsets do StarField — mantidos em 0 (mini-game ocupa a área de toque) ──
+  // ── Offsets do StarField — sutil deriva idle dentro do componente ──
   const offsetX = useSharedValue(0);
   const offsetY = useSharedValue(0);
 
@@ -623,14 +621,8 @@ export default function ChargingScreen({ route, navigation }) {
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         <Animated.View style={[{ flex: 1 }, entradaStyle]}>
 
-          {/* ── Campo estelar + mini-game overlay ── */}
-          <View
-            style={{ flex: 1 }}
-            onLayout={(e) => {
-              const { width: w, height: h } = e.nativeEvent.layout;
-              if (w !== gameArea.width || h !== gameArea.height) setGameArea({ width: w, height: h });
-            }}
-          >
+          {/* ── Campo estelar + porcentagem de bateria centralizada ── */}
+          <View style={{ flex: 1 }}>
             <StarField
               carregando={carregando}
               phase="idle"
@@ -639,15 +631,22 @@ export default function ChargingScreen({ route, navigation }) {
               bateria={bateria}
               pontosGanhos={pontosGanhos}
             />
-            {!!user && gameArea.width > 0 && gameArea.height > 0 && (
-              <LoadingMiniGame
-                userEmail={user?.email}
-                uid={uid}
-                isLoadingComplete={false}
-                playAreaBounds={gameArea}
-                onScoreSaved={() => onAtualizar?.()}
-              />
-            )}
+            <View
+              pointerEvents="none"
+              style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}
+            >
+              <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.45)', letterSpacing: 1.5, textTransform: 'uppercase' }}>
+                Bateria
+              </Text>
+              <Text style={{
+                fontSize: 96, fontWeight: '300', color: '#fff',
+                marginTop: 4, letterSpacing: -2,
+                textShadowColor: 'rgba(0,255,127,0.25)', textShadowRadius: 18,
+              }}>
+                {bateria > 0 ? `${bateria}` : '--'}
+                <Text style={{ fontSize: 48, color: PRIMARY, fontWeight: '400' }}>%</Text>
+              </Text>
+            </View>
           </View>
 
           {/* ── Seção inferior ── */}
