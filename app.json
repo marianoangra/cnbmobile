@@ -63,12 +63,6 @@
           "defaultChannel": "default"
         }
       ],
-      [
-        "expo-build-properties",
-        {
-          "ios": { "useFrameworks": "static" }
-        }
-      ],
       "expo-secure-store"
     ],
     "extra": {
