@@ -4,10 +4,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   useSharedValue, useAnimatedStyle,
-  withTiming, withRepeat, withSequence, withSpring,
-  Easing, cancelAnimation, runOnJS,
+  withTiming, withRepeat, withSequence,
+  Easing, cancelAnimation,
 } from 'react-native-reanimated';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Svg, { Circle, G, Line } from 'react-native-svg';
 import * as Battery from 'expo-battery';
 import { Zap, Plug, TrendingUp } from 'lucide-react-native';
@@ -15,12 +14,12 @@ import { useCarregamento } from '../hooks/useCarregamento';
 import { calcularAtividadeDiaria } from '../services/pontos';
 import { useAccent } from '../context/AccentContext';
 import { useScreenTrace } from '../hooks/useScreenTrace';
+import LoadingMiniGame from '../components/LoadingMiniGame';
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 const NEON         = '#00FF7F';
 const NEON_TRIGGER = '#39FF14';
 const PRIMARY      = '#c6ff4a';
-const PULL_TRIGGER = 130;
 
 const { width: SW } = Dimensions.get('window');
 const OFFSET   = 90;               // canvas se extende além dos limites para o parallax
@@ -366,15 +365,6 @@ function StarField({ carregando, phase, offsetX, offsetY, bateria, pontosGanhos 
   const glowStyle  = useAnimatedStyle(() => ({ opacity: centerGlow.value * 0.38 }));
   const dustStyle  = useAnimatedStyle(() => ({ opacity: nebulaAlpha.value * 0.22 }));
 
-  const label = (() => {
-    if (phase === 'triggered')  return { text: 'Solte para atualizar', color: NEON_TRIGGER };
-    if (phase === 'pulling')    return { text: 'Puxe para atualizar',  color: 'rgba(255,255,255,0.35)' };
-    if (phase === 'refreshing') return { text: 'Atualizando',          color: NEON_TRIGGER };
-    if (phase === 'success')    return { text: 'Atualizado',           color: NEON_TRIGGER };
-    if (carregando)             return { text: 'Carregando',           color: neon };
-    return                             { text: 'Em pausa',             color: 'rgba(255,255,255,0.12)' };
-  })();
-
   return (
     <View style={{ flex: 1, overflow: 'hidden' }}>
 
@@ -484,34 +474,6 @@ function StarField({ carregando, phase, offsetX, offsetY, bateria, pontosGanhos 
       {/* ── Satélite — passa a cada 45–90 s ── */}
       <Satellite triggerKey={satKey} />
 
-      {/* ── Valor da bateria — centralizado, flutua nas estrelas ── */}
-      <View
-        style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}
-        pointerEvents="none"
-      >
-        <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-          <Text style={{
-            fontSize: 88, fontWeight: '100',
-            color: '#ffffff', letterSpacing: -5, lineHeight: 94,
-          }}>
-            {bateria > 0 ? bateria : '--'}
-          </Text>
-          {bateria > 0 && (
-            <Text style={{
-              fontSize: 30, fontWeight: '200',
-              color: 'rgba(255,255,255,0.36)', marginTop: 24,
-            }}>%</Text>
-          )}
-        </View>
-        <Text style={{
-          fontSize: 8, letterSpacing: 5,
-          color: label.color, textTransform: 'uppercase',
-          marginTop: 2,
-        }}>
-          {label.text}
-        </Text>
-      </View>
-
     </View>
   );
 }
@@ -586,7 +548,7 @@ export default function ChargingScreen({ route, navigation }) {
   const { carregando, pontosGanhos, segundosRestantes } = useCarregamento(uid, onAtualizar);
 
   const [bateria, setBateria] = useState(0);
-  const [phase,   setPhase]   = useState('idle');
+  const [gameArea, setGameArea] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
     Battery.getBatteryLevelAsync()
@@ -611,44 +573,9 @@ export default function ChargingScreen({ route, navigation }) {
     transform: [{ translateY: entradaY.value }],
   }));
 
-  // ── Parallax offset — compartilhado com StarField ──────────────────────────
+  // ── Offsets do StarField — mantidos em 0 (mini-game ocupa a área de toque) ──
   const offsetX = useSharedValue(0);
   const offsetY = useSharedValue(0);
-
-  async function handleRefresh() {
-    setPhase('refreshing');
-    try {
-      await Promise.race([
-        onAtualizar?.() ?? Promise.resolve(),
-        new Promise(res => setTimeout(res, 1600)),
-      ]);
-    } catch {}
-    setPhase('success');
-    setTimeout(() => setPhase('idle'), 1200);
-  }
-
-  // Gesto de pan — parallax em todas as direções + pull-to-refresh para baixo
-  const panGesture = Gesture.Pan()
-    .onUpdate((e) => {
-      // Parallax — limita a ±OFFSET para não sair do canvas
-      offsetX.value = Math.max(-OFFSET, Math.min(OFFSET, e.translationX * 0.85));
-      offsetY.value = Math.max(-OFFSET, Math.min(OFFSET, e.translationY * 0.85));
-
-      // Pull-to-refresh — detecta arrasto para baixo
-      if (e.translationY > 0) {
-        const pull = e.translationY * 0.58;
-        if (pull >= PULL_TRIGGER) runOnJS(setPhase)('triggered');
-        else if (pull > 8)        runOnJS(setPhase)('pulling');
-      }
-    })
-    .onEnd((e) => {
-      const didTrigger = e.translationY > 0 && e.translationY * 0.58 >= PULL_TRIGGER;
-      // Mola de retorno ao centro
-      offsetX.value = withSpring(0, { damping: 20, stiffness: 130 });
-      offsetY.value = withSpring(0, { damping: 20, stiffness: 130 });
-      if (didTrigger) runOnJS(handleRefresh)();
-      else            runOnJS(setPhase)('idle');
-    });
 
   const podeSacar  = (perfil?.pontos ?? 0) >= 100000;
   const barHeights = calcularAtividadeDiaria(perfil?.atividadeDias);
@@ -696,19 +623,32 @@ export default function ChargingScreen({ route, navigation }) {
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         <Animated.View style={[{ flex: 1 }, entradaStyle]}>
 
-          {/* ── Campo estelar interativo — ocupa toda a área superior ── */}
-          <GestureDetector gesture={panGesture}>
-            <View style={{ flex: 1 }}>
-              <StarField
-                carregando={carregando}
-                phase={phase}
-                offsetX={offsetX}
-                offsetY={offsetY}
-                bateria={bateria}
-                pontosGanhos={pontosGanhos}
+          {/* ── Campo estelar + mini-game overlay ── */}
+          <View
+            style={{ flex: 1 }}
+            onLayout={(e) => {
+              const { width: w, height: h } = e.nativeEvent.layout;
+              if (w !== gameArea.width || h !== gameArea.height) setGameArea({ width: w, height: h });
+            }}
+          >
+            <StarField
+              carregando={carregando}
+              phase="idle"
+              offsetX={offsetX}
+              offsetY={offsetY}
+              bateria={bateria}
+              pontosGanhos={pontosGanhos}
+            />
+            {!!user && gameArea.width > 0 && gameArea.height > 0 && (
+              <LoadingMiniGame
+                userEmail={user?.email}
+                uid={uid}
+                isLoadingComplete={false}
+                playAreaBounds={gameArea}
+                onScoreSaved={() => onAtualizar?.()}
               />
-            </View>
-          </GestureDetector>
+            )}
+          </View>
 
           {/* ── Seção inferior ── */}
           <View style={{ paddingHorizontal: 20, paddingBottom: 120, gap: 10 }}>
@@ -729,6 +669,12 @@ export default function ChargingScreen({ route, navigation }) {
                   +{pontosGanhos.toLocaleString('pt-BR')}
                 </Text>
                 <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>pontos · on-chain</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 }}>
+                  <Zap size={10} color={PRIMARY} />
+                  <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', fontWeight: '600' }}>
+                    Bateria {bateria > 0 ? `${bateria}%` : '--%'}
+                  </Text>
+                </View>
               </View>
               <BarChart heights={barHeights} />
             </LinearGradient>
