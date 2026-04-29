@@ -1,15 +1,8 @@
 /**
  * Config plugin para corrigir incompatibilidades de build iOS com New Architecture.
  *
- * Firebase Storage 11+ é 100% Swift. Sem use_frameworks!, o compilador Swift não
- * gera FirebaseStorage-Swift.h automaticamente. Firebase.h inclui condicionalmente
- * esse arquivo quando FirebaseStorage-umbrella.h é encontrado (via sistema de módulos).
- *
- * Solução:
- *  1. use_modular_headers! global para que FirebaseCoreInternal (Swift) consiga
- *     importar GoogleUtilities (ObjC) durante pod install.
- *  2. Stub FirebaseStorage-Swift.h com declarações ObjC completas para os tipos
- *     Swift (@objc) de FirebaseStorage que RNFBStorage usa.
+ * use_modular_headers! global para que FirebaseCoreInternal (Swift) consiga
+ * importar GoogleUtilities (ObjC) durante pod install.
  *
  * NÃO usar use_frameworks! junto com use_modular_headers! — a combinação cria
  * definições de módulo duplicadas para FirebaseCore → FIRApp* undefined.
@@ -26,17 +19,7 @@ use_modular_headers!
 
 `;
 
-const POST_INSTALL_BLOCK = `    # [CNB_IOS_FIXES_APPLIED] Stub FirebaseStorage-Swift.h + warnings flags
-    require 'fileutils'
-    stub_dir = "#{installer.sandbox.root}/Headers/Public/FirebaseStorage"
-    FileUtils.mkdir_p(stub_dir)
-    stub_src = File.join(__dir__, '..', 'plugins', 'FirebaseStorage-Swift-stub.h')
-    stub_dst = "#{stub_dir}/FirebaseStorage-Swift.h"
-    if File.exist?(stub_src)
-      FileUtils.cp(stub_src, stub_dst)
-    else
-      File.write(stub_dst, "// FirebaseStorage-Swift.h stub\\n") unless File.exist?(stub_dst)
-    end
+const POST_INSTALL_BLOCK = `    # [CNB_IOS_FIXES_APPLIED] Warning flags para Firebase/RN ObjC compile
     installer.pods_project.targets.each do |target|
       target.build_configurations.each do |cfg|
         extra_flags = %w[
