@@ -51,8 +51,6 @@
       "./plugins/withIOSFixes",
       "expo-web-browser",
       "@react-native-firebase/app",
-      "@react-native-firebase/perf",
-      "@react-native-firebase/crashlytics",
       "expo-localization",
       "expo-apple-authentication",
       [
@@ -61,12 +59,6 @@
           "icon": "./assets/icon.png",
           "color": "#00FF7F",
           "defaultChannel": "default"
-        }
-      ],
-      [
-        "expo-build-properties",
-        {
-          "ios": { "useFrameworks": "static" }
         }
       ],
       "expo-secure-store"
