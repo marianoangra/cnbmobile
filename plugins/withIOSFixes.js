@@ -1,23 +1,16 @@
 /**
- * Config plugin para corrigir incompatibilidades de build iOS com New Architecture.
+ * Config plugin: warning flags do Cocoapods post_install para silenciar
+ * implicit-int / non-modular-include warnings que vêm do Firebase/RN.
  *
- * use_modular_headers! global para que FirebaseCoreInternal (Swift) consiga
- * importar GoogleUtilities (ObjC) durante pod install.
- *
- * NÃO usar use_frameworks! junto com use_modular_headers! — a combinação cria
- * definições de módulo duplicadas para FirebaseCore → FIRApp* undefined.
+ * useFrameworks=static (do expo-build-properties) já cria framework wrappers
+ * com modular headers — não usar use_modular_headers! aqui (causa duplicate
+ * module definitions e "FIRApp undefined").
  */
 const { withDangerousMod } = require('@expo/config-plugins');
 const fs = require('fs');
 const path = require('path');
 
 const FIX_MARKER = 'CNB_IOS_FIXES_APPLIED';
-
-// Inserido ANTES do target 'CNBMobile' do
-const MODULAR_HEADERS_BLOCK = `# [CNB_IOS_FIXES_APPLIED] use_modular_headers! para Firebase Swift pods
-use_modular_headers!
-
-`;
 
 const POST_INSTALL_BLOCK = `    # [CNB_IOS_FIXES_APPLIED] Warning flags para Firebase/RN ObjC compile
     installer.pods_project.targets.each do |target|
@@ -48,16 +41,8 @@ module.exports = function withIOSFixes(config) {
 
       let podfile = fs.readFileSync(podfilePath, 'utf8');
 
-      // Pula se já aplicado
       if (podfile.includes(FIX_MARKER)) return config;
 
-      // 1. Inserir use_modular_headers! antes do target 'CNBMobile' do
-      podfile = podfile.replace(
-        /^(target 'CNBMobile' do)/m,
-        `${MODULAR_HEADERS_BLOCK}$1`,
-      );
-
-      // 2. Inserir post_install fixes antes do "  end\nend" final
       podfile = podfile.replace(
         /(\s+\)\s*\n)(  end\nend\s*)$/,
         `$1${POST_INSTALL_BLOCK}$2`,

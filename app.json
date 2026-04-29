@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.cnb.cnbappv2",
-      "buildNumber": "175",
+      "buildNumber": "176",
       "usesAppleSignIn": true,
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
@@ -61,6 +61,12 @@
           "icon": "./assets/icon.png",
           "color": "#00FF7F",
           "defaultChannel": "default"
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": { "useFrameworks": "static" }
         }
       ],
       "expo-secure-store"
