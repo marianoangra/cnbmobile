@@ -16,13 +16,12 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.cnb.cnbappv2",
-      "buildNumber": "173",
+      "buildNumber": "174",
       "usesAppleSignIn": true,
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "NSCameraUsageDescription": "Usada para foto de perfil.",
         "NSPhotoLibraryUsageDescription": "Usada para selecionar foto de perfil.",
-        "NSUserTrackingUsageDescription": "Usamos dados de análise para melhorar sua experiência no app.",
         "UIBackgroundModes": [
           "fetch",
           "remote-notification"
