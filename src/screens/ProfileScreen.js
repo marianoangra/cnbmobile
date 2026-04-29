@@ -74,7 +74,7 @@ function NivelBadge({ pontos }) {
       borderRadius: 99, paddingHorizontal: 10, paddingVertical: 4,
     }}>
       <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: nivel.cor }} />
-      <Text style={{ fontSize: 11, color: nivel.cor, fontWeight: '600' }}>
+      <Text style={{ fontSize: 14, color: nivel.cor, fontWeight: '600' }}>
         {nivel.label}
       </Text>
     </View>
@@ -89,8 +89,8 @@ function StatBox({ label, value, cor }) {
       borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
       borderRadius: 14,
     }}>
-      <Text style={{ fontSize: 22, fontWeight: '700', color: cor ?? '#fff' }}>{value}</Text>
-      <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginTop: 3 }}>{label}</Text>
+      <Text style={{ fontSize: 29, fontWeight: '700', color: cor ?? '#fff' }}>{value}</Text>
+      <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginTop: 3 }}>{label}</Text>
     </View>
   );
 }
@@ -115,8 +115,8 @@ function MenuItem({ Icon, title, sub, onPress, danger }) {
         <Icon size={16} color={danger ? '#FF4444' : PRIMARY} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={{ fontSize: 14, color: danger ? '#FF4444' : '#fff', fontWeight: '500' }}>{title}</Text>
-        {sub && <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{sub}</Text>}
+        <Text style={{ fontSize: 18, color: danger ? '#FF4444' : '#fff', fontWeight: '500' }}>{title}</Text>
+        {sub && <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{sub}</Text>}
       </View>
       {!danger && <ChevronRight size={16} color="rgba(255,255,255,0.3)" />}
     </TouchableOpacity>
@@ -316,10 +316,10 @@ export default function ProfileScreen({ route, navigation }) {
             }}>
               <User size={36} color={PRIMARY} />
             </View>
-            <Text style={{ fontSize: 21, fontWeight: '700', color: '#fff', textAlign: 'center', marginBottom: 10 }}>
+            <Text style={{ fontSize: 27, fontWeight: '700', color: '#fff', textAlign: 'center', marginBottom: 10 }}>
               Faça login para ver seu perfil
             </Text>
-            <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', textAlign: 'center', lineHeight: 21, marginBottom: 36 }}>
+            <Text style={{ fontSize: 18, color: 'rgba(255,255,255,0.5)', textAlign: 'center', lineHeight: 21, marginBottom: 36 }}>
               Acesse sua conta para ver pontos, saques e programa de indicação.
             </Text>
             <TouchableOpacity
@@ -327,7 +327,7 @@ export default function ProfileScreen({ route, navigation }) {
               activeOpacity={0.85}
               style={{ backgroundColor: PRIMARY, borderRadius: 14, paddingVertical: 14, width: '100%', alignItems: 'center' }}
             >
-              <Text style={{ color: '#000', fontWeight: '700', fontSize: 16 }}>Entrar / Cadastrar</Text>
+              <Text style={{ color: '#000', fontWeight: '700', fontSize: 21 }}>Entrar / Cadastrar</Text>
             </TouchableOpacity>
           </View>
         </SafeAreaView>
@@ -347,7 +347,7 @@ export default function ProfileScreen({ route, navigation }) {
 
           {/* ── Avatar + Nome ── */}
           <Animated.View style={[{ paddingTop: 12, paddingBottom: 20 }, a0]}>
-            <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 16 }}>Perfil</Text>
+            <Text style={{ fontSize: 16, color: 'rgba(255,255,255,0.5)', marginBottom: 16 }}>Perfil</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
               {/* Avatar 64px com Award badge */}
               <View style={{ position: 'relative' }}>
@@ -362,7 +362,7 @@ export default function ProfileScreen({ route, navigation }) {
                   {perfilLocal?.avatarURL ? (
                     <Avatar uri={perfilLocal.avatarURL} nome={perfilLocal.nome} size={64} />
                   ) : (
-                    <Text style={{ color: '#000', fontWeight: '700', fontSize: 20 }}>
+                    <Text style={{ color: '#000', fontWeight: '700', fontSize: 26 }}>
                       {(perfilLocal?.nome ?? 'U').charAt(0).toUpperCase()}
                     </Text>
                   )}
@@ -380,13 +380,13 @@ export default function ProfileScreen({ route, navigation }) {
               </View>
 
               <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 16, fontWeight: '600', color: '#fff' }}>
+                <Text style={{ fontSize: 21, fontWeight: '600', color: '#fff' }}>
                   {perfilLocal?.nome ?? 'Usuário'}
                 </Text>
-                <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 }} numberOfLines={1}>
+                <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', marginTop: 2 }} numberOfLines={1}>
                   {perfilLocal?.email ?? ''}
                 </Text>
-                <Text style={{ fontSize: 10, color: PRIMARY, marginTop: 3 }}>
+                <Text style={{ fontSize: 13, color: PRIMARY, marginTop: 3 }}>
                   {calcularNivel(pontos).label}
                 </Text>
               </View>
@@ -406,10 +406,10 @@ export default function ProfileScreen({ route, navigation }) {
               <View style={{ flexDirection: 'row' }}>
                 {/* Pontos */}
                 <View style={{ flex: 1, alignItems: 'center' }}>
-                  <Text style={{ fontSize: 18, fontWeight: '600', color: PRIMARY }}>
+                  <Text style={{ fontSize: 24, fontWeight: '600', color: PRIMARY }}>
                     {pontos.toLocaleString('pt-BR')}
                   </Text>
-                  <Text style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 1, marginTop: 3 }}>
+                  <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 1, marginTop: 3 }}>
                     Pontos
                   </Text>
                 </View>
@@ -417,10 +417,10 @@ export default function ProfileScreen({ route, navigation }) {
                 <View style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.1)' }} />
                 {/* Ranking */}
                 <View style={{ flex: 1, alignItems: 'center' }}>
-                  <Text style={{ fontSize: 18, fontWeight: '600', color: '#fff' }}>
+                  <Text style={{ fontSize: 24, fontWeight: '600', color: '#fff' }}>
                     {minhaPos?.posicao ?? '—'}
                   </Text>
-                  <Text style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 1, marginTop: 3 }}>
+                  <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 1, marginTop: 3 }}>
                     Ranking
                   </Text>
                 </View>
@@ -428,8 +428,8 @@ export default function ProfileScreen({ route, navigation }) {
                 <View style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.1)' }} />
                 {/* Indicações */}
                 <View style={{ flex: 1, alignItems: 'center' }}>
-                  <Text style={{ fontSize: 18, fontWeight: '600', color: '#fff' }}>{afiliados.total}</Text>
-                  <Text style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 1, marginTop: 3 }}>
+                  <Text style={{ fontSize: 24, fontWeight: '600', color: '#fff' }}>{afiliados.total}</Text>
+                  <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 1, marginTop: 3 }}>
                     Indicações
                   </Text>
                 </View>
@@ -493,8 +493,8 @@ export default function ProfileScreen({ route, navigation }) {
                   <Icon size={16} color={accent ?? PRIMARY} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 12, fontWeight: '500', color: '#fff' }}>{title}</Text>
-                  <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginTop: 1 }} numberOfLines={1}>{sub}</Text>
+                  <Text style={{ fontSize: 16, fontWeight: '500', color: '#fff' }}>{title}</Text>
+                  <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginTop: 1 }} numberOfLines={1}>{sub}</Text>
                 </View>
                 <ChevronRight size={16} color="rgba(255,255,255,0.3)" />
               </TouchableOpacity>
@@ -510,13 +510,13 @@ export default function ProfileScreen({ route, navigation }) {
 
             {/* Header */}
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-              <Text style={{ fontSize: 14, fontWeight: '600', color: '#fff' }}>Programa de Indicação</Text>
+              <Text style={{ fontSize: 18, fontWeight: '600', color: '#fff' }}>Programa de Indicação</Text>
               <View style={{
                 backgroundColor: 'rgba(198,255,74,0.1)',
                 borderRadius: 99, paddingHorizontal: 8, paddingVertical: 3,
                 borderWidth: 1, borderColor: 'rgba(198,255,74,0.25)',
               }}>
-                <Text style={{ fontSize: 10, color: PRIMARY, fontWeight: '600' }}>{afiliados.total} cadastros</Text>
+                <Text style={{ fontSize: 13, color: PRIMARY, fontWeight: '600' }}>{afiliados.total} cadastros</Text>
               </View>
             </View>
 
@@ -528,10 +528,10 @@ export default function ProfileScreen({ route, navigation }) {
             }}>
               <Users size={15} color={PRIMARY} />
               <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 12, color: '#fff', fontWeight: '500' }}>
+                <Text style={{ fontSize: 16, color: '#fff', fontWeight: '500' }}>
                   {afiliados.ativas} de {afiliados.total} indicados já ativaram
                 </Text>
-                <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
+                <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
                   Ativo = carregou o celular por 3+ minutos
                 </Text>
               </View>
@@ -539,7 +539,7 @@ export default function ProfileScreen({ route, navigation }) {
 
             {/* Milestones */}
             <Text style={{
-              fontSize: 10, color: 'rgba(255,255,255,0.45)',
+              fontSize: 13, color: 'rgba(255,255,255,0.45)',
               letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10,
             }}>
               Bônus por indicados ativos
@@ -548,10 +548,10 @@ export default function ProfileScreen({ route, navigation }) {
             {/* 5 ativos → 50k pts */}
             <View style={{ marginBottom: 12 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
-                <Text style={{ fontSize: 12, color: afiliados.bonus5k ? PRIMARY : '#fff' }}>
+                <Text style={{ fontSize: 16, color: afiliados.bonus5k ? PRIMARY : '#fff' }}>
                   5 ativos — +50.000 pts
                 </Text>
-                <Text style={{ fontSize: 11, fontWeight: '600', color: afiliados.bonus5k ? PRIMARY : 'rgba(255,255,255,0.4)' }}>
+                <Text style={{ fontSize: 14, fontWeight: '600', color: afiliados.bonus5k ? PRIMARY : 'rgba(255,255,255,0.4)' }}>
                   {afiliados.bonus5k ? 'Recebido' : `${Math.min(afiliados.ativas, 5)}/5`}
                 </Text>
               </View>
@@ -567,10 +567,10 @@ export default function ProfileScreen({ route, navigation }) {
             {/* 10 ativos → 100k pts */}
             <View style={{ marginBottom: 16 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
-                <Text style={{ fontSize: 12, color: afiliados.bonus10k ? PRIMARY : '#fff' }}>
+                <Text style={{ fontSize: 16, color: afiliados.bonus10k ? PRIMARY : '#fff' }}>
                   10 ativos — +100.000 pts
                 </Text>
-                <Text style={{ fontSize: 11, fontWeight: '600', color: afiliados.bonus10k ? PRIMARY : 'rgba(255,255,255,0.4)' }}>
+                <Text style={{ fontSize: 14, fontWeight: '600', color: afiliados.bonus10k ? PRIMARY : 'rgba(255,255,255,0.4)' }}>
                   {afiliados.bonus10k ? 'Recebido' : `${Math.min(afiliados.ativas, 10)}/10`}
                 </Text>
               </View>
@@ -583,7 +583,7 @@ export default function ProfileScreen({ route, navigation }) {
               </View>
             </View>
 
-            <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 14 }}>
+            <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.4)', marginBottom: 14 }}>
               +100 pts imediato por cada novo cadastro via código
             </Text>
 
@@ -593,8 +593,8 @@ export default function ProfileScreen({ route, navigation }) {
               borderWidth: 1, borderColor: 'rgba(198,255,74,0.2)',
               borderRadius: 12, padding: 12, marginBottom: 10,
             }}>
-              <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>Seu código</Text>
-              <Text style={{ fontSize: 24, fontWeight: '700', color: PRIMARY, letterSpacing: 4 }}>
+              <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>Seu código</Text>
+              <Text style={{ fontSize: 32, fontWeight: '700', color: PRIMARY, letterSpacing: 4 }}>
                 {afiliados.codigo || '---'}
               </Text>
             </View>
@@ -611,7 +611,7 @@ export default function ProfileScreen({ route, navigation }) {
                 }}
               >
                 <Copy size={13} color="rgba(255,255,255,0.8)" />
-                <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.9)' }}>Copiar</Text>
+                <Text style={{ fontSize: 16, color: 'rgba(255,255,255,0.9)' }}>Copiar</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -625,13 +625,13 @@ export default function ProfileScreen({ route, navigation }) {
                 }}
               >
                 <Share2 size={13} color={PRIMARY} />
-                <Text style={{ fontSize: 12, color: PRIMARY, fontWeight: '600' }}>Compartilhar</Text>
+                <Text style={{ fontSize: 16, color: PRIMARY, fontWeight: '600' }}>Compartilhar</Text>
               </TouchableOpacity>
             </View>
 
             {!perfilLocal?.referidoPor && (
               <View style={{ borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.07)', paddingTop: 12 }}>
-                <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 8 }}>
+                <Text style={{ fontSize: 16, color: 'rgba(255,255,255,0.5)', marginBottom: 8 }}>
                   Tem um código de referência?
                 </Text>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -639,7 +639,7 @@ export default function ProfileScreen({ route, navigation }) {
                     style={{
                       flex: 1, backgroundColor: 'rgba(0,0,0,0.3)',
                       borderRadius: 10, padding: 10,
-                      color: '#fff', fontSize: 14,
+                      color: '#fff', fontSize: 18,
                       borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
                       letterSpacing: 2,
                     }}
@@ -662,7 +662,7 @@ export default function ProfileScreen({ route, navigation }) {
                   >
                     {aplicandoCodigo
                       ? <ActivityIndicator color="#000" size="small" />
-                      : <Text style={{ color: '#000', fontWeight: '700', fontSize: 13 }}>Aplicar</Text>
+                      : <Text style={{ color: '#000', fontWeight: '700', fontSize: 17 }}>Aplicar</Text>
                     }
                   </TouchableOpacity>
                 </View>
@@ -672,7 +672,7 @@ export default function ProfileScreen({ route, navigation }) {
 
           {/* ── Histórico de saques ── */}
           <Animated.View style={[{ marginBottom: 24 }, a3]}>
-            <Text style={{ fontSize: 14, fontWeight: '600', color: '#fff', marginBottom: 12 }}>
+            <Text style={{ fontSize: 18, fontWeight: '600', color: '#fff', marginBottom: 12 }}>
               Histórico de Saques
             </Text>
 
@@ -685,7 +685,7 @@ export default function ProfileScreen({ route, navigation }) {
                 borderRadius: 14, padding: 24, alignItems: 'center',
               }}>
                 <Inbox size={28} color="rgba(255,255,255,0.2)" style={{ marginBottom: 8 }} />
-                <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>Nenhum saque realizado ainda</Text>
+                <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 17 }}>Nenhum saque realizado ainda</Text>
               </View>
             ) : (
               <View style={{ gap: 8 }}>
@@ -697,8 +697,8 @@ export default function ProfileScreen({ route, navigation }) {
                     borderRadius: 12, padding: 14,
                   }}>
                     <View style={{ flex: 1, marginRight: 12 }}>
-                      <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{formatarData(s.criadoEm)}</Text>
-                      <Text style={{ fontSize: 13, color: '#fff', marginTop: 2 }} numberOfLines={1}>
+                      <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.4)' }}>{formatarData(s.criadoEm)}</Text>
+                      <Text style={{ fontSize: 17, color: '#fff', marginTop: 2 }} numberOfLines={1}>
                         {s.chavePix
                           ? s.chavePix
                           : s.walletAddress
@@ -707,10 +707,10 @@ export default function ProfileScreen({ route, navigation }) {
                       </Text>
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: '#FF4444' }}>
+                      <Text style={{ fontSize: 17, fontWeight: '700', color: '#FF4444' }}>
                         -{(s.pontos ?? 0).toLocaleString('pt-BR')} pts
                       </Text>
-                      <Text style={{ fontSize: 11, color: STATUS_COLOR[s.status] ?? 'rgba(255,255,255,0.4)', marginTop: 2 }}>
+                      <Text style={{ fontSize: 14, color: STATUS_COLOR[s.status] ?? 'rgba(255,255,255,0.4)', marginTop: 2 }}>
                         {STATUS_LABEL[s.status] ?? s.status}
                       </Text>
                     </View>
@@ -732,7 +732,7 @@ export default function ProfileScreen({ route, navigation }) {
               }}
             >
               <LogOut size={15} color="#FF4444" />
-              <Text style={{ color: '#FF4444', fontWeight: '600', fontSize: 14 }}>Sair da conta</Text>
+              <Text style={{ color: '#FF4444', fontWeight: '600', fontSize: 18 }}>Sair da conta</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -740,7 +740,7 @@ export default function ProfileScreen({ route, navigation }) {
               activeOpacity={0.8}
               style={{ alignItems: 'center', paddingVertical: 12 }}
             >
-              <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12 }}>Excluir minha conta</Text>
+              <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 16 }}>Excluir minha conta</Text>
             </TouchableOpacity>
           </Animated.View>
 
