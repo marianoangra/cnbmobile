@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
@@ -478,6 +478,190 @@ function StarField({ carregando, phase, offsetX, offsetY, bateria, pontosGanhos 
 }
 
 
+// ── Bateria em modo espera (não carregando) ───────────────────────────────────
+const IDLE_IMG = require('../../assets/battery-idle.png');
+
+function IdleBattery({ carregando }) {
+  const fade   = useSharedValue(0);
+  const scale  = useSharedValue(1);
+  const floatY = useSharedValue(0);
+  const glow   = useSharedValue(0.5);
+
+  useEffect(() => {
+    if (!carregando) {
+      // fade-in suave quando entra em idle
+      fade.value = withTiming(1, { duration: 700, easing: Easing.out(Easing.cubic) });
+
+      // respiração — escala 1.0 ↔ 1.045
+      scale.value = withRepeat(withSequence(
+        withTiming(1.045, { duration: 2400, easing: Easing.inOut(Easing.sin) }),
+        withTiming(1.000, { duration: 2400, easing: Easing.inOut(Easing.sin) }),
+      ), -1, true);
+
+      // flutuar — sobe/desce 6px
+      floatY.value = withRepeat(withSequence(
+        withTiming(-6, { duration: 2800, easing: Easing.inOut(Easing.sin) }),
+        withTiming( 6, { duration: 2800, easing: Easing.inOut(Easing.sin) }),
+      ), -1, true);
+
+      // pulso de brilho — opacidade do glow atrás
+      glow.value = withRepeat(withSequence(
+        withTiming(1.0, { duration: 1800, easing: Easing.inOut(Easing.sin) }),
+        withTiming(0.4, { duration: 1800, easing: Easing.inOut(Easing.sin) }),
+      ), -1, true);
+    } else {
+      fade.value = withTiming(0, { duration: 500, easing: Easing.in(Easing.cubic) });
+      cancelAnimation(scale);
+      cancelAnimation(floatY);
+      cancelAnimation(glow);
+    }
+    return () => {
+      cancelAnimation(fade);
+      cancelAnimation(scale);
+      cancelAnimation(floatY);
+      cancelAnimation(glow);
+    };
+  }, [carregando]);
+
+  const wrapStyle = useAnimatedStyle(() => ({
+    opacity: fade.value,
+    transform: [
+      { translateY: floatY.value },
+      { scale: scale.value },
+    ],
+  }));
+
+  const glowStyle = useAnimatedStyle(() => ({
+    opacity: fade.value * glow.value * 0.55,
+  }));
+
+  return (
+    <View pointerEvents="none" style={{ alignItems: 'center', justifyContent: 'center' }}>
+      {/* Glow verde difuso atrás */}
+      <Animated.View
+        style={[{
+          position: 'absolute',
+          width: 280, height: 280, borderRadius: 140,
+          backgroundColor: '#c6ff4a',
+        }, glowStyle]}
+      />
+      {/* Imagem da bateria */}
+      <Animated.View style={wrapStyle}>
+        <Image
+          source={IDLE_IMG}
+          style={{ width: 220, height: 320 }}
+          resizeMode="contain"
+        />
+      </Animated.View>
+    </View>
+  );
+}
+
+// ── Halo girando enquanto carrega ─────────────────────────────────────────────
+const GLOW_SIZE = 300;
+const GLOW_C    = GLOW_SIZE / 2;
+
+function ChargingGlow({ carregando, color }) {
+  const rotCw  = useSharedValue(0);
+  const rotCcw = useSharedValue(0);
+  const fade   = useSharedValue(0);
+
+  useEffect(() => {
+    if (carregando) {
+      fade.value = withTiming(1, { duration: 700, easing: Easing.out(Easing.cubic) });
+      rotCw.value = withRepeat(
+        withTiming(360, { duration: 4200, easing: Easing.linear }),
+        -1, false,
+      );
+      rotCcw.value = withRepeat(
+        withTiming(-360, { duration: 6800, easing: Easing.linear }),
+        -1, false,
+      );
+    } else {
+      fade.value = withTiming(0, { duration: 600, easing: Easing.in(Easing.cubic) });
+      cancelAnimation(rotCw);
+      cancelAnimation(rotCcw);
+    }
+    return () => {
+      cancelAnimation(rotCw);
+      cancelAnimation(rotCcw);
+      cancelAnimation(fade);
+    };
+  }, [carregando]);
+
+  const wrapStyle = useAnimatedStyle(() => ({ opacity: fade.value }));
+  const cwStyle   = useAnimatedStyle(() => ({ transform: [{ rotate: `${rotCw.value}deg`  }] }));
+  const ccwStyle  = useAnimatedStyle(() => ({ transform: [{ rotate: `${rotCcw.value}deg` }] }));
+
+  const r1 = GLOW_C - 14;
+  const r2 = GLOW_C - 38;
+  const r3 = GLOW_C - 62;
+
+  return (
+    <Animated.View pointerEvents="none" style={[{
+      width: GLOW_SIZE, height: GLOW_SIZE,
+      alignItems: 'center', justifyContent: 'center',
+    }, wrapStyle]}>
+
+      {/* Halo difuso estático — feito com strokes empilhados de larguras crescentes */}
+      <Svg width={GLOW_SIZE} height={GLOW_SIZE} style={StyleSheet.absoluteFill}>
+        <Circle cx={GLOW_C} cy={GLOW_C} r={r1} fill="none" stroke={color} strokeOpacity={0.04} strokeWidth={28} />
+        <Circle cx={GLOW_C} cy={GLOW_C} r={r1} fill="none" stroke={color} strokeOpacity={0.08} strokeWidth={14} />
+        <Circle cx={GLOW_C} cy={GLOW_C} r={r2} fill="none" stroke={color} strokeOpacity={0.05} strokeWidth={22} />
+        <Circle cx={GLOW_C} cy={GLOW_C} r={r2} fill="none" stroke={color} strokeOpacity={0.10} strokeWidth={10} />
+      </Svg>
+
+      {/* Camada 1 — arcos girando horário, mais brilhantes */}
+      <Animated.View style={[StyleSheet.absoluteFill, cwStyle]}>
+        <Svg width={GLOW_SIZE} height={GLOW_SIZE}>
+          {/* glow espesso e suave */}
+          <Circle
+            cx={GLOW_C} cy={GLOW_C} r={r1}
+            fill="none" stroke={color} strokeOpacity={0.18}
+            strokeWidth={10} strokeLinecap="round"
+            strokeDasharray={`${Math.PI * r1 * 0.55} ${Math.PI * r1 * 1.45}`}
+          />
+          {/* linha brilhante central */}
+          <Circle
+            cx={GLOW_C} cy={GLOW_C} r={r1}
+            fill="none" stroke={color} strokeOpacity={0.9}
+            strokeWidth={2} strokeLinecap="round"
+            strokeDasharray={`${Math.PI * r1 * 0.55} ${Math.PI * r1 * 1.45}`}
+          />
+          {/* segunda volta defasada */}
+          <Circle
+            cx={GLOW_C} cy={GLOW_C} r={r2}
+            fill="none" stroke={color} strokeOpacity={0.5}
+            strokeWidth={1.6} strokeLinecap="round"
+            strokeDasharray={`${Math.PI * r2 * 0.32} ${Math.PI * r2 * 1.68}`}
+            strokeDashoffset={Math.PI * r2 * 0.6}
+          />
+        </Svg>
+      </Animated.View>
+
+      {/* Camada 2 — arcos girando anti-horário, finos */}
+      <Animated.View style={[StyleSheet.absoluteFill, ccwStyle]}>
+        <Svg width={GLOW_SIZE} height={GLOW_SIZE}>
+          <Circle
+            cx={GLOW_C} cy={GLOW_C} r={r2}
+            fill="none" stroke={color} strokeOpacity={0.6}
+            strokeWidth={1.4} strokeLinecap="round"
+            strokeDasharray={`${Math.PI * r2 * 0.42} ${Math.PI * r2 * 1.58}`}
+          />
+          <Circle
+            cx={GLOW_C} cy={GLOW_C} r={r3}
+            fill="none" stroke={color} strokeOpacity={0.35}
+            strokeWidth={1.2} strokeLinecap="round"
+            strokeDasharray={`${Math.PI * r3 * 0.25} ${Math.PI * r3 * 1.75}`}
+            strokeDashoffset={Math.PI * r3 * 0.4}
+          />
+        </Svg>
+      </Animated.View>
+
+    </Animated.View>
+  );
+}
+
 // ── Barra de progresso 1 hora ─────────────────────────────────────────────────
 function ProgressoHora({ segundosRestantes, carregando }) {
   const PRIMARY = useAccent();
@@ -631,22 +815,37 @@ export default function ChargingScreen({ route, navigation }) {
               bateria={bateria}
               pontosGanhos={pontosGanhos}
             />
+            {/* Modo espera — bateria animada quando NÃO carregando */}
             <View
               pointerEvents="none"
               style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}
             >
-              <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.45)', letterSpacing: 1.5, textTransform: 'uppercase' }}>
-                Bateria
-              </Text>
-              <Text style={{
-                fontSize: 96, fontWeight: '300', color: '#fff',
-                marginTop: 4, letterSpacing: -2,
-                textShadowColor: 'rgba(0,255,127,0.25)', textShadowRadius: 18,
-              }}>
-                {bateria > 0 ? `${bateria}` : '--'}
-                <Text style={{ fontSize: 48, color: PRIMARY, fontWeight: '400' }}>%</Text>
-              </Text>
+              <IdleBattery carregando={carregando} />
             </View>
+
+            {/* Halo girando — atrás do número da bateria, só quando carregando */}
+            <View
+              pointerEvents="none"
+              style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}
+            >
+              <ChargingGlow carregando={carregando} color={PRIMARY} />
+            </View>
+
+            {carregando && (
+              <View
+                pointerEvents="none"
+                style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}
+              >
+                <Text style={{
+                  fontSize: 96, fontWeight: '300', color: '#fff',
+                  letterSpacing: -2,
+                  textShadowColor: 'rgba(0,255,127,0.25)', textShadowRadius: 18,
+                }}>
+                  {bateria > 0 ? `${bateria}` : '--'}
+                  <Text style={{ fontSize: 48, color: PRIMARY, fontWeight: '400' }}>%</Text>
+                </Text>
+              </View>
+            )}
           </View>
 
           {/* ── Seção inferior ── */}
@@ -668,12 +867,6 @@ export default function ChargingScreen({ route, navigation }) {
                   +{pontosGanhos.toLocaleString('pt-BR')}
                 </Text>
                 <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>pontos · on-chain</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 }}>
-                  <Zap size={10} color={PRIMARY} />
-                  <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', fontWeight: '600' }}>
-                    Bateria {bateria > 0 ? `${bateria}%` : '--%'}
-                  </Text>
-                </View>
               </View>
               <BarChart heights={barHeights} />
             </LinearGradient>
