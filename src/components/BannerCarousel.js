@@ -1,13 +1,11 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Dimensions, ScrollView, View, StyleSheet } from 'react-native';
 import FrontierBanner from './FrontierBanner';
-import KastBanner from './KastBanner';
-import SolflareBanner from './SolflareBanner';
-import BingXBanner from './BingXBanner';
+import WhatsappBanner from './WhatsappBanner';
 
 const PRIMARY = '#c6ff4a';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const BANNERS = ['kast', 'frontier', 'solflare', 'bingx'];
+const BANNERS = ['whatsapp', 'frontier'];
 
 export default function BannerCarousel({ uid }) {
   const scrollRef = useRef(null);
@@ -51,16 +49,10 @@ export default function BannerCarousel({ uid }) {
         decelerationRate="fast"
       >
         <View style={{ width: SCREEN_WIDTH - 40 }}>
-          <KastBanner uid={uid} />
+          <WhatsappBanner />
         </View>
         <View style={{ width: SCREEN_WIDTH - 40, marginLeft: 40 }}>
           <FrontierBanner />
-        </View>
-        <View style={{ width: SCREEN_WIDTH - 40, marginLeft: 40 }}>
-          <SolflareBanner />
-        </View>
-        <View style={{ width: SCREEN_WIDTH - 40, marginLeft: 40 }}>
-          <BingXBanner />
         </View>
       </ScrollView>
 
