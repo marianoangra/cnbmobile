@@ -184,7 +184,7 @@ function AvatarHeader({ onPress, borderColor }) {
   );
 }
 
-function CardPontos({ pontos, progresso, faltam, user, estaCarregando, onSaque, barStyle, pontosHoje, variacaoDia }) {
+function CardPontos({ pontos, progresso, faltam, user, estaCarregando, onSaque, barStyle, pontosHoje }) {
   const PRIMARY = useAccent();
   const pct = Math.round(progresso * 100);
   return (
@@ -225,7 +225,7 @@ function CardPontos({ pontos, progresso, faltam, user, estaCarregando, onSaque, 
       {/* Topo: label + badge */}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
         <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>Seus pontos</Text>
-        {estaCarregando ? (
+        {estaCarregando && (
           <View style={{
             flexDirection: 'row', alignItems: 'center', gap: 4,
             backgroundColor: 'rgba(198,255,74,0.1)',
@@ -234,18 +234,7 @@ function CardPontos({ pontos, progresso, faltam, user, estaCarregando, onSaque, 
             <Zap size={10} color={PRIMARY} strokeWidth={2.5} />
             <Text style={{ fontSize: 10, color: PRIMARY, fontWeight: '600' }}>Ativo</Text>
           </View>
-        ) : user && variacaoDia !== null ? (
-          <View style={{
-            flexDirection: 'row', alignItems: 'center', gap: 4,
-            backgroundColor: 'rgba(198,255,74,0.1)',
-            paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99,
-          }}>
-            <Text style={{ fontSize: 10, color: PRIMARY, fontWeight: '700' }}>
-              +{Math.abs(parseFloat(variacaoDia)).toFixed(1)}%
-            </Text>
-            <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>vs ontem</Text>
-          </View>
-        ) : null}
+        )}
       </View>
 
       {/* Valor de pontos */}
@@ -758,7 +747,6 @@ export default function HomeScreen({ route, navigation }) {
               onSaque={handleSaque}
               barStyle={barStyle}
               pontosHoje={pontosHoje}
-              variacaoDia={variacaoDia}
               modo={perfil?.modo}
             />
           </Animated.View>
