@@ -27,6 +27,7 @@ import {
 import BannerCarousel from '../components/BannerCarousel';
 import { getSaques, atualizarModo } from '../services/pontos';
 import { useAccent } from '../context/AccentContext';
+import { useTheme } from '../context/ThemeContext';
 
 const PURPLE = '#c084fc';
 import { onPontosUpdate } from '../services/chargeEvents';
@@ -187,11 +188,14 @@ function AvatarHeader({ onPress, borderColor }) {
 
 function CardPontos({ pontos, progresso, faltam, user, estaCarregando, onSaque, barStyle, pontosHoje }) {
   const PRIMARY = useAccent();
+  const { colors, isDark } = useTheme();
   const { t } = useTranslation();
   const pct = Math.round(progresso * 100);
   return (
     <LinearGradient
-      colors={['#182418', '#0c1410', '#070a07']}
+      // Card destacado: mantém gradient escuro mesmo em light pra preservar
+      // identidade visual do brand "JUICE" (verde sobre fundo escuro)
+      colors={isDark ? ['#182418', '#0c1410', '#070a07'] : ['#1a2818', '#0e1a10', '#0a1208']}
       locations={[0, 0.6, 1]}
       start={{ x: 0.05, y: 0 }}
       end={{ x: 1, y: 1 }}
@@ -199,7 +203,7 @@ function CardPontos({ pontos, progresso, faltam, user, estaCarregando, onSaque, 
         borderRadius: 24,
         padding: 20,
         borderWidth: 1,
-        borderColor: 'rgba(198,255,74,0.25)',
+        borderColor: colors.primaryStrong,
         overflow: 'hidden',
         marginBottom: 16,
       }}
@@ -294,6 +298,7 @@ function CardPontos({ pontos, progresso, faltam, user, estaCarregando, onSaque, 
 
 function Atalhos({ onPress }) {
   const PRIMARY = useAccent();
+  const { colors } = useTheme();
   return (
     <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
       {ATALHOS.map(({ Icon, label, id }) => (
@@ -303,14 +308,14 @@ function Atalhos({ onPress }) {
           activeOpacity={0.75}
           style={{
             flex: 1,
-            backgroundColor: 'rgba(255,255,255,0.05)',
-            borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
+            backgroundColor: colors.surfaceAlt,
+            borderWidth: 1, borderColor: colors.borderStrong,
             borderRadius: 14, paddingVertical: 17,
             alignItems: 'center', gap: 7,
           }}
         >
           <Icon size={22} color={PRIMARY} />
-          <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>{label}</Text>
+          <Text style={{ fontSize: 10, color: colors.textMuted }}>{label}</Text>
         </TouchableOpacity>
       ))}
     </View>
@@ -319,11 +324,12 @@ function Atalhos({ onPress }) {
 
 function Atividades({ atividades, loading }) {
   const PRIMARY = useAccent();
+  const { colors } = useTheme();
   const { t } = useTranslation();
   return (
     <View>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>{t('home.recentActivity')}</Text>
+        <Text style={{ fontSize: 12, color: colors.textSecondary }}>{t('home.recentActivity')}</Text>
       </View>
 
       {loading ? (
@@ -331,41 +337,41 @@ function Atividades({ atividades, loading }) {
       ) : atividades.length === 0 ? (
         <View style={{
           padding: 20, borderRadius: 12, alignItems: 'center',
-          backgroundColor: 'rgba(255,255,255,0.03)',
-          borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
+          backgroundColor: colors.surface,
+          borderWidth: 1, borderColor: colors.borderSubtle,
         }}>
-          <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>
+          <Text style={{ fontSize: 13, color: colors.textDim, textAlign: 'center' }}>
             {t('home.noActivity')}
           </Text>
-          <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', marginTop: 4, textAlign: 'center' }}>
+          <Text style={{ fontSize: 11, color: colors.textGhost, marginTop: 4, textAlign: 'center' }}>
             {t('home.noActivitySub')}
           </Text>
         </View>
       ) : (
         <View style={{ gap: 8 }}>
-          {atividades.map((t, i) => (
+          {atividades.map((it, i) => (
             <View
               key={i}
               style={{
                 flexDirection: 'row', alignItems: 'center', gap: 12,
                 padding: 12, borderRadius: 12,
-                backgroundColor: 'rgba(255,255,255,0.03)',
-                borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
+                backgroundColor: colors.surface,
+                borderWidth: 1, borderColor: colors.borderSubtle,
               }}
             >
               <View style={{
                 width: 36, height: 36, borderRadius: 18,
-                backgroundColor: t.pos ? 'rgba(198,255,74,0.15)' : 'rgba(255,255,255,0.10)',
+                backgroundColor: it.pos ? colors.primaryMid : colors.surfaceStrong,
                 alignItems: 'center', justifyContent: 'center',
               }}>
-                <t.Icon size={16} color={t.pos ? PRIMARY : 'rgba(255,255,255,0.8)'} />
+                <it.Icon size={16} color={it.pos ? PRIMARY : colors.textStrong} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 12, fontWeight: '500', color: '#fff' }} numberOfLines={1}>{t.title}</Text>
-                <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginTop: 2 }} numberOfLines={1}>{t.sub}</Text>
+                <Text style={{ fontSize: 12, fontWeight: '500', color: colors.text }} numberOfLines={1}>{it.title}</Text>
+                <Text style={{ fontSize: 10, color: colors.textFaint, marginTop: 2 }} numberOfLines={1}>{it.sub}</Text>
               </View>
-              <Text style={{ fontSize: 12, fontWeight: '600', color: t.pos ? PRIMARY : 'rgba(255,255,255,0.8)' }}>
-                {t.value}
+              <Text style={{ fontSize: 12, fontWeight: '600', color: it.pos ? PRIMARY : colors.textStrong }}>
+                {it.value}
               </Text>
             </View>
           ))}
@@ -379,6 +385,7 @@ function Atividades({ atividades, loading }) {
 export default function HomeScreen({ route, navigation }) {
   useScreenTrace('home_screen');
   const PRIMARY = useAccent();
+  const { colors, isDark } = useTheme();
   const { t } = useTranslation();
   const { user, perfil, onAtualizar } = route?.params || {};
   const onAtualizarRef = useRef(onAtualizar);
@@ -465,7 +472,7 @@ export default function HomeScreen({ route, navigation }) {
   const progresso = Math.min(pontos / META, 1);
   const faltam    = Math.max(META - pontos, 0);
   const podeSacar = pontos >= META;
-  const nome      = perfil?.nome?.split(' ')[0] ?? (user ? 'Usuário' : 'Visitante');
+  const nome      = perfil?.nome?.split(' ')[0] ?? (user ? t('common.user') : 'Visitante');
   const estaCarregando = useCarregando();
 
   // Badge dinâmico: pontos ganhos hoje vs ontem
@@ -513,38 +520,43 @@ export default function HomeScreen({ route, navigation }) {
     if (id === 'dados')   return navigation.navigate('Dados');
   }
 
+  // Background gradient — adapta ao tema
+  const bgGradient = isDark
+    ? ['#0b1310', '#0a0f0d', '#000000']
+    : [colors.background, '#E7ECF1', '#DAE2EA'];
+
   return (
     <LinearGradient
-      colors={['#0b1310', '#0a0f0d', '#000000']}
+      colors={bgGradient}
       locations={[0, 0.5, 1]}
       style={{ flex: 1 }}
     >
       {/* ── Modal de perfil (Lite / Tech) ── */}
       <Modal visible={modalPerfil} animationType="slide" transparent onRequestClose={() => setModalPerfil(false)}>
         <TouchableOpacity
-          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.80)', justifyContent: 'flex-end' }}
+          style={{ flex: 1, backgroundColor: colors.overlayStrong, justifyContent: 'flex-end' }}
           activeOpacity={1}
           onPress={() => setModalPerfil(false)}
         >
           <TouchableOpacity activeOpacity={1}>
             <View style={{
-              backgroundColor: '#090909',
+              backgroundColor: isDark ? '#090909' : colors.modalBg,
               borderTopLeftRadius: 28, borderTopRightRadius: 28,
               padding: 24, paddingBottom: 48,
-              borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
+              borderWidth: 1, borderColor: colors.border,
             }}>
               {/* Handle */}
               <View style={{
                 width: 40, height: 4, borderRadius: 2,
-                backgroundColor: 'rgba(255,255,255,0.12)',
+                backgroundColor: colors.borderStrong,
                 alignSelf: 'center', marginBottom: 24,
               }} />
 
-              <Text style={{ fontSize: 20, fontWeight: '700', color: '#fff', marginBottom: 4 }}>
+              <Text style={{ fontSize: 20, fontWeight: '700', color: colors.text, marginBottom: 4 }}>
                 Qual é o seu perfil?
               </Text>
-              <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginBottom: 24, lineHeight: 19 }}>
-                Personalize como o CNB Mobile funciona para você
+              <Text style={{ fontSize: 13, color: colors.textFaint, marginBottom: 24, lineHeight: 19 }}>
+                Personalize como o JUICE funciona para você
               </Text>
 
               {/* ── LITE ── */}
@@ -568,7 +580,7 @@ export default function HomeScreen({ route, navigation }) {
                 </View>
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 5 }}>
-                    <Text style={{ fontSize: 17, fontWeight: '700', color: '#fff' }}>Lite</Text>
+                    <Text style={{ fontSize: 17, fontWeight: '700', color: colors.text }}>Lite</Text>
                     <View style={{
                       backgroundColor: 'rgba(192,132,252,0.12)',
                       borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2,
@@ -577,7 +589,7 @@ export default function HomeScreen({ route, navigation }) {
                       <Text style={{ fontSize: 9, fontWeight: '800', color: '#c084fc', letterSpacing: 1.2 }}>LITE</Text>
                     </View>
                   </View>
-                  <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', lineHeight: 18 }}>
+                  <Text style={{ fontSize: 12, color: colors.textFaint, lineHeight: 18 }}>
                     Sou novo em Tecnologia — ouvi falar que é só colocar para carregar e ganhar
                   </Text>
                 </View>
@@ -589,31 +601,31 @@ export default function HomeScreen({ route, navigation }) {
                 activeOpacity={0.85}
                 style={{
                   flexDirection: 'row', alignItems: 'center', gap: 16,
-                  backgroundColor: 'rgba(198,255,74,0.04)',
+                  backgroundColor: colors.primarySoft,
                   borderWidth: perfil?.modo === 'tech' ? 2 : 1.5,
-                  borderColor: perfil?.modo === 'tech' ? PRIMARY : 'rgba(198,255,74,0.22)',
+                  borderColor: perfil?.modo === 'tech' ? PRIMARY : colors.primaryStrong,
                   borderRadius: 20, padding: 18,
                 }}
               >
                 <View style={{
                   width: 52, height: 52, borderRadius: 26,
-                  backgroundColor: 'rgba(198,255,74,0.10)',
+                  backgroundColor: colors.primaryMid,
                   alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                 }}>
                   <Zap size={24} color={PRIMARY} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 5 }}>
-                    <Text style={{ fontSize: 17, fontWeight: '700', color: '#fff' }}>Tech</Text>
+                    <Text style={{ fontSize: 17, fontWeight: '700', color: colors.text }}>Tech</Text>
                     <View style={{
-                      backgroundColor: 'rgba(198,255,74,0.12)',
+                      backgroundColor: colors.primaryMid,
                       borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2,
-                      borderWidth: 1, borderColor: 'rgba(198,255,74,0.28)',
+                      borderWidth: 1, borderColor: colors.primaryStrong,
                     }}>
                       <Text style={{ fontSize: 9, fontWeight: '800', color: PRIMARY, letterSpacing: 1.2 }}>TECH</Text>
                     </View>
                   </View>
-                  <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', lineHeight: 18 }}>
+                  <Text style={{ fontSize: 12, color: colors.textFaint, lineHeight: 18 }}>
                     Avançado em Tech — quero performar e me sinto confiante para utilizar todas as funções
                   </Text>
                 </View>
@@ -627,36 +639,36 @@ export default function HomeScreen({ route, navigation }) {
       {/* ── Modal de notificações ── */}
       <Modal visible={modalNotif} animationType="slide" transparent onRequestClose={() => setModalNotif(false)}>
         <TouchableOpacity
-          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' }}
+          style={{ flex: 1, backgroundColor: colors.overlay, justifyContent: 'flex-end' }}
           activeOpacity={1}
           onPress={() => setModalNotif(false)}
         >
           <TouchableOpacity activeOpacity={1}>
             <View style={{
-              backgroundColor: '#0d1a0d',
+              backgroundColor: isDark ? '#0d1a0d' : colors.modalBg,
               borderTopLeftRadius: 24, borderTopRightRadius: 24,
               padding: 24, paddingBottom: 40,
-              borderWidth: 1, borderColor: 'rgba(198,255,74,0.12)',
+              borderWidth: 1, borderColor: colors.primaryMid,
             }}>
-              <Text style={{ fontSize: 18, fontWeight: '700', color: '#fff', marginBottom: 4 }}>
+              <Text style={{ fontSize: 18, fontWeight: '700', color: colors.text, marginBottom: 4 }}>
                 Notificações
               </Text>
-              <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginBottom: 24 }}>
-                Gerencie os alertas do CNB Mobile
+              <Text style={{ fontSize: 12, color: colors.textFaint, marginBottom: 24 }}>
+                Gerencie os alertas do JUICE
               </Text>
 
               {/* Toggle lembrete diário */}
               <View style={{
                 flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-                backgroundColor: 'rgba(255,255,255,0.04)',
+                backgroundColor: colors.surfaceAlt,
                 borderRadius: 14, padding: 16, marginBottom: 10,
-                borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
+                borderWidth: 1, borderColor: colors.border,
               }}>
                 <View style={{ flex: 1, marginRight: 12 }}>
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: '#fff', marginBottom: 2 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text, marginBottom: 2 }}>
                     Lembrete diário de carregamento
                   </Text>
-                  <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>
+                  <Text style={{ fontSize: 11, color: colors.textFaint }}>
                     Aviso às 20h se você ainda não carregou hoje
                   </Text>
                 </View>
@@ -665,7 +677,7 @@ export default function HomeScreen({ route, navigation }) {
                   : <Switch
                       value={notifAtiva}
                       onValueChange={handleToggleNotif}
-                      trackColor={{ false: 'rgba(255,255,255,0.15)', true: 'rgba(198,255,74,0.5)' }}
+                      trackColor={{ false: colors.surfaceStrong, true: colors.primaryGlow }}
                       thumbColor={notifAtiva ? PRIMARY : '#fff'}
                     />
                 }
@@ -673,14 +685,14 @@ export default function HomeScreen({ route, navigation }) {
 
               {/* Linha informativa: alertas de pontos e missões */}
               <View style={{
-                backgroundColor: 'rgba(255,255,255,0.04)',
+                backgroundColor: colors.surfaceAlt,
                 borderRadius: 14, padding: 16,
-                borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
+                borderWidth: 1, borderColor: colors.border,
               }}>
-                <Text style={{ fontSize: 13, fontWeight: '600', color: '#fff', marginBottom: 2 }}>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text, marginBottom: 2 }}>
                   Alertas de pontos e missões
                 </Text>
-                <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>
+                <Text style={{ fontSize: 11, color: colors.textFaint }}>
                   Enviados pelo servidor quando você completa uma missão ou recebe um bônus
                 </Text>
               </View>
@@ -715,10 +727,10 @@ export default function HomeScreen({ route, navigation }) {
                 borderColor={perfil?.modo === 'lite' ? PURPLE : PRIMARY}
               />
               <View>
-                <Text style={{ fontSize: 14, fontWeight: '600', color: '#fff' }}>
+                <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text }}>
                   {t(saudacaoKey())}, {nome}!
                 </Text>
-                <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>
+                <Text style={{ fontSize: 11, color: colors.textSecondary }}>
                   {frase}
                 </Text>
               </View>
@@ -729,14 +741,14 @@ export default function HomeScreen({ route, navigation }) {
               onPress={abrirModalNotif}
               style={{
                 width: 36, height: 36, borderRadius: 18,
-                backgroundColor: 'rgba(255,255,255,0.05)',
+                backgroundColor: colors.surfaceAlt,
                 borderWidth: 1, borderColor: notifAtiva
                   ? 'rgba(198,255,74,0.35)'
-                  : 'rgba(255,255,255,0.10)',
+                  : colors.borderStrong,
                 alignItems: 'center', justifyContent: 'center',
               }}
             >
-              <Bell size={16} color={notifAtiva ? PRIMARY : 'rgba(255,255,255,0.8)'} />
+              <Bell size={16} color={notifAtiva ? PRIMARY : colors.textStrong} />
             </TouchableOpacity>
           </Animated.View>
 
@@ -766,7 +778,7 @@ export default function HomeScreen({ route, navigation }) {
 
           {/* ── Banners (carousel) ── */}
           <Animated.View style={[{ marginBottom: 20 }, a3]}>
-            <Text style={{ fontSize: 10, letterSpacing: 2, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', marginBottom: 8 }}>
+            <Text style={{ fontSize: 10, letterSpacing: 2, color: colors.textFaint, textTransform: 'uppercase', marginBottom: 8 }}>
               Parceiros
             </Text>
             <BannerCarousel uid={perfil?.uid} />
