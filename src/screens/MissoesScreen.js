@@ -3,6 +3,7 @@ import { diaKey, diaKeyDe } from '../utils/date';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useTranslation } from 'react-i18next';
 import Animated, {
   useSharedValue, useAnimatedStyle,
   withTiming, withDelay, Easing,
@@ -112,6 +113,7 @@ function BarraProgresso({ progresso, completo }) {
 // ─── Badges ───────────────────────────────────────────────────────────────────
 function BadgeCompleto() {
   const PRIMARY = useAccent();
+  const { t } = useTranslation();
   return (
     <View style={{
       flexDirection: 'row', alignItems: 'center', gap: 4,
@@ -120,12 +122,13 @@ function BadgeCompleto() {
       borderRadius: 99, paddingHorizontal: 8, paddingVertical: 3,
     }}>
       <CheckCircle size={10} color={PRIMARY} />
-      <Text style={{ fontSize: 10, color: PRIMARY, fontWeight: '700' }}>Completo</Text>
+      <Text style={{ fontSize: 10, color: PRIMARY, fontWeight: '700' }}>{t('missions.badgeComplete')}</Text>
     </View>
   );
 }
 
 function BadgeBloqueado() {
+  const { t } = useTranslation();
   return (
     <View style={{
       flexDirection: 'row', alignItems: 'center', gap: 4,
@@ -134,7 +137,7 @@ function BadgeBloqueado() {
       borderRadius: 99, paddingHorizontal: 8, paddingVertical: 3,
     }}>
       <Lock size={10} color={TEXT_FAINT} />
-      <Text style={{ fontSize: 10, color: TEXT_FAINT, fontWeight: '600' }}>Bloqueado</Text>
+      <Text style={{ fontSize: 10, color: TEXT_FAINT, fontWeight: '600' }}>{t('missions.badgeLocked')}</Text>
     </View>
   );
 }
@@ -143,6 +146,7 @@ function BadgeBloqueado() {
 // Mantém o setInterval localmente: apenas este componente re-renderiza por segundo,
 // não a tela inteira (corrige PERF-01).
 function CountdownDisplay({ getFn }) {
+  const { t } = useTranslation();
   const [segs, setSegs] = useState(getFn);
   useEffect(() => {
     const t = setInterval(() => setSegs(getFn()), 1000);
@@ -152,7 +156,7 @@ function CountdownDisplay({ getFn }) {
   return (
     <View
       style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
-      accessibilityLabel={`Tempo restante: ${formatarTempo(segs)}`}
+      accessibilityLabel={t('missions.a11yCountdown', { time: formatarTempo(segs) })}
     >
       <Clock size={10} color={TEXT_FAINT} />
       <Text style={{ fontSize: 10, color: TEXT_FAINT, fontWeight: '600' }}>
@@ -165,8 +169,14 @@ function CountdownDisplay({ getFn }) {
 // ─── MissionCard ──────────────────────────────────────────────────────────────
 function MissionCard({ Icon, titulo, descricao, pontos, completo, bloqueado, progresso, labelProgresso, delay, onPress, labelCTA }) {
   const PRIMARY = useAccent();
+  const { t } = useTranslation();
   const animStyle = useEntrada(delay);
-  const statusLabel = completo ? 'Completa' : bloqueado ? 'Bloqueada' : `Progresso: ${labelProgresso}`;
+  const statusLabel = completo
+    ? t('missions.statusComplete')
+    : bloqueado
+      ? t('missions.statusLocked')
+      : t('missions.statusProgress', { label: labelProgresso });
+  const ctaLabel = labelCTA ?? t('missions.ctaDefault');
   return (
     <Animated.View
       style={[animStyle, {
@@ -180,7 +190,7 @@ function MissionCard({ Icon, titulo, descricao, pontos, completo, bloqueado, pro
       }]}
       accessible
       accessibilityRole="none"
-      accessibilityLabel={`Missão: ${titulo}. ${descricao}. Recompensa: ${pontos}. ${statusLabel}`}
+      accessibilityLabel={t('missions.a11yMission', { title: titulo, desc: descricao, pts: pontos, status: statusLabel })}
       accessibilityState={{ disabled: bloqueado }}
     >
       {/* Linha superior: ícone + título + badge de pontos */}
@@ -233,7 +243,7 @@ function MissionCard({ Icon, titulo, descricao, pontos, completo, bloqueado, pro
                   onPress={onPress}
                   activeOpacity={0.8}
                   accessibilityRole="button"
-                  accessibilityLabel={labelCTA ?? 'Ir agora'}
+                  accessibilityLabel={ctaLabel}
                   style={{
                     backgroundColor: PRIMARY,
                     borderRadius: 8,
@@ -242,7 +252,7 @@ function MissionCard({ Icon, titulo, descricao, pontos, completo, bloqueado, pro
                   }}
                 >
                   <Text style={{ fontSize: 11, color: '#000', fontWeight: '700' }}>
-                    {labelCTA ?? 'Ir agora'}
+                    {ctaLabel}
                   </Text>
                 </TouchableOpacity>
               )
@@ -273,6 +283,7 @@ function Secao({ titulo, subtitulo, getCountdownFn, animStyle }) {
 // evitando que a seção desapareça silenciosamente (corrige LOGICA-02).
 function BannerOnboardingCompleto({ animStyle }) {
   const PRIMARY = useAccent();
+  const { t } = useTranslation();
   return (
     <Animated.View style={[animStyle, {
       flexDirection: 'row', alignItems: 'center', gap: 10,
@@ -283,10 +294,10 @@ function BannerOnboardingCompleto({ animStyle }) {
       <CheckCircle size={18} color={PRIMARY} />
       <View style={{ flex: 1 }}>
         <Text style={{ fontSize: 13, fontWeight: '600', color: '#fff', marginBottom: 2 }}>
-          Primeiros passos concluídos
+          {t('missions.onboardingDone')}
         </Text>
         <Text style={{ fontSize: 11, color: TEXT_MUTED, lineHeight: 16 }}>
-          Bônus de onboarding creditados na sua conta.
+          {t('missions.onboardingDoneSub')}
         </Text>
       </View>
     </Animated.View>
@@ -304,6 +315,7 @@ function ordenarMissoes(missoes) {
 // ─── Tela principal ───────────────────────────────────────────────────────────
 export default function MissoesScreen({ route, navigation }) {
   const PRIMARY = useAccent();
+  const { t } = useTranslation();
   const { user, perfil } = route?.params || {};
 
   const bloqueado     = !user;
@@ -335,31 +347,31 @@ export default function MissoesScreen({ route, navigation }) {
   // Perfil completo = foto + nome (e-mail é obrigatório no cadastro)
   const perfilCompleto = temAvatarURL && temNome;
   const perfilItens    = [
-    temAvatarURL ? null : 'foto',
-    temNome      ? null : 'nome',
+    temAvatarURL ? null : t('missions.missingPhoto'),
+    temNome      ? null : t('missions.missingName'),
   ].filter(Boolean);
 
   const MISSOES_ONBOARDING = useMemo(() => [
     {
       id: 'onboarding-perfil',
       Icon: User,
-      titulo: 'Completar perfil',
-      descricao: 'Adicione foto e nome de usuário à sua conta',
+      titulo: t('missions.completeProfile'),
+      descricao: t('missions.completeProfileDesc'),
       pontos: '+500 pts',
       completo: !bloqueado && perfilCompleto,
       bloqueado,
       progresso: bloqueado ? 0 : ((temAvatarURL ? 1 : 0) + (temNome ? 1 : 0)) / 2,
       labelProgresso: bloqueado
-        ? 'Faça login para completar'
+        ? t('missions.completeProfileLogin')
         : perfilCompleto
-          ? 'Perfil completo'
-          : `Falta: ${perfilItens.join(' e ')}`,
+          ? t('missions.completeProfileDone')
+          : t('missions.completeProfileMissing', { items: perfilItens.join(t('missions.and')) }),
       delay: 100,
       onPress: bloqueado ? null : () => navigation.navigate('EditProfile', { perfil, onSalvar: () => {} }),
-      labelCTA: 'Completar',
+      labelCTA: t('missions.completeProfileCTA'),
     },
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  ], [bloqueado, perfilCompleto, temAvatarURL, temNome]);
+  ], [bloqueado, perfilCompleto, temAvatarURL, temNome, t]);
 
   const onboardingCompleto = MISSOES_ONBOARDING.every(m => m.completo);
 
@@ -368,79 +380,77 @@ export default function MissoesScreen({ route, navigation }) {
     {
       id: 'diaria-login',
       Icon: LogIn,
-      titulo: 'Login diário',
-      descricao: 'Abrir o app ao menos uma vez por dia',
+      titulo: t('missions.dailyLogin'),
+      descricao: t('missions.dailyLoginDesc'),
       pontos: '+100 pts',
       completo: loginHojeOk,
       bloqueado,
       progresso: loginHojeOk ? 1 : 0,
-      labelProgresso: loginHojeOk ? '1/1 — sessão ativa' : '0/1 — abra o app hoje',
+      labelProgresso: loginHojeOk ? t('missions.dailyLoginDone') : t('missions.dailyLoginPending'),
       delay: 160,
       // Sem CTA: o ato de abrir o app já registra o login
     },
     {
       id: 'diaria-carregar',
       Icon: Zap,
-      titulo: 'Carregar hoje',
-      descricao: 'Conecte o carregador e acumule pontos hoje',
+      titulo: t('missions.dailyCharge'),
+      descricao: t('missions.dailyChargeDesc'),
       pontos: '+500 pts',
       completo: !bloqueado && hojeOk,
       bloqueado,
       progresso: bloqueado ? 0 : hojeOk ? 1 : 0,
-      labelProgresso: hojeOk ? 'Concluído hoje' : 'Nenhum carregamento hoje',
+      labelProgresso: hojeOk ? t('missions.dailyChargeDone') : t('missions.dailyChargePending'),
       delay: 200,
       onPress: bloqueado ? null : () => navigation.navigate('Carregar'),
-      labelCTA: 'Carregar agora',
+      labelCTA: t('missions.dailyChargeCTA'),
     },
-  ]), [bloqueado, hojeOk, loginHojeOk]);
+  ]), [bloqueado, hojeOk, loginHojeOk, t]);
 
   // ── Missões semanais ──────────────────────────────────────────────────────
   const MISSOES_SEMANAIS = useMemo(() => ordenarMissoes([
     {
       id: 'semanal-pontos',
       Icon: TrendingUp,
-      titulo: 'Acumular 1.000 pts esta semana',
-      descricao: 'Some 1.000 pontos nos últimos 7 dias',
+      titulo: t('missions.weeklyPoints'),
+      descricao: t('missions.weeklyPointsDesc'),
       pontos: '+200 pts',
       completo: !bloqueado && semanaTotal >= 1000,
       bloqueado,
       progresso: bloqueado ? 0 : Math.min(semanaTotal / 1000, 1),
-      labelProgresso: bloqueado
-        ? '0/1.000 pts'
-        : `${semanaTotal.toLocaleString('pt-BR')}/1.000 pts`,
+      labelProgresso: t('missions.weeklyPointsProgress', { current: bloqueado ? 0 : semanaTotal.toLocaleString('pt-BR') }),
       delay: 280,
       onPress: bloqueado ? null : () => navigation.navigate('Carregar'),
-      labelCTA: 'Carregar agora',
+      labelCTA: t('missions.dailyChargeCTA'),
     },
     {
       id: 'semanal-amigo',
       Icon: UserPlus,
-      titulo: 'Convidar 1 amigo',
-      descricao: 'Indique um amigo com seu código de referência',
+      titulo: t('missions.weeklyFriend'),
+      descricao: t('missions.weeklyFriendDesc'),
       pontos: '+2.000 pts',
       completo: !bloqueado && referidos >= 1,
       bloqueado,
       progresso: bloqueado ? 0 : Math.min(referidos, 1),
-      labelProgresso: bloqueado ? '0/1 amigo' : `${Math.min(referidos, 1)}/1 amigo`,
+      labelProgresso: t('missions.weeklyFriendProgress', { current: bloqueado ? 0 : Math.min(referidos, 1) }),
       delay: 320,
       onPress: bloqueado ? null : () => navigation.navigate('Perfil'),
-      labelCTA: 'Convidar amigo',
+      labelCTA: t('missions.weeklyFriendCTA'),
     },
     {
       id: 'semanal-streak',
       Icon: Flame,
-      titulo: 'Carregar 3 dias seguidos',
-      descricao: 'Carregue o celular em 3 dias consecutivos',
+      titulo: t('missions.weeklyStreak'),
+      descricao: t('missions.weeklyStreakDesc'),
       pontos: '+1.000 pts',
       completo: !bloqueado && consec >= 3,
       bloqueado,
       progresso: bloqueado ? 0 : Math.min(consec / 3, 1),
-      labelProgresso: bloqueado ? '0/3 dias' : `${Math.min(consec, 3)}/3 dias`,
+      labelProgresso: t('missions.weeklyStreakProgress', { current: bloqueado ? 0 : Math.min(consec, 3) }),
       delay: 360,
       onPress: bloqueado ? null : () => navigation.navigate('Carregar'),
-      labelCTA: 'Carregar agora',
+      labelCTA: t('missions.dailyChargeCTA'),
     },
-  ]), [bloqueado, semanaTotal, referidos, consec]);
+  ]), [bloqueado, semanaTotal, referidos, consec, t]);
 
   return (
     <LinearGradient
@@ -457,13 +467,13 @@ export default function MissoesScreen({ route, navigation }) {
           {/* ── Header ── */}
           <Animated.View style={[a0, { marginBottom: 24 }]}>
             <Text style={{ fontSize: 12, color: TEXT_FAINT, marginBottom: 4 }}>
-              Missões
+              {t('missions.title')}
             </Text>
             <Text style={{ fontSize: 26, fontWeight: '700', color: '#fff', letterSpacing: -0.5 }}>
-              Seus desafios
+              {t('missions.headerTitle')}
             </Text>
             <Text style={{ fontSize: 13, color: TEXT_MUTED, marginTop: 4 }}>
-              Complete missões e ganhe pontos extras
+              {t('missions.headerSubtitle')}
             </Text>
           </Animated.View>
 
@@ -478,23 +488,23 @@ export default function MissoesScreen({ route, navigation }) {
               <Lock size={18} color={PRIMARY} />
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 13, fontWeight: '600', color: '#fff', marginBottom: 2 }}>
-                  Faça login para participar
+                  {t('missions.loginBanner')}
                 </Text>
                 <Text style={{ fontSize: 11, color: TEXT_FAINT, lineHeight: 16 }}>
-                  Entre na sua conta para desbloquear as missões.
+                  {t('missions.loginBannerSub')}
                 </Text>
               </View>
               <TouchableOpacity
                 onPress={() => navigation?.navigate?.('Login')}
                 activeOpacity={0.85}
                 accessibilityRole="button"
-                accessibilityLabel="Fazer login para desbloquear missões"
+                accessibilityLabel={t('missions.loginBtnA11y')}
                 style={{
                   backgroundColor: PRIMARY, borderRadius: 10,
                   paddingHorizontal: 12, paddingVertical: 8,
                 }}
               >
-                <Text style={{ color: '#000', fontWeight: '700', fontSize: 11 }}>Entrar</Text>
+                <Text style={{ color: '#000', fontWeight: '700', fontSize: 11 }}>{t('missions.loginBtn')}</Text>
               </TouchableOpacity>
             </Animated.View>
           )}
@@ -503,8 +513,8 @@ export default function MissoesScreen({ route, navigation }) {
           {perfil?.modo !== 'lite' && (
             <>
               <Secao
-                titulo="Primeiros passos"
-                subtitulo="Complete uma vez e ganhe bônus permanente"
+                titulo={t('missions.sectionFirstSteps')}
+                subtitulo={t('missions.sectionFirstStepsSub')}
                 animStyle={a1}
               />
               {onboardingCompleto
@@ -520,8 +530,8 @@ export default function MissoesScreen({ route, navigation }) {
 
           {/* ── Missões diárias ── */}
           <Secao
-            titulo="Diárias"
-            subtitulo="Renovam todo dia à meia-noite"
+            titulo={t('missions.sectionDaily')}
+            subtitulo={t('missions.sectionDailySub')}
             getCountdownFn={segsAteMeiaNoite}
             animStyle={a2}
           />
@@ -533,8 +543,8 @@ export default function MissoesScreen({ route, navigation }) {
 
           {/* ── Missões semanais — em Lite, só o streak de carregamento ── */}
           <Secao
-            titulo="Semanais"
-            subtitulo="Renovam toda segunda-feira"
+            titulo={t('missions.sectionWeekly')}
+            subtitulo={t('missions.sectionWeeklySub')}
             getCountdownFn={segsAteSegunda}
             animStyle={a3}
           />
