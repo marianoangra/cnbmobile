@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   ScrollView, Alert, ActivityIndicator, KeyboardAvoidingView, Platform,
@@ -27,6 +28,7 @@ function solanaValido(addr) {
 
 export default function WithdrawScreen({ route, navigation }) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { perfil } = route.params || {};
   const [aba, setAba] = useState(route.params?.initialAba ?? 'pix');
@@ -196,7 +198,7 @@ export default function WithdrawScreen({ route, navigation }) {
           style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 }}
         >
           <ArrowLeft size={18} color="rgba(255,255,255,0.6)" />
-          <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>Voltar</Text>
+          <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>{t('common.back')}</Text>
         </TouchableOpacity>
         <ScrollView
           contentContainerStyle={styles.container}

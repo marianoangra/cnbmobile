@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   View, Text, FlatList, RefreshControl,
   ActivityIndicator, TouchableOpacity,
@@ -160,6 +161,7 @@ const ITEM_HEIGHT = 68;
 
 function RankingItem({ item, uid, index, modo }) {
   const PRIMARY = useAccent();
+  const { t } = useTranslation();
   const isMe = item.uid === uid;
 
   const opacity    = useSharedValue(0);
@@ -204,14 +206,14 @@ function RankingItem({ item, uid, index, modo }) {
 
         <View style={{ flex: 1 }}>
           <Text style={{ fontSize: 13, fontWeight: isMe ? '600' : '500', color: isMe ? PRIMARY : '#fff' }} numberOfLines={1}>
-            {item.nome}{isMe ? ' · Você' : ''}
+            {item.nome}{isMe ? t('ranking.you') : ''}
           </Text>
           <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginTop: 1 }}>
             {modo === 'indicacoes'
-              ? `${item.referidos ?? 0} indicações`
+              ? `${item.referidos ?? 0}${t('ranking.referralsSuffix')}`
               : modo === 'semanal'
-                ? `${(item.pontosSemana ?? 0).toLocaleString('pt-BR')} pts esta semana`
-                : `${(item.pontos ?? 0).toLocaleString('pt-BR')} pontos`
+                ? `${(item.pontosSemana ?? 0).toLocaleString('pt-BR')}${t('ranking.ptsWeek')}`
+                : `${(item.pontos ?? 0).toLocaleString('pt-BR')}${t('ranking.pointsSuffix')}`
             }
           </Text>
         </View>
@@ -241,6 +243,7 @@ function RankingItem({ item, uid, index, modo }) {
 // ─── Tela principal ───────────────────────────────────────────────────────────
 export default function RankingScreen({ route }) {
   const PRIMARY = useAccent();
+  const { t } = useTranslation();
   const { uid, perfil } = route?.params || {};
   const [modo, setModo]                     = useState('semanal');
   const [ranking, setRanking]               = useState([]);
@@ -297,13 +300,13 @@ export default function RankingScreen({ route }) {
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
           <AlertCircle size={32} color="rgba(255,255,255,0.3)" style={{ marginBottom: 12 }} />
           <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 15, marginBottom: 20 }}>
-            Falha ao carregar o ranking
+            {t('ranking.errorTitle')}
           </Text>
           <TouchableOpacity
             onPress={() => { setLoading(true); carregar(); }}
             style={{ backgroundColor: PRIMARY, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 }}
           >
-            <Text style={{ color: '#000', fontWeight: '700' }}>Tentar novamente</Text>
+            <Text style={{ color: '#000', fontWeight: '700' }}>{t('ranking.retry')}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -334,9 +337,9 @@ export default function RankingScreen({ route }) {
                 paddingTop: 16, paddingBottom: 20,
               }}>
                 <View>
-                  <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>Ranking</Text>
+                  <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>{t('ranking.heading')}</Text>
                   <Text style={{ fontSize: 24, fontWeight: '600', color: '#fff', letterSpacing: -0.5, marginTop: 2 }}>
-                    {modo === 'semanal' ? 'Semanal' : modo === 'indicacoes' ? 'Indicações' : 'Geral'}
+                    {modo === 'semanal' ? t('ranking.tabWeekly') : modo === 'indicacoes' ? t('ranking.tabReferrals') : t('ranking.tabGeneral')}
                   </Text>
                 </View>
               </View>
@@ -349,9 +352,9 @@ export default function RankingScreen({ route }) {
                 borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
               }}>
                 {[
-                  { id: 'semanal',    label: 'Semanal',    Icon: Clock  },
-                  { id: 'global',     label: 'Geral',      Icon: Trophy },
-                  { id: 'indicacoes', label: 'Indicações', Icon: Users  },
+                  { id: 'semanal',    label: t('ranking.tabWeekly'),   Icon: Clock  },
+                  { id: 'global',     label: t('ranking.tabGeneral'),  Icon: Trophy },
+                  { id: 'indicacoes', label: t('ranking.tabReferrals'), Icon: Users  },
                 ].map(({ id, label, Icon }) => (
                   <TouchableOpacity
                     key={id}
@@ -382,7 +385,7 @@ export default function RankingScreen({ route }) {
                   borderWidth: 1.5, borderColor: 'rgba(198,255,74,0.25)',
                   borderRadius: 14, padding: 14, marginBottom: 20,
                 }}>
-                  <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>Sua posição</Text>
+                  <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>{t('ranking.yourPosition')}</Text>
                   <Text style={{ fontSize: 20, fontWeight: '700', color: PRIMARY }}>
                     {minhaPos.posicao}
                   </Text>
@@ -399,12 +402,12 @@ export default function RankingScreen({ route }) {
                   borderWidth: 1.5, borderColor: 'rgba(198,255,74,0.25)',
                   borderRadius: 14, padding: 14, marginBottom: 20,
                 }}>
-                  <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>Suas indicações</Text>
+                  <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>{t('ranking.yourReferrals')}</Text>
                   <Text style={{ fontSize: 20, fontWeight: '700', color: PRIMARY }}>
                     {minhaEntradaInd?.posicao ?? '—'}
                   </Text>
                   <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>
-                    {minhaEntradaInd?.referidos ?? perfil?.referidos ?? 0} indicações
+                    {minhaEntradaInd?.referidos ?? perfil?.referidos ?? 0}{t('ranking.referralsSuffix')}
                   </Text>
                 </View>
               )}
@@ -416,7 +419,7 @@ export default function RankingScreen({ route }) {
                   borderWidth: 1.5, borderColor: 'rgba(198,255,74,0.25)',
                   borderRadius: 14, padding: 14, marginBottom: 20,
                 }}>
-                  <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>Sua posição semanal</Text>
+                  <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>{t('ranking.yourWeeklyPosition')}</Text>
                   <Text style={{ fontSize: 20, fontWeight: '700', color: PRIMARY }}>
                     {minhaEntradaSemanal.posicao}
                   </Text>
@@ -430,7 +433,7 @@ export default function RankingScreen({ route }) {
                 <View style={{ alignItems: 'center', paddingVertical: 32 }}>
                   <Clock size={32} color="rgba(255,255,255,0.2)" style={{ marginBottom: 10 }} />
                   <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14, textAlign: 'center' }}>
-                    Nenhuma atividade esta semana.{'\n'}Carregue para aparecer aqui!
+                    {t('ranking.noWeeklyActivity')}
                   </Text>
                 </View>
               )}
@@ -446,7 +449,7 @@ export default function RankingScreen({ route }) {
                 <View style={{ alignItems: 'center', paddingVertical: 48 }}>
                   <Users size={36} color="rgba(255,255,255,0.2)" style={{ marginBottom: 12 }} />
                   <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14, textAlign: 'center' }}>
-                    Nenhuma indicação ainda.{'\n'}Compartilhe seu código e apareça aqui!
+                    {t('ranking.noReferrals')}
                   </Text>
                 </View>
               )}

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -665,6 +666,7 @@ function ChargingGlow({ carregando, color }) {
 // ── Barra de progresso 1 hora ─────────────────────────────────────────────────
 function ProgressoHora({ segundosRestantes, carregando }) {
   const PRIMARY = useAccent();
+  const { t } = useTranslation();
   const progresso = (3600 - segundosRestantes) / 3600;
   const barWidth  = useSharedValue(progresso);
 
@@ -684,7 +686,7 @@ function ProgressoHora({ segundosRestantes, carregando }) {
   return (
     <View style={{ width: '100%' }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>Progresso da hora</Text>
+        <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>{t('charging.hourProgress')}</Text>
         <Text style={{ fontSize: 11, fontWeight: '600', color: carregando ? PRIMARY : 'rgba(255,255,255,0.25)' }}>
           {carregando ? `${timeStr} restante` : '--:--'}
         </Text>
@@ -694,7 +696,7 @@ function ProgressoHora({ segundosRestantes, carregando }) {
       </View>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
         <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>
-          {carregando ? '+50 pts bônus ao completar 1h' : 'Conecte o carregador para iniciar'}
+          {carregando ? t('charging.bonusOnComplete') : t('charging.connectCharger')}
         </Text>
         {carregando && (
           <Text style={{ fontSize: 10, color: PRIMARY, fontWeight: '600' }}>{pct}%</Text>
@@ -727,6 +729,7 @@ function BarChart({ heights }) {
 export default function ChargingScreen({ route, navigation }) {
   useScreenTrace('charging_screen');
   const PRIMARY = useAccent();
+  const { t } = useTranslation();
   const { user, uid, perfil, onAtualizar } = route?.params || {};
   const { carregando, pontosGanhos, segundosRestantes, limiteBotAtingido } = useCarregamento(uid, onAtualizar);
 
@@ -779,10 +782,10 @@ export default function ChargingScreen({ route, navigation }) {
               <Zap size={40} color={NEON} />
             </View>
             <Text style={{ fontSize: 22, fontWeight: '700', color: '#fff', textAlign: 'center', marginBottom: 10 }}>
-              Ganhe pontos carregando
+              {t('charging.earnPointsTitle')}
             </Text>
             <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', textAlign: 'center', lineHeight: 21, marginBottom: 36 }}>
-              Conecte-se à sua conta e acumule pontos reais enquanto carrega seu celular.
+              {t('charging.loginToEarn')}
             </Text>
             <TouchableOpacity
               onPress={() => navigation.navigate('Login')}
@@ -792,7 +795,7 @@ export default function ChargingScreen({ route, navigation }) {
                 paddingVertical: 14, width: '100%', alignItems: 'center',
               }}
             >
-              <Text style={{ color: '#001508', fontWeight: '700', fontSize: 16 }}>Entrar / Cadastrar</Text>
+              <Text style={{ color: '#001508', fontWeight: '700', fontSize: 16 }}>{t('common.loginRegister')}</Text>
             </TouchableOpacity>
           </Animated.View>
         </SafeAreaView>
@@ -862,11 +865,11 @@ export default function ChargingScreen({ route, navigation }) {
               }}
             >
               <View>
-                <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>Recompensa acumulada</Text>
+                <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>{t('charging.accumulatedReward')}</Text>
                 <Text style={{ fontSize: 24, fontWeight: '600', color: PRIMARY, marginTop: 2 }}>
                   +{pontosGanhos.toLocaleString('pt-BR')}
                 </Text>
-                <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>pontos · on-chain</Text>
+                <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{t('charging.onChain')}</Text>
               </View>
               <BarChart heights={barHeights} />
             </LinearGradient>
@@ -885,10 +888,10 @@ export default function ChargingScreen({ route, navigation }) {
                 <Plug size={16} color="#FFA500" style={{ marginTop: 2 }} />
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 13, fontWeight: '700', color: '#FFA500', marginBottom: 3 }}>
-                    Limite de 8h atingido
+                    {t('charging.botLimitTitle')}
                   </Text>
                   <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 18 }}>
-                    Desconecte e reconecte o carregador para continuar acumulando pontos.
+                    {t('charging.botLimitMsg')}
                   </Text>
                 </View>
               </View>
@@ -905,7 +908,7 @@ export default function ChargingScreen({ route, navigation }) {
                 }}
               >
                 <TrendingUp size={16} color="#000" />
-                <Text style={{ color: '#000', fontWeight: '600', fontSize: 14 }}>Saque disponível</Text>
+                <Text style={{ color: '#000', fontWeight: '600', fontSize: 14 }}>{t('charging.withdrawAvailable')}</Text>
               </TouchableOpacity>
             )}
 
@@ -921,21 +924,21 @@ export default function ChargingScreen({ route, navigation }) {
                 <>
                   <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: NEON }} />
                   <Text style={{ fontSize: 12, color: NEON, fontWeight: '600' }}>
-                    Sessão ativa · +{pontosGanhos.toLocaleString('pt-BR')} pts
+                    {t('charging.sessionActive')} · +{pontosGanhos.toLocaleString('pt-BR')} pts
                   </Text>
                 </>
               ) : (
                 <>
                   <Plug size={12} color="rgba(255,255,255,0.3)" />
                   <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>
-                    Conecte o USB para começar
+                    {t('charging.connectUsb')}
                   </Text>
                 </>
               )}
             </View>
 
             <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.18)', textAlign: 'center' }}>
-              Saque disponível a partir de 100.000 pontos
+              {t('charging.withdrawFrom')}
             </Text>
           </View>
 

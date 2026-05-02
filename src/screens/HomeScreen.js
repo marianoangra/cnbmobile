@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   View, Text, Image, ScrollView, TouchableOpacity, Alert,
   ActivityIndicator, RefreshControl, Modal, Switch,
@@ -36,11 +37,11 @@ const PRIMARY  = '#c6ff4a';
 const META     = 100000;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-function saudacao() {
+function saudacaoKey() {
   const h = new Date().getHours();
-  if (h < 12) return 'Bom dia';
-  if (h < 18) return 'Boa tarde';
-  return 'Boa noite';
+  if (h < 12) return 'home.goodMorning';
+  if (h < 18) return 'home.goodAfternoon';
+  return 'home.goodEvening';
 }
 
 const FRASES_MOTIVACIONAIS = [
@@ -186,6 +187,7 @@ function AvatarHeader({ onPress, borderColor }) {
 
 function CardPontos({ pontos, progresso, faltam, user, estaCarregando, onSaque, barStyle, pontosHoje }) {
   const PRIMARY = useAccent();
+  const { t } = useTranslation();
   const pct = Math.round(progresso * 100);
   return (
     <LinearGradient
@@ -224,7 +226,7 @@ function CardPontos({ pontos, progresso, faltam, user, estaCarregando, onSaque, 
 
       {/* Topo: label + badge */}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>Seus pontos</Text>
+        <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>{t('home.yourPoints')}</Text>
         {estaCarregando && (
           <View style={{
             flexDirection: 'row', alignItems: 'center', gap: 4,
@@ -232,7 +234,7 @@ function CardPontos({ pontos, progresso, faltam, user, estaCarregando, onSaque, 
             paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99,
           }}>
             <Zap size={10} color={PRIMARY} strokeWidth={2.5} />
-            <Text style={{ fontSize: 10, color: PRIMARY, fontWeight: '600' }}>Ativo</Text>
+            <Text style={{ fontSize: 10, color: PRIMARY, fontWeight: '600' }}>{t('home.active')}</Text>
           </View>
         )}
       </View>
@@ -263,10 +265,10 @@ function CardPontos({ pontos, progresso, faltam, user, estaCarregando, onSaque, 
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
         <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', flex: 1 }}>
           {!user
-            ? 'Entre para acumular pontos'
+            ? t('home.loginToAccumulate')
             : faltam > 0
-              ? `Faltam ${faltam.toLocaleString('pt-BR')} pts para saque`
-              : 'Meta atingida — disponível para saque'}
+              ? t('home.pointsLeft', { count: faltam.toLocaleString('pt-BR') })
+              : t('home.metReached')}
         </Text>
         {user && (
           <Text style={{ fontSize: 10, color: PRIMARY, fontWeight: '600' }}>{pct}%</Text>
@@ -284,7 +286,7 @@ function CardPontos({ pontos, progresso, faltam, user, estaCarregando, onSaque, 
         }}
       >
         <ArrowUpRight size={14} color="#000" />
-        <Text style={{ color: '#000', fontSize: 12, fontWeight: '600' }}>Saque</Text>
+        <Text style={{ color: '#000', fontSize: 12, fontWeight: '600' }}>{t('home.withdraw')}</Text>
       </TouchableOpacity>
     </LinearGradient>
   );
@@ -317,10 +319,11 @@ function Atalhos({ onPress }) {
 
 function Atividades({ atividades, loading }) {
   const PRIMARY = useAccent();
+  const { t } = useTranslation();
   return (
     <View>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>Atividades recentes</Text>
+        <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>{t('home.recentActivity')}</Text>
       </View>
 
       {loading ? (
@@ -332,10 +335,10 @@ function Atividades({ atividades, loading }) {
           borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
         }}>
           <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>
-            Nenhuma atividade ainda
+            {t('home.noActivity')}
           </Text>
           <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', marginTop: 4, textAlign: 'center' }}>
-            Carregue seu celular para acumular pontos
+            {t('home.noActivitySub')}
           </Text>
         </View>
       ) : (
@@ -376,6 +379,7 @@ function Atividades({ atividades, loading }) {
 export default function HomeScreen({ route, navigation }) {
   useScreenTrace('home_screen');
   const PRIMARY = useAccent();
+  const { t } = useTranslation();
   const { user, perfil, onAtualizar } = route?.params || {};
   const onAtualizarRef = useRef(onAtualizar);
   useEffect(() => { onAtualizarRef.current = onAtualizar; }, [onAtualizar]);
@@ -492,7 +496,7 @@ export default function HomeScreen({ route, navigation }) {
   // Handlers de navegação
   function handleSaque() {
     if (!user) return navigation.navigate('Login');
-    if (!podeSacar) return Alert.alert('Pontos insuficientes', 'Você precisa de 100.000 pts para sacar.');
+    if (!podeSacar) return Alert.alert(t('home.insufficientPoints'), t('home.insufficientPointsMsg'));
     navigation.navigate('Withdraw', { perfil });
   }
 
@@ -712,7 +716,7 @@ export default function HomeScreen({ route, navigation }) {
               />
               <View>
                 <Text style={{ fontSize: 14, fontWeight: '600', color: '#fff' }}>
-                  {saudacao()}, {nome}!
+                  {t(saudacaoKey())}, {nome}!
                 </Text>
                 <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>
                   {frase}

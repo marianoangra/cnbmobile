@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View, Text, TextInput, ScrollView, TouchableOpacity, Alert,
@@ -126,6 +127,7 @@ function MenuItem({ Icon, title, sub, onPress, danger }) {
 // ─── Tela principal ───────────────────────────────────────────────────────────
 export default function ProfileScreen({ route, navigation }) {
   const PRIMARY = useAccent();
+  const { t } = useTranslation();
   const { user, perfil, onAtualizar, atualizarPerfil } = route?.params || {};
 
   const [saques, setSaques]               = useState([]);
@@ -198,24 +200,24 @@ export default function ProfileScreen({ route, navigation }) {
         await AsyncStorage.removeItem('@cnb_notif_desabilitadas').catch(() => {});
         setNotifAtivas(true);
         if (perfil?.uid) registrarTokenPush(perfil.uid).catch(() => {});
-        Alert.alert('Notificações ativadas!', 'Você receberá alertas de pontos e missões.');
+        Alert.alert(t('profile.notifEnabled'), t('profile.notifEnabledMsg'));
       } else {
-        Alert.alert('Permissão necessária', 'Ative as notificações nas Configurações do dispositivo para receber alertas do CNB Mobile.');
+        Alert.alert(t('profile.notifPermRequired'), t('profile.notifPermMsg'));
       }
     } else if (notifAtivas) {
       Alert.alert(
-        'Desativar notificações',
-        'Para desativar completamente, acesse as Configurações do dispositivo > CNB Mobile > Notificações.',
+        t('profile.notifPermRequired'),
+        t('profile.notifDisableMsg'),
         [
-          { text: 'Abrir Configurações', onPress: () => Notifications.requestPermissionsAsync() },
-          { text: 'Cancelar', style: 'cancel' },
+          { text: t('profile.openSettings'), onPress: () => Notifications.requestPermissionsAsync() },
+          { text: t('common.cancel'), style: 'cancel' },
         ]
       );
     } else {
       await AsyncStorage.removeItem('@cnb_notif_desabilitadas').catch(() => {});
       setNotifAtivas(true);
       if (perfil?.uid) registrarTokenPush(perfil.uid).catch(() => {});
-      Alert.alert('Notificações reativadas!', 'Você voltará a receber alertas de pontos e missões.');
+      Alert.alert(t('profile.notifReenabled'), t('profile.notifReenabledMsg'));
     }
   }
 
@@ -231,15 +233,15 @@ export default function ProfileScreen({ route, navigation }) {
 
   async function handleAplicarCodigo() {
     const codigo = codigoParaAplicar.trim().toUpperCase();
-    if (!codigo) return Alert.alert('Atenção', 'Digite um código de indicação.');
+    if (!codigo) return Alert.alert(t('common.attention'), t('profile.enterCodePrompt'));
     setAplicando(true);
     try {
       await processarIndicacao(perfil.uid, codigo);
       setCodigo('');
       afiliadosCacheRef.current = { data: null, ts: 0 };
-      Alert.alert('Código aplicado!', 'Você foi indicado com sucesso. O indicador recebeu +100 pts.');
+      Alert.alert(t('profile.codeApplied'), t('profile.codeAppliedMsg'));
     } catch (e) {
-      Alert.alert('Erro', e.message ?? 'Código inválido ou já utilizado.');
+      Alert.alert(t('common.error'), e.message ?? t('profile.invalidCode'));
     } finally {
       setAplicando(false);
     }
@@ -260,32 +262,32 @@ export default function ProfileScreen({ route, navigation }) {
 
   async function handleCopiarCodigo() {
     await Clipboard.setStringAsync(afiliados.codigo);
-    Alert.alert('Copiado!', 'Código copiado para a área de transferência.');
+    Alert.alert(t('profile.copied'), t('profile.copiedMsg'));
   }
 
   async function handleLogout() {
-    Alert.alert('Sair', 'Deseja mesmo sair da conta?', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Sair', style: 'destructive', onPress: () => { limparSessao(); signOut(auth); } },
+    Alert.alert(t('profile.logoutTitle'), t('profile.logoutMsg'), [
+      { text: t('profile.cancel'), style: 'cancel' },
+      { text: t('profile.confirm'), style: 'destructive', onPress: () => { limparSessao(); signOut(auth); } },
     ]);
   }
 
   async function handleExcluirConta() {
-    Alert.alert('Excluir conta', 'Todos os seus dados e pontos serão apagados permanentemente.', [
-      { text: 'Cancelar', style: 'cancel' },
+    Alert.alert(t('profile.deleteTitle'), t('profile.deleteMsg'), [
+      { text: t('profile.cancel'), style: 'cancel' },
       {
-        text: 'Excluir', style: 'destructive', onPress: () => {
-          Alert.alert('Confirmar exclusão', 'Tem certeza? Essa ação não pode ser desfeita.', [
-            { text: 'Cancelar', style: 'cancel' },
+        text: t('profile.deleteTitle'), style: 'destructive', onPress: () => {
+          Alert.alert(t('profile.deleteConfirmTitle'), t('profile.deleteConfirmMsg'), [
+            { text: t('profile.cancel'), style: 'cancel' },
             {
-              text: 'Sim, excluir tudo', style: 'destructive', onPress: async () => {
+              text: t('profile.deleteConfirm'), style: 'destructive', onPress: async () => {
                 try {
                   await excluirConta(perfil.uid, auth.currentUser);
                 } catch (e) {
                   if (e.code === 'auth/requires-recent-login') {
-                    Alert.alert('Necessário re-login', 'Faça logout e login novamente para excluir a conta.');
+                    Alert.alert(t('profile.requiresRelogin'), t('profile.deleteReloginError'));
                   } else {
-                    Alert.alert('Erro', 'Não foi possível excluir a conta.');
+                    Alert.alert(t('common.error'), t('profile.deleteError'));
                   }
                 }
               },
@@ -317,17 +319,17 @@ export default function ProfileScreen({ route, navigation }) {
               <User size={36} color={PRIMARY} />
             </View>
             <Text style={{ fontSize: 27, fontWeight: '700', color: '#fff', textAlign: 'center', marginBottom: 10 }}>
-              Faça login para ver seu perfil
+              {t('profile.loginToView')}
             </Text>
             <Text style={{ fontSize: 18, color: 'rgba(255,255,255,0.5)', textAlign: 'center', lineHeight: 21, marginBottom: 36 }}>
-              Acesse sua conta para ver pontos, saques e programa de indicação.
+              {t('profile.loginToViewSub')}
             </Text>
             <TouchableOpacity
               onPress={() => navigation.navigate('Login')}
               activeOpacity={0.85}
               style={{ backgroundColor: PRIMARY, borderRadius: 14, paddingVertical: 14, width: '100%', alignItems: 'center' }}
             >
-              <Text style={{ color: '#000', fontWeight: '700', fontSize: 21 }}>Entrar / Cadastrar</Text>
+              <Text style={{ color: '#000', fontWeight: '700', fontSize: 21 }}>{t('common.loginRegister')}</Text>
             </TouchableOpacity>
           </View>
         </SafeAreaView>
@@ -347,7 +349,7 @@ export default function ProfileScreen({ route, navigation }) {
 
           {/* ── Avatar + Nome ── */}
           <Animated.View style={[{ paddingTop: 12, paddingBottom: 20 }, a0]}>
-            <Text style={{ fontSize: 16, color: 'rgba(255,255,255,0.5)', marginBottom: 16 }}>Perfil</Text>
+            <Text style={{ fontSize: 16, color: 'rgba(255,255,255,0.5)', marginBottom: 16 }}>{t('profile.profile')}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
               {/* Avatar 64px com Award badge */}
               <View style={{ position: 'relative' }}>
@@ -381,7 +383,7 @@ export default function ProfileScreen({ route, navigation }) {
 
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 21, fontWeight: '600', color: '#fff' }}>
-                  {perfilLocal?.nome ?? 'Usuário'}
+                  {perfilLocal?.nome ?? t('common.user')}
                 </Text>
                 <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', marginTop: 2 }} numberOfLines={1}>
                   {perfilLocal?.email ?? ''}
@@ -510,7 +512,7 @@ export default function ProfileScreen({ route, navigation }) {
 
             {/* Header */}
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-              <Text style={{ fontSize: 18, fontWeight: '600', color: '#fff' }}>Programa de Indicação</Text>
+              <Text style={{ fontSize: 18, fontWeight: '600', color: '#fff' }}>{t('profile.referralProgram')}</Text>
               <View style={{
                 backgroundColor: 'rgba(198,255,74,0.1)',
                 borderRadius: 99, paddingHorizontal: 8, paddingVertical: 3,
@@ -593,7 +595,7 @@ export default function ProfileScreen({ route, navigation }) {
               borderWidth: 1, borderColor: 'rgba(198,255,74,0.2)',
               borderRadius: 12, padding: 12, marginBottom: 10,
             }}>
-              <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>Seu código</Text>
+              <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>{t('profile.yourCode')}</Text>
               <Text style={{ fontSize: 32, fontWeight: '700', color: PRIMARY, letterSpacing: 4 }}>
                 {afiliados.codigo || '---'}
               </Text>
@@ -611,7 +613,7 @@ export default function ProfileScreen({ route, navigation }) {
                 }}
               >
                 <Copy size={13} color="rgba(255,255,255,0.8)" />
-                <Text style={{ fontSize: 16, color: 'rgba(255,255,255,0.9)' }}>Copiar</Text>
+                <Text style={{ fontSize: 16, color: 'rgba(255,255,255,0.9)' }}>{t('profile.copy')}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -625,7 +627,7 @@ export default function ProfileScreen({ route, navigation }) {
                 }}
               >
                 <Share2 size={13} color={PRIMARY} />
-                <Text style={{ fontSize: 16, color: PRIMARY, fontWeight: '600' }}>Compartilhar</Text>
+                <Text style={{ fontSize: 16, color: PRIMARY, fontWeight: '600' }}>{t('profile.share')}</Text>
               </TouchableOpacity>
             </View>
 
@@ -643,7 +645,7 @@ export default function ProfileScreen({ route, navigation }) {
                       borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
                       letterSpacing: 2,
                     }}
-                    placeholder="Digite o código"
+                    placeholder={t('profile.enterCode')}
                     placeholderTextColor="rgba(255,255,255,0.3)"
                     value={codigoParaAplicar}
                     onChangeText={v => setCodigo(v.toUpperCase())}
@@ -662,7 +664,7 @@ export default function ProfileScreen({ route, navigation }) {
                   >
                     {aplicandoCodigo
                       ? <ActivityIndicator color="#000" size="small" />
-                      : <Text style={{ color: '#000', fontWeight: '700', fontSize: 17 }}>Aplicar</Text>
+                      : <Text style={{ color: '#000', fontWeight: '700', fontSize: 17 }}>{t('profile.apply')}</Text>
                     }
                   </TouchableOpacity>
                 </View>
@@ -673,7 +675,7 @@ export default function ProfileScreen({ route, navigation }) {
           {/* ── Histórico de saques ── */}
           <Animated.View style={[{ marginBottom: 24 }, a3]}>
             <Text style={{ fontSize: 18, fontWeight: '600', color: '#fff', marginBottom: 12 }}>
-              Histórico de Saques
+              {t('profile.withdrawHistory')}
             </Text>
 
             {loadingSaques ? (
@@ -685,7 +687,7 @@ export default function ProfileScreen({ route, navigation }) {
                 borderRadius: 14, padding: 24, alignItems: 'center',
               }}>
                 <Inbox size={28} color="rgba(255,255,255,0.2)" style={{ marginBottom: 8 }} />
-                <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 17 }}>Nenhum saque realizado ainda</Text>
+                <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 17 }}>{t('profile.noWithdrawals')}</Text>
               </View>
             ) : (
               <View style={{ gap: 8 }}>
@@ -732,7 +734,7 @@ export default function ProfileScreen({ route, navigation }) {
               }}
             >
               <LogOut size={15} color="#FF4444" />
-              <Text style={{ color: '#FF4444', fontWeight: '600', fontSize: 18 }}>Sair da conta</Text>
+              <Text style={{ color: '#FF4444', fontWeight: '600', fontSize: 18 }}>{t('profile.logout')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -740,7 +742,7 @@ export default function ProfileScreen({ route, navigation }) {
               activeOpacity={0.8}
               style={{ alignItems: 'center', paddingVertical: 12 }}
             >
-              <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 16 }}>Excluir minha conta</Text>
+              <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 16 }}>{t('profile.deleteAccount')}</Text>
             </TouchableOpacity>
           </Animated.View>
 
