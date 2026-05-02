@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '../context/ThemeContext';
 import Avatar from '../components/Avatar';
 import { atualizarNome, uploadAvatar } from '../services/pontos';
@@ -14,6 +15,7 @@ import i18n, { salvarIdioma } from '../i18n';
 export default function EditProfileScreen({ route, navigation }) {
   const { perfil, onSalvar } = route.params || {};
   const { colors, isDark, toggleTheme } = useTheme();
+  const { t } = useTranslation();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [nome, setNome] = useState(perfil?.nome ?? '');
@@ -43,7 +45,7 @@ export default function EditProfileScreen({ route, navigation }) {
   async function handleTrocarAvatar() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permissão necessária', 'Permita o acesso à galeria para trocar a foto.');
+      Alert.alert(t('editProfile.permissionNeeded'), t('editProfile.permissionMsg'));
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -58,14 +60,14 @@ export default function EditProfileScreen({ route, navigation }) {
       setAvatarURL(url);
       onSalvar?.({ avatarURL: url });
     } catch (e) {
-      Alert.alert('Erro ao salvar foto', e?.message ?? 'Tente novamente.');
+      Alert.alert(t('editProfile.savePhotoError'), e?.message ?? t('editProfile.tryAgain'));
     } finally {
       setTrocandoAvatar(false);
     }
   }
 
   async function handleSalvar() {
-    if (!nome.trim()) return Alert.alert('Atenção', 'O nome não pode estar vazio.');
+    if (!nome.trim()) return Alert.alert(t('common.attention'), t('editProfile.nameEmptyError'));
     const nomeIgual = nome.trim() === perfil?.nome;
     if (nomeIgual) {
       navigation.goBack();
@@ -80,7 +82,7 @@ export default function EditProfileScreen({ route, navigation }) {
     } catch (e) {
       console.error('[EditProfile] erro ao salvar:', e);
       const detalhe = e?.code ?? e?.message ?? 'erro desconhecido';
-      Alert.alert('Erro ao salvar', detalhe);
+      Alert.alert(t('editProfile.saveError'), detalhe);
     } finally {
       setSalvando(false);
     }
@@ -112,72 +114,72 @@ export default function EditProfileScreen({ route, navigation }) {
                   : <Text style={styles.avatarCameraIcon}>📷</Text>}
               </View>
             </TouchableOpacity>
-            <Text style={styles.avatarHint}>Toque para alterar a foto</Text>
+            <Text style={styles.avatarHint}>{t('editProfile.tapToChangePhoto')}</Text>
           </View>
 
           {/* E-mail — não editável */}
           <View style={styles.campo}>
-            <Text style={styles.campoLabel}>E-mail</Text>
+            <Text style={styles.campoLabel}>{t('editProfile.email')}</Text>
             <View style={[styles.input, { justifyContent: 'center', opacity: 0.5 }]}>
               <Text style={{ color: colors.white, fontSize: 17 }}>{perfil?.email ?? '—'}</Text>
             </View>
-            <Text style={styles.campoHint}>O e-mail não pode ser alterado</Text>
+            <Text style={styles.campoHint}>{t('editProfile.emailCantChange')}</Text>
           </View>
 
           {/* Nome */}
           <View style={styles.campo}>
-            <Text style={styles.campoLabel}>Nome de usuário</Text>
+            <Text style={styles.campoLabel}>{t('editProfile.username')}</Text>
             <TextInput
               style={styles.input}
               value={nome}
-              onChangeText={t => { setNome(t); setAlterado(true); }}
-              placeholder="Seu nome"
+              onChangeText={txt => { setNome(txt); setAlterado(true); }}
+              placeholder={t('editProfile.usernamePlaceholder')}
               placeholderTextColor={colors.secondary}
               autoCapitalize="words"
               maxLength={40}
               returnKeyType="done"
             />
-            <Text style={styles.campoHint}>{nome.trim().length}/40 caracteres</Text>
+            <Text style={styles.campoHint}>{t('editProfile.charCount', { count: nome.trim().length })}</Text>
           </View>
 
           {/* Aparência */}
           <View style={styles.campo}>
-            <Text style={styles.campoLabel}>Aparência</Text>
+            <Text style={styles.campoLabel}>{t('editProfile.appearance')}</Text>
             <View style={styles.themeRow}>
               <TouchableOpacity
                 style={[styles.themeBtn, isDark && styles.themeBtnAtivo]}
                 onPress={() => { if (!isDark) { toggleTheme(); setAlterado(true); } }}
                 activeOpacity={0.8}>
                 <Text style={styles.themeBtnIcon}>🌙</Text>
-                <Text style={[styles.themeBtnText, isDark && styles.themeBtnTextAtivo]}>Dark</Text>
+                <Text style={[styles.themeBtnText, isDark && styles.themeBtnTextAtivo]}>{t('editProfile.themeDark')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.themeBtn, !isDark && styles.themeBtnAtivo]}
                 onPress={() => { if (isDark) { toggleTheme(); setAlterado(true); } }}
                 activeOpacity={0.8}>
                 <Text style={styles.themeBtnIcon}>☀️</Text>
-                <Text style={[styles.themeBtnText, !isDark && styles.themeBtnTextAtivo]}>Light</Text>
+                <Text style={[styles.themeBtnText, !isDark && styles.themeBtnTextAtivo]}>{t('editProfile.themeLight')}</Text>
               </TouchableOpacity>
             </View>
           </View>
 
           {/* Idioma */}
           <View style={styles.campo}>
-            <Text style={styles.campoLabel}>Idioma</Text>
+            <Text style={styles.campoLabel}>{t('editProfile.language')}</Text>
             <View style={styles.themeRow}>
               <TouchableOpacity
                 style={[styles.themeBtn, idioma === 'pt' && styles.themeBtnAtivo]}
                 onPress={() => handleTrocarIdioma('pt')}
                 activeOpacity={0.8}>
                 <Text style={styles.themeBtnIcon}>🇧🇷</Text>
-                <Text style={[styles.themeBtnText, idioma === 'pt' && styles.themeBtnTextAtivo]}>Português</Text>
+                <Text style={[styles.themeBtnText, idioma === 'pt' && styles.themeBtnTextAtivo]}>{t('editProfile.languagePt')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.themeBtn, idioma === 'en' && styles.themeBtnAtivo]}
                 onPress={() => handleTrocarIdioma('en')}
                 activeOpacity={0.8}>
                 <Text style={styles.themeBtnIcon}>🇺🇸</Text>
-                <Text style={[styles.themeBtnText, idioma === 'en' && styles.themeBtnTextAtivo]}>English</Text>
+                <Text style={[styles.themeBtnText, idioma === 'en' && styles.themeBtnTextAtivo]}>{t('editProfile.languageEn')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -190,11 +192,11 @@ export default function EditProfileScreen({ route, navigation }) {
             activeOpacity={0.85}>
             {salvando
               ? <ActivityIndicator color={colors.background} />
-              : <Text style={styles.btnSalvarText}>Salvar alterações</Text>}
+              : <Text style={styles.btnSalvarText}>{t('editProfile.save')}</Text>}
           </TouchableOpacity>
 
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.btnCancelar} activeOpacity={0.7}>
-            <Text style={styles.btnCancelarText}>Cancelar</Text>
+            <Text style={styles.btnCancelarText}>{t('editProfile.cancel')}</Text>
           </TouchableOpacity>
 
         </Animated.View>

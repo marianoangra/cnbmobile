@@ -161,6 +161,28 @@
     "back": "Back",
     "cancel": "Cancel"
   },
+  "editProfile": {
+    "tapToChangePhoto": "Tap to change photo",
+    "email": "Email",
+    "emailCantChange": "Email cannot be changed",
+    "username": "Username",
+    "usernamePlaceholder": "Your name",
+    "charCount": "{{count}}/40 characters",
+    "appearance": "Appearance",
+    "themeDark": "Dark",
+    "themeLight": "Light",
+    "language": "Language",
+    "languagePt": "Português",
+    "languageEn": "English",
+    "save": "Save changes",
+    "cancel": "Cancel",
+    "permissionNeeded": "Permission required",
+    "permissionMsg": "Allow access to gallery to change the photo.",
+    "savePhotoError": "Error saving photo",
+    "tryAgain": "Please try again.",
+    "nameEmptyError": "Name cannot be empty.",
+    "saveError": "Error saving"
+  },
   "onboarding": {
     "slide1Title": "Welcome to\nJUICE",
     "slide1Desc": "Turn your phone charging time into real rewards, straight to your PIX account.",

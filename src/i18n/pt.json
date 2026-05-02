@@ -161,6 +161,28 @@
     "back": "Voltar",
     "cancel": "Cancelar"
   },
+  "editProfile": {
+    "tapToChangePhoto": "Toque para alterar a foto",
+    "email": "E-mail",
+    "emailCantChange": "O e-mail não pode ser alterado",
+    "username": "Nome de usuário",
+    "usernamePlaceholder": "Seu nome",
+    "charCount": "{{count}}/40 caracteres",
+    "appearance": "Aparência",
+    "themeDark": "Dark",
+    "themeLight": "Light",
+    "language": "Idioma",
+    "languagePt": "Português",
+    "languageEn": "English",
+    "save": "Salvar alterações",
+    "cancel": "Cancelar",
+    "permissionNeeded": "Permissão necessária",
+    "permissionMsg": "Permita o acesso à galeria para trocar a foto.",
+    "savePhotoError": "Erro ao salvar foto",
+    "tryAgain": "Tente novamente.",
+    "nameEmptyError": "O nome não pode estar vazio.",
+    "saveError": "Erro ao salvar"
+  },
   "onboarding": {
     "slide1Title": "Bem-vindo ao\nJUICE",
     "slide1Desc": "Transforme o tempo de carregamento do seu celular em recompensas reais, direto no seu PIX.",
