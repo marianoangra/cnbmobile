@@ -1,7 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
-import { Platform, Linking } from 'react-native';
+import { Platform, Linking, AppState } from 'react-native';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from './firebase';
 
@@ -79,7 +79,7 @@ export async function agendarLembreteCarregamento() {
   await Notifications.scheduleNotificationAsync({
     identifier: ID_LEMBRETE_CARGA,
     content: {
-      title: 'CNB Mobile',
+      title: 'JUICE',
       body: 'Você ainda não carregou hoje. Conecte o carregador e ganhe pontos!',
       data: { tela: 'Carregar' },
     },
@@ -97,4 +97,25 @@ export async function agendarLembreteCarregamento() {
  */
 export async function cancelarLembretes() {
   await Notifications.cancelAllScheduledNotificationsAsync();
+}
+
+/**
+ * Envia notificação imediata quando o carregamento é detectado com o app em background.
+ * Ao tocar na notificação, o usuário é levado diretamente à tela de carregamento.
+ * No iOS, esta é a única forma de "trazer o app para frente" sem interação do usuário.
+ */
+export async function notificarInicioCarregamento() {
+  // Só notifica se o app NÃO está em primeiro plano (seria redundante)
+  if (AppState.currentState === 'active') return;
+  const ativa = await notificacoesAtivas();
+  if (!ativa) return;
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: 'JUICE ⚡',
+      body: 'Carregamento detectado! Abra o app para acumular pontos $JUICE.',
+      data: { tela: 'Carregar' },
+      sound: true,
+    },
+    trigger: null, // disparo imediato
+  }).catch(() => {});
 }

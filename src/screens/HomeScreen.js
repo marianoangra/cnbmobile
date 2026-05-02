@@ -14,7 +14,7 @@ import Svg, { Defs, RadialGradient, Stop, Rect } from 'react-native-svg';
 import * as Battery from 'expo-battery';
 import {
   Bell, ArrowUpRight, ArrowDownLeft,
-  QrCode, Wallet, Activity, Zap, Database, Cpu,
+  Gift, Wallet, Activity, Zap, Database, Cpu,
 } from 'lucide-react-native';
 import Avatar from '../components/Avatar';
 import { diaKey, diaKeyDe } from '../utils/date';
@@ -109,10 +109,10 @@ function useCarregando() {
 
 // ─── Dados estáticos (Figma) ──────────────────────────────────────────────────
 const ATALHOS = [
-  { Icon: Wallet,    label: 'Wallet',  id: 'wallet' },
-  { Icon: Activity,  label: 'DePIN',   id: 'depin'  },
-  { Icon: QrCode,    label: 'Comprar', id: 'pix'    },
-  { Icon: Database,  label: 'Dados',   id: 'dados'  },
+  { Icon: Wallet,    label: 'Wallet',  id: 'wallet'  },
+  { Icon: Activity,  label: 'DePIN',   id: 'depin'   },
+  { Icon: Gift,      label: 'Airdrop', id: 'airdrop' },
+  { Icon: Database,  label: 'Dados',   id: 'dados'   },
 ];
 
 // Constrói lista de atividades reais a partir de saques + atividadeDias do perfil
@@ -538,10 +538,10 @@ export default function HomeScreen({ route, navigation }) {
   }
 
   function handleAtalho(id) {
-    if (id === 'pix')    return navigation.navigate('BuyTokens', { perfil });
-    if (id === 'depin')  return navigation.navigate('DePINInfo');
-    if (id === 'wallet') return navigation.navigate('Wallet', { user: perfil });
-    if (id === 'dados')  return navigation.navigate('Dados');
+    if (id === 'airdrop') return navigation.navigate('Airdrop', { perfil });
+    if (id === 'depin')   return navigation.navigate('DePINInfo');
+    if (id === 'wallet')  return navigation.navigate('Wallet', { user: perfil });
+    if (id === 'dados')   return navigation.navigate('Dados');
   }
 
   return (

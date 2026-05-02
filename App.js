@@ -50,6 +50,7 @@ import BuyTokensScreen from './src/screens/BuyTokensScreen';
 import DadosScreen from './src/screens/DadosScreen';
 import RelatorioContaScreen from './src/screens/RelatorioContaScreen';
 import ModoEscolhaScreen from './src/screens/ModoEscolhaScreen';
+import AirdropScreen from './src/screens/AirdropScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -319,6 +320,11 @@ function AppNavigator({ user, perfil, onAtualizar, atualizarPerfil }) {
           />
         )}
       </Stack.Screen>
+      <Stack.Screen
+        name="Airdrop"
+        component={AirdropScreen}
+        options={{ headerShown: false }}
+      />
       {isTech && (
         <>
           <Stack.Screen

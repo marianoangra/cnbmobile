@@ -728,7 +728,7 @@ export default function ChargingScreen({ route, navigation }) {
   useScreenTrace('charging_screen');
   const PRIMARY = useAccent();
   const { user, uid, perfil, onAtualizar } = route?.params || {};
-  const { carregando, pontosGanhos, segundosRestantes } = useCarregamento(uid, onAtualizar);
+  const { carregando, pontosGanhos, segundosRestantes, limiteBotAtingido } = useCarregamento(uid, onAtualizar);
 
   const [bateria, setBateria] = useState(0);
 
@@ -872,7 +872,27 @@ export default function ChargingScreen({ route, navigation }) {
             </LinearGradient>
 
             {/* Progresso da hora */}
-            <ProgressoHora segundosRestantes={segundosRestantes} carregando={carregando} />
+            <ProgressoHora segundosRestantes={segundosRestantes} carregando={carregando && !limiteBotAtingido} />
+
+            {/* Aviso anti-bot: limite de 8h atingido */}
+            {limiteBotAtingido && (
+              <View style={{
+                backgroundColor: 'rgba(255,160,0,0.08)',
+                borderWidth: 1, borderColor: 'rgba(255,160,0,0.25)',
+                borderRadius: 14, padding: 14,
+                flexDirection: 'row', alignItems: 'flex-start', gap: 10,
+              }}>
+                <Plug size={16} color="#FFA500" style={{ marginTop: 2 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#FFA500', marginBottom: 3 }}>
+                    Limite de 8h atingido
+                  </Text>
+                  <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 18 }}>
+                    Desconecte e reconecte o carregador para continuar acumulando pontos.
+                  </Text>
+                </View>
+              </View>
+            )}
 
             {/* Botão de saque */}
             {podeSacar && (

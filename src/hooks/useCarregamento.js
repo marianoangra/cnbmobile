@@ -7,6 +7,9 @@ import { iniciarForegroundService, pararForegroundService, servicoRodando, SESSA
 import { logInicioCarregamento, logFimCarregamento, logSessaoOnChain } from '../services/analytics';
 import { calcularPontosTotal, adicionarPontos } from '../services/pontos';
 import { emitPontosUpdate } from '../services/chargeEvents';
+import { notificarInicioCarregamento } from '../services/notificacoes';
+
+const LIMITE_MINUTOS_ANTI_BOT = 480; // 8 horas contínuas
 
 function estaCarregando(state) {
   return state === Battery.BatteryState.CHARGING || state === Battery.BatteryState.FULL;
@@ -16,6 +19,9 @@ export function useCarregamento(uid, onPontosAdicionados) {
   const [carregando, setCarregando] = useState(false);
   const [pontosGanhos, setPontosGanhos] = useState(0);
   const [segundosRestantes, setSegundosRestantes] = useState(3600);
+  const [limiteBotAtingido, setLimiteBotAtingido] = useState(false);
+  // Ref espelhado para uso dentro de callbacks sem closure stale
+  const limiteBotRef = useRef(false);
 
   const uidRef = useRef(uid);
   const carregandoRef = useRef(false);
@@ -83,11 +89,23 @@ export function useCarregamento(uid, onPontosAdicionados) {
 
       iniciarContador();
       logInicioCarregamento();
+      // Notifica o usuário se o app estiver em background (iOS/Android)
+      notificarInicioCarregamento().catch(() => {});
 
       // Tick local a cada minuto — só atualiza UI (Firestore é gravado pelo Foreground Service)
       if (!minuteTickRef.current) {
         minuteTickRef.current = setInterval(() => {
           minutosRef.current += 1;
+
+          // Anti-bot: interrompe após 8 horas consecutivas de carregamento.
+          // Reinicia automaticamente quando o usuário desconectar e reconectar.
+          if (minutosRef.current >= LIMITE_MINUTOS_ANTI_BOT) {
+            limiteBotRef.current = true;
+            if (montadoRef.current) setLimiteBotAtingido(true);
+            pararSessao(minutosRef.current);
+            return;
+          }
+
           const pts = calcularPontosTotal(minutosRef.current);
           if (montadoRef.current) setPontosGanhos(pts);
           emitPontosUpdate(pts);
@@ -117,9 +135,11 @@ export function useCarregamento(uid, onPontosAdicionados) {
       if (minutos > 0) logFimCarregamento(minutos, calcularPontosTotal(minutos));
       pararContador();
       minutosRef.current = 0;
+      limiteBotRef.current = false;
       if (montadoRef.current) {
         setPontosGanhos(0);
         setSegundosRestantes(3600);
+        setLimiteBotAtingido(false);
       }
       emitPontosUpdate(0);
       // Fallback de salvamento: garante que minutos não gravados pelo serviço
@@ -186,7 +206,8 @@ export function useCarregamento(uid, onPontosAdicionados) {
 
       // Detecta serviço morto pelo SO: UI acha que está carregando mas serviço parou.
       // Reinicia se bateria ainda está carregando — o listener de bateria cuida do caso contrário.
-      if (!servicoRodando() && uidRef.current) {
+      // Não reinicia se o limite anti-bot foi atingido nesta sessão.
+      if (!servicoRodando() && uidRef.current && !limiteBotRef.current) {
         try {
           const state = await Battery.getBatteryStateAsync();
           if (estaCarregando(state)) {
@@ -256,5 +277,5 @@ export function useCarregamento(uid, onPontosAdicionados) {
     };
   }, [iniciarSessao, pararSessao, pararContador]);
 
-  return { carregando, pontosGanhos, segundosRestantes };
+  return { carregando, pontosGanhos, segundosRestantes, limiteBotAtingido };
 }

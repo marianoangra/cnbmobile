@@ -1,7 +1,11 @@
 import * as Battery from 'expo-battery';
+import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { adicionarMinutoComBonus, calcularPontosTotal } from './pontos';
 import { lerConsentimentos } from '../utils/consentimentos';
+
+// Anti-bot: limite de sessão contínua de 8 horas
+const LIMITE_MINUTOS = 480;
 
 export const SESSAO_KEY = 'cnb_sessao_carregamento';
 
@@ -97,6 +101,23 @@ async function tarefaCarregamento(taskData) {
     minutos++;
     pendingMinutes++;
 
+    // Anti-bot: para após 8 horas contínuas de carregamento.
+    // Reinicia quando o usuário desconectar e reconectar o carregador.
+    if (minutos >= LIMITE_MINUTOS) {
+      try {
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: 'JUICE',
+            body: 'Limite de 8h de carregamento contínuo atingido. Desconecte e reconecte o carregador para continuar.',
+            data: { tela: 'Carregar' },
+          },
+          trigger: null,
+        });
+      } catch {}
+      try { await BackgroundService.stop(); } catch {}
+      break;
+    }
+
     // Tenta aplicar todos os minutos pendentes (incluindo o atual)
     let flushed = 0;
     while (flushed < pendingMinutes) {
@@ -129,7 +150,7 @@ async function tarefaCarregamento(taskData) {
 
 const OPCOES_BASE = {
   taskName: 'cnb-carregamento',
-  taskTitle: 'CNB Mobile',
+  taskTitle: 'JUICE',
   taskDesc: 'Acumulando pontos enquanto você carrega...',
   taskIcon: { name: 'ic_launcher', type: 'mipmap' },
   color: '#00FF7F',

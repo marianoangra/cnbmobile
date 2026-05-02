@@ -128,7 +128,11 @@ export default function LoginScreen({ navigation }) {
   }
 
   async function handleLoginApple() {
-    setLoadingApple(true);
+    // IMPORTANT: do NOT call setLoadingApple(true) before signInAsync.
+    // On iPad, the Apple Sign In sheet is presented as a popover anchored to the
+    // native button. Triggering a React re-render (pointerEvents='none') while
+    // the sheet is being shown causes the popover's "Continue" button to become
+    // unresponsive. Set loading state only AFTER the sheet is dismissed.
     try {
       const bytes = await Crypto.getRandomBytesAsync(32);
       const rawNonce = Array.from(bytes)
@@ -145,6 +149,8 @@ export default function LoginScreen({ navigation }) {
         ],
         nonce: hashedNonce,
       });
+      // Apple sheet has been dismissed — safe to trigger loading state now
+      setLoadingApple(true);
       if (!cred.identityToken) throw new Error('Sem identityToken retornado pela Apple.');
       await assinarFirebaseComApple({ identityToken: cred.identityToken, rawNonce });
       logLogin('apple');
