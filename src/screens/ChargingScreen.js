@@ -839,14 +839,17 @@ export default function ChargingScreen({ route, navigation }) {
                 pointerEvents="none"
                 style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}
               >
-                <Text style={{
-                  fontSize: 96, fontWeight: '300', color: '#fff',
-                  letterSpacing: -2,
-                  textShadowColor: 'rgba(0,255,127,0.25)', textShadowRadius: 18,
-                }}>
-                  {bateria > 0 ? `${bateria}` : '--'}
-                  <Text style={{ fontSize: 48, color: PRIMARY, fontWeight: '400' }}>%</Text>
-                </Text>
+                <Image
+                  source={require('../../assets/cnb-logo.png')}
+                  style={{
+                    width: 140, height: 140,
+                    tintColor: PRIMARY,
+                    shadowColor: PRIMARY,
+                    shadowOpacity: 0.6,
+                    shadowRadius: 24,
+                  }}
+                  resizeMode="contain"
+                />
               </View>
             )}
           </View>
