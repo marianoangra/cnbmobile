@@ -5,7 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { iniciarForegroundService, pararForegroundService, servicoRodando, SESSAO_KEY } from '../services/backgroundService';
 import { logInicioCarregamento, logFimCarregamento, logSessaoOnChain } from '../services/analytics';
-import { calcularPontosTotal, adicionarPontos } from '../services/pontos';
+import { calcularPontosTotal, adicionarMinutoComBonus } from '../services/pontos';
 import { emitPontosUpdate } from '../services/chargeEvents';
 import { notificarInicioCarregamento } from '../services/notificacoes';
 
@@ -144,26 +144,40 @@ export function useCarregamento(uid, onPontosAdicionados) {
       emitPontosUpdate(0);
       // Fallback de salvamento: garante que minutos não gravados pelo serviço
       // sejam persistidos no Firestore antes de encerrar a sessão.
+      //
+      // IMPORTANTE: adicionarPontos() NÃO pode ser usado aqui porque a regra
+      // do Firestore limita a +60 pts e +1 min por operação. Para sessões com
+      // mais de 6 minutos (ou qualquer sessão de iOS, onde o background service
+      // não roda), adicionarPontos() seria silenciosamente rejeitada.
+      // Usamos adicionarMinutoComBonus() em loop — 1 transação por minuto —
+      // que respeita as regras e aplica o bônus de hora corretamente.
       if (uidRef.current && minutos > 0) {
         try {
-          if (!servicoIniciadoRef.current) {
-            // Serviço nunca rodou (módulo nativo indisponível ou falhou ao iniciar).
-            // Nenhum adicionarMinutoComBonus foi chamado — salva tudo agora.
-            await adicionarPontos(uidRef.current, calcularPontosTotal(minutos), minutos);
-            console.log(`[Carregar] Serviço indisponível — salvos ${minutos} min direto no Firestore`);
-          } else {
-            // Serviço rodou, mas pode ter minutos pendentes (offline).
-            const raw = await AsyncStorage.getItem(SESSAO_KEY);
-            if (raw) {
-              const { pendingMinutes: pending = 0 } = JSON.parse(raw);
-              if (pending > 0) {
-                await adicionarPontos(uidRef.current, pending * 10, pending);
-                console.log(`[Carregar] Salvos ${pending} min pendentes (offline) no Firestore`);
+          const minutosParaSalvar = !servicoIniciadoRef.current
+            ? minutos  // serviço nunca rodou (iOS ou falha): salva toda a sessão
+            : await (async () => {    // serviço rodou: salva só os pendentes (offline)
+                try {
+                  const raw = await AsyncStorage.getItem(SESSAO_KEY);
+                  if (!raw) return 0;
+                  const { pendingMinutes: pending = 0 } = JSON.parse(raw);
+                  return pending;
+                } catch { return 0; }
+              })();
+
+          if (minutosParaSalvar > 0) {
+            let salvos = 0;
+            for (let i = 0; i < minutosParaSalvar; i++) {
+              try {
+                await adicionarMinutoComBonus(uidRef.current);
+                salvos++;
+              } catch {
+                break; // offline — para aqui, perde o restante desta tentativa
               }
             }
+            console.log(`[Carregar] Fallback: ${salvos}/${minutosParaSalvar} min salvos no Firestore`);
           }
         } catch (e) {
-          console.warn('[Carregar] Erro ao salvar minutos pendentes:', e?.message);
+          console.warn('[Carregar] Erro ao salvar minutos no fallback:', e?.message);
         }
       }
       servicoIniciadoRef.current = false;
