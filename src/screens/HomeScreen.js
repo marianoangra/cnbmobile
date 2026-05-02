@@ -184,7 +184,7 @@ function AvatarHeader({ onPress, borderColor }) {
   );
 }
 
-function CardPontos({ pontos, progresso, faltam, user, estaCarregando, onSaque, onPix, barStyle, pontosHoje, variacaoDia, modo }) {
+function CardPontos({ pontos, progresso, faltam, user, estaCarregando, onSaque, barStyle, pontosHoje, variacaoDia }) {
   const PRIMARY = useAccent();
   const pct = Math.round(progresso * 100);
   return (
@@ -284,38 +284,19 @@ function CardPontos({ pontos, progresso, faltam, user, estaCarregando, onSaque, 
         )}
       </View>
 
-      {/* Botões CTA */}
-      <View style={{ flexDirection: 'row', gap: 8, marginTop: 16 }}>
-        <TouchableOpacity
-          onPress={onSaque}
-          activeOpacity={0.85}
-          style={{
-            flex: 1, backgroundColor: PRIMARY,
-            borderRadius: 12, paddingVertical: 10,
-            flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-          }}
-        >
-          <ArrowUpRight size={14} color="#000" />
-          <Text style={{ color: '#000', fontSize: 12, fontWeight: '600' }}>Saque</Text>
-        </TouchableOpacity>
-
-        {modo !== 'lite' && (
-          <TouchableOpacity
-            onPress={onPix}
-            activeOpacity={0.85}
-            style={{
-              flex: 1,
-              backgroundColor: 'rgba(255,255,255,0.06)',
-              borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
-              borderRadius: 12, paddingVertical: 10,
-              flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-            }}
-          >
-            <Wallet size={14} color="rgba(255,255,255,0.8)" />
-            <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 12 }}>CNB Privado</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+      {/* Botão CTA */}
+      <TouchableOpacity
+        onPress={onSaque}
+        activeOpacity={0.85}
+        style={{
+          marginTop: 16, backgroundColor: PRIMARY,
+          borderRadius: 12, paddingVertical: 10,
+          flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+        }}
+      >
+        <ArrowUpRight size={14} color="#000" />
+        <Text style={{ color: '#000', fontSize: 12, fontWeight: '600' }}>Saque</Text>
+      </TouchableOpacity>
     </LinearGradient>
   );
 }
@@ -530,11 +511,6 @@ export default function HomeScreen({ route, navigation }) {
     setRefreshing(true);
     await onAtualizarRef.current?.();
     setRefreshing(false);
-  }
-
-  function handlePrivado() {
-    if (!user) return navigation.navigate('Login');
-    navigation.navigate('Withdraw', { perfil, initialAba: 'privado' });
   }
 
   function handleAtalho(id) {
@@ -780,7 +756,6 @@ export default function HomeScreen({ route, navigation }) {
               user={user}
               estaCarregando={estaCarregando}
               onSaque={handleSaque}
-              onPix={handlePrivado}
               barStyle={barStyle}
               pontosHoje={pontosHoje}
               variacaoDia={variacaoDia}
