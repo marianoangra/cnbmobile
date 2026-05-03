@@ -486,7 +486,6 @@ function IdleBattery({ carregando }) {
   const fade   = useSharedValue(0);
   const scale  = useSharedValue(1);
   const floatY = useSharedValue(0);
-  const glow   = useSharedValue(0.5);
 
   useEffect(() => {
     if (!carregando) {
@@ -504,23 +503,15 @@ function IdleBattery({ carregando }) {
         withTiming(-6, { duration: 2800, easing: Easing.inOut(Easing.sin) }),
         withTiming( 6, { duration: 2800, easing: Easing.inOut(Easing.sin) }),
       ), -1, true);
-
-      // pulso de brilho — opacidade do glow atrás
-      glow.value = withRepeat(withSequence(
-        withTiming(1.0, { duration: 1800, easing: Easing.inOut(Easing.sin) }),
-        withTiming(0.4, { duration: 1800, easing: Easing.inOut(Easing.sin) }),
-      ), -1, true);
     } else {
       fade.value = withTiming(0, { duration: 500, easing: Easing.in(Easing.cubic) });
       cancelAnimation(scale);
       cancelAnimation(floatY);
-      cancelAnimation(glow);
     }
     return () => {
       cancelAnimation(fade);
       cancelAnimation(scale);
       cancelAnimation(floatY);
-      cancelAnimation(glow);
     };
   }, [carregando]);
 
@@ -532,21 +523,8 @@ function IdleBattery({ carregando }) {
     ],
   }));
 
-  const glowStyle = useAnimatedStyle(() => ({
-    opacity: fade.value * glow.value * 0.55,
-  }));
-
   return (
     <View pointerEvents="none" style={{ alignItems: 'center', justifyContent: 'center' }}>
-      {/* Glow verde difuso atrás */}
-      <Animated.View
-        style={[{
-          position: 'absolute',
-          width: 280, height: 280, borderRadius: 140,
-          backgroundColor: '#c6ff4a',
-        }, glowStyle]}
-      />
-      {/* Imagem da bateria */}
       <Animated.View style={wrapStyle}>
         <Image
           source={IDLE_IMG}
@@ -555,6 +533,55 @@ function IdleBattery({ carregando }) {
         />
       </Animated.View>
     </View>
+  );
+}
+
+// ── Anel girando ao redor do raio ─────────────────────────────────────────────
+const RING_SIZE = 200;
+const RING_C    = RING_SIZE / 2;
+const RING_R    = RING_C - 6;
+const RING_CIRC = 2 * Math.PI * RING_R;
+
+function RotatingRing({ carregando, color }) {
+  const rot  = useSharedValue(0);
+  const fade = useSharedValue(0);
+
+  useEffect(() => {
+    if (carregando) {
+      fade.value = withTiming(1, { duration: 600, easing: Easing.out(Easing.cubic) });
+      rot.value = withRepeat(
+        withTiming(360, { duration: 4500, easing: Easing.linear }),
+        -1, false,
+      );
+    } else {
+      fade.value = withTiming(0, { duration: 400, easing: Easing.in(Easing.cubic) });
+      cancelAnimation(rot);
+    }
+    return () => {
+      cancelAnimation(rot);
+      cancelAnimation(fade);
+    };
+  }, [carregando]);
+
+  const wrapStyle = useAnimatedStyle(() => ({
+    opacity: fade.value,
+    transform: [{ rotate: `${rot.value}deg` }],
+  }));
+
+  return (
+    <Animated.View pointerEvents="none" style={[{ width: RING_SIZE, height: RING_SIZE }, wrapStyle]}>
+      <Svg width={RING_SIZE} height={RING_SIZE}>
+        <Circle
+          cx={RING_C} cy={RING_C} r={RING_R}
+          fill="none"
+          stroke={color}
+          strokeWidth={2.5}
+          strokeOpacity={0.65}
+          strokeLinecap="round"
+          strokeDasharray={`${RING_CIRC * 0.42} ${RING_CIRC * 0.58}`}
+        />
+      </Svg>
+    </Animated.View>
   );
 }
 
@@ -770,16 +797,27 @@ export default function ChargingScreen({ route, navigation }) {
               <ChargingGlow carregando={carregando} color={PRIMARY} />
             </View>
 
+            {/* Anel girando ao redor do raio */}
+            <View
+              pointerEvents="none"
+              style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}
+            >
+              <RotatingRing carregando={carregando} color={PRIMARY} />
+            </View>
+
             {carregando && (
               <View
                 pointerEvents="none"
                 style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}
               >
-                {/* Raio do logo JUICE (mesmo path do "I" do wordmark) */}
-                <Svg width={140} height={180} viewBox="150 5 75 115">
+                {/* Raio centralizado — eixo vertical, centroide em (12,12) */}
+                <Svg width={140} height={180} viewBox="0 0 24 24">
                   <Path
-                    d="M 204 12 L 156 76 L 184 76 L 171 113 L 217 63 L 190 63 Z"
+                    d="M 12 2 L 6 13 L 11 13 L 12 22 L 18 11 L 13 11 Z"
                     fill={PRIMARY}
+                    stroke={PRIMARY}
+                    strokeWidth={0.5}
+                    strokeLinejoin="round"
                   />
                 </Svg>
               </View>

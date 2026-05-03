@@ -173,7 +173,7 @@ export default function SplashScreen() {
           </View>
 
           <Text style={{ fontSize: 30, fontWeight: '600', color: '#ffffff', letterSpacing: -0.5 }}>
-            CNB
+            Juice
           </Text>
         </Animated.View>
 

@@ -15,8 +15,12 @@ const PRIMARY = '#c6ff4a';
 
 const FAQ = [
   {
+    q: 'O CNB Mobile vai virar JUICE Mobile?',
+    a: 'Sim — o rebrand para JUICE Mobile é parte estratégica da implantação completa do sistema na Solana. O novo nome reflete melhor a essência do produto (energia do carregamento → valor on-chain) e posiciona o projeto como a melhor opção dentro do ecossistema DePIN global da Solana, onde competimos com players internacionais. Sua conta, seus pontos e seus CNB tokens permanecem intactos durante a transição — só muda a marca.',
+  },
+  {
     q: 'O que é DePIN?',
-    a: 'DePIN (Decentralized Physical Infrastructure Network) é uma rede onde usuários comuns contribuem com infraestrutura física — no caso do CNB, o ato de carregar o celular — e são recompensados por isso de forma transparente e verificável on-chain.',
+    a: 'DePIN (Decentralized Physical Infrastructure Network) é uma rede onde usuários comuns contribuem com infraestrutura física — no caso do JUICE Mobile, o ato de carregar o celular — e são recompensados por isso de forma transparente e verificável on-chain.',
   },
   {
     q: 'Como meus pontos são gerados?',
@@ -28,7 +32,7 @@ const FAQ = [
   },
   {
     q: 'O que é a privacidade ZK?',
-    a: 'Zero-Knowledge Proofs permitem provar que sua atividade é real sem revelar quem você é. O CNB registra a prova on-chain usando seu UID hasheado — ninguém consegue identificar você a partir do registro público.',
+    a: 'Zero-Knowledge Proofs permitem provar que sua atividade é real sem revelar quem você é. O JUICE Mobile registra a prova on-chain usando seu UID hasheado — ninguém consegue identificar você a partir do registro público.',
   },
   {
     q: 'Como funciona o resgate privado?',
@@ -135,7 +139,7 @@ export default function DePINInfoScreen({ navigation }) {
                 marginTop: 16, fontSize: 26, fontWeight: '700',
                 color: '#fff', letterSpacing: -0.5,
               }}>
-                CNB Mobile
+                JUICE Mobile
               </Text>
               <View style={{
                 marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 6,

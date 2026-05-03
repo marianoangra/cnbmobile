@@ -1,7 +1,7 @@
 import './global.css'; // NativeWind
 import './src/i18n'; // inicializa i18n antes de tudo
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Alert, Platform, Modal, Text, TouchableOpacity, StyleSheet, Linking, AppState, StatusBar, Animated } from 'react-native';
+import { View, Alert, Platform, Modal, Text, TouchableOpacity, StyleSheet, Linking, AppState, StatusBar, Animated, Easing } from 'react-native';
 import * as Battery from 'expo-battery';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -32,7 +32,27 @@ import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { AccentProvider, useAccent } from './src/context/AccentContext';
 import ErrorBoundary from './src/components/ErrorBoundary';
 import { Home, Zap, Trophy, User, Target } from 'lucide-react-native';
+import Svg, { Polygon, Circle } from 'react-native-svg';
+
+const AnimatedSvg = Animated.createAnimatedComponent(Svg);
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+// Raio com eixo vertical — pontos topo e base ambos em x=12, simetria 180° em (12,12)
+function CenteredBolt({ size = 22, color = '#0A0F1E' }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Polygon
+        points="12,2 6,13 11,13 12,22 18,11 13,11"
+        fill={color}
+        stroke={color}
+        strokeWidth={1.6}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        fillRule="evenodd"
+      />
+    </Svg>
+  );
+}
 
 import MissoesScreen from './src/screens/MissoesScreen';
 import SplashScreen from './src/screens/SplashScreen';
@@ -73,6 +93,24 @@ function FloatingTabBar({ state, descriptors, navigation }) {
   const [charging, setCharging] = useState(false);
   const pulseAnim = React.useRef(new Animated.Value(1)).current;
   const glowAnim  = React.useRef(new Animated.Value(0)).current;
+  const ringAnim  = React.useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.timing(ringAnim, {
+        toValue: 1,
+        duration: 4500,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    ).start();
+    return () => ringAnim.stopAnimation();
+  }, []);
+
+  const ringSpin = ringAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
 
   useEffect(() => {
     let sub;
@@ -193,6 +231,29 @@ function FloatingTabBar({ state, descriptors, navigation }) {
                         opacity: glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 0.25] }),
                       }}
                     />
+                    {/* Anel girando ao redor do botão */}
+                    <Animated.View
+                      pointerEvents="none"
+                      style={{
+                        position: 'absolute',
+                        width: 66, height: 66,
+                        transform: [{ rotate: ringSpin }],
+                      }}
+                    >
+                      <Svg width={66} height={66}>
+                        <Circle
+                          cx={33}
+                          cy={33}
+                          r={31}
+                          fill="none"
+                          stroke={centerColor}
+                          strokeOpacity={0.45}
+                          strokeWidth={1.6}
+                          strokeLinecap="round"
+                          strokeDasharray="22 16"
+                        />
+                      </Svg>
+                    </Animated.View>
                     {/* Botão principal animado */}
                     <Animated.View style={{
                       width: 54, height: 54, borderRadius: 27,
@@ -205,7 +266,7 @@ function FloatingTabBar({ state, descriptors, navigation }) {
                       elevation: 10,
                       transform: [{ scale: pulseAnim }],
                     }}>
-                      <Icon size={22} color="#0A0F1E" strokeWidth={2.5} />
+                      <CenteredBolt size={28} color="#0A0F1E" />
                     </Animated.View>
                   </View>
                 </TouchableOpacity>
