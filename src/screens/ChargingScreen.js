@@ -563,40 +563,23 @@ const GLOW_SIZE = 300;
 const GLOW_C    = GLOW_SIZE / 2;
 
 function ChargingGlow({ carregando, color }) {
-  const rotCw  = useSharedValue(0);
-  const rotCcw = useSharedValue(0);
-  const fade   = useSharedValue(0);
+  const fade = useSharedValue(0);
 
   useEffect(() => {
     if (carregando) {
       fade.value = withTiming(1, { duration: 700, easing: Easing.out(Easing.cubic) });
-      rotCw.value = withRepeat(
-        withTiming(360, { duration: 4200, easing: Easing.linear }),
-        -1, false,
-      );
-      rotCcw.value = withRepeat(
-        withTiming(-360, { duration: 6800, easing: Easing.linear }),
-        -1, false,
-      );
     } else {
       fade.value = withTiming(0, { duration: 600, easing: Easing.in(Easing.cubic) });
-      cancelAnimation(rotCw);
-      cancelAnimation(rotCcw);
     }
     return () => {
-      cancelAnimation(rotCw);
-      cancelAnimation(rotCcw);
       cancelAnimation(fade);
     };
   }, [carregando]);
 
   const wrapStyle = useAnimatedStyle(() => ({ opacity: fade.value }));
-  const cwStyle   = useAnimatedStyle(() => ({ transform: [{ rotate: `${rotCw.value}deg`  }] }));
-  const ccwStyle  = useAnimatedStyle(() => ({ transform: [{ rotate: `${rotCcw.value}deg` }] }));
 
   const r1 = GLOW_C - 14;
   const r2 = GLOW_C - 38;
-  const r3 = GLOW_C - 62;
 
   return (
     <Animated.View pointerEvents="none" style={[{
@@ -611,53 +594,6 @@ function ChargingGlow({ carregando, color }) {
         <Circle cx={GLOW_C} cy={GLOW_C} r={r2} fill="none" stroke={color} strokeOpacity={0.05} strokeWidth={22} />
         <Circle cx={GLOW_C} cy={GLOW_C} r={r2} fill="none" stroke={color} strokeOpacity={0.10} strokeWidth={10} />
       </Svg>
-
-      {/* Camada 1 — arcos girando horário, mais brilhantes */}
-      <Animated.View style={[StyleSheet.absoluteFill, cwStyle]}>
-        <Svg width={GLOW_SIZE} height={GLOW_SIZE}>
-          {/* glow espesso e suave */}
-          <Circle
-            cx={GLOW_C} cy={GLOW_C} r={r1}
-            fill="none" stroke={color} strokeOpacity={0.18}
-            strokeWidth={10} strokeLinecap="round"
-            strokeDasharray={`${Math.PI * r1 * 0.55} ${Math.PI * r1 * 1.45}`}
-          />
-          {/* linha brilhante central */}
-          <Circle
-            cx={GLOW_C} cy={GLOW_C} r={r1}
-            fill="none" stroke={color} strokeOpacity={0.9}
-            strokeWidth={2} strokeLinecap="round"
-            strokeDasharray={`${Math.PI * r1 * 0.55} ${Math.PI * r1 * 1.45}`}
-          />
-          {/* segunda volta defasada */}
-          <Circle
-            cx={GLOW_C} cy={GLOW_C} r={r2}
-            fill="none" stroke={color} strokeOpacity={0.5}
-            strokeWidth={1.6} strokeLinecap="round"
-            strokeDasharray={`${Math.PI * r2 * 0.32} ${Math.PI * r2 * 1.68}`}
-            strokeDashoffset={Math.PI * r2 * 0.6}
-          />
-        </Svg>
-      </Animated.View>
-
-      {/* Camada 2 — arcos girando anti-horário, finos */}
-      <Animated.View style={[StyleSheet.absoluteFill, ccwStyle]}>
-        <Svg width={GLOW_SIZE} height={GLOW_SIZE}>
-          <Circle
-            cx={GLOW_C} cy={GLOW_C} r={r2}
-            fill="none" stroke={color} strokeOpacity={0.6}
-            strokeWidth={1.4} strokeLinecap="round"
-            strokeDasharray={`${Math.PI * r2 * 0.42} ${Math.PI * r2 * 1.58}`}
-          />
-          <Circle
-            cx={GLOW_C} cy={GLOW_C} r={r3}
-            fill="none" stroke={color} strokeOpacity={0.35}
-            strokeWidth={1.2} strokeLinecap="round"
-            strokeDasharray={`${Math.PI * r3 * 0.25} ${Math.PI * r3 * 1.75}`}
-            strokeDashoffset={Math.PI * r3 * 0.4}
-          />
-        </Svg>
-      </Animated.View>
 
     </Animated.View>
   );
