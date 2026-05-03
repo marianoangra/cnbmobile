@@ -8,7 +8,7 @@ import Animated, {
   withTiming, withRepeat, withSequence,
   Easing, cancelAnimation,
 } from 'react-native-reanimated';
-import Svg, { Circle, G, Line } from 'react-native-svg';
+import Svg, { Circle, G, Line, Path } from 'react-native-svg';
 import * as Battery from 'expo-battery';
 import { Zap, Plug, TrendingUp } from 'lucide-react-native';
 import { useCarregamento } from '../hooks/useCarregamento';
@@ -775,17 +775,13 @@ export default function ChargingScreen({ route, navigation }) {
                 pointerEvents="none"
                 style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}
               >
-                <Image
-                  source={require('../../assets/cnb-logo.png')}
-                  style={{
-                    width: 140, height: 140,
-                    tintColor: PRIMARY,
-                    shadowColor: PRIMARY,
-                    shadowOpacity: 0.6,
-                    shadowRadius: 24,
-                  }}
-                  resizeMode="contain"
-                />
+                {/* Raio do logo JUICE (mesmo path do "I" do wordmark) */}
+                <Svg width={140} height={180} viewBox="150 5 75 115">
+                  <Path
+                    d="M 204 12 L 156 76 L 184 76 L 171 113 L 217 63 L 190 63 Z"
+                    fill={PRIMARY}
+                  />
+                </Svg>
               </View>
             )}
           </View>
