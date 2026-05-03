@@ -56,7 +56,7 @@ module.exports = function withIOSFixes(config) {
       if (podfile.includes(FIX_MARKER)) return config;
 
       podfile = podfile.replace(
-        /^(target 'CNBMobile' do)/m,
+        /^(target '[^']+' do)/m,
         `${MODULAR_HEADERS_BLOCK}$1`,
       );
 
