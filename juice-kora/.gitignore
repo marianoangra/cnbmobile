@@ -1,0 +1,11 @@
+# Nunca commitar a keypair do paymaster
+kora-keypair.json
+*.keypair.json
+secrets/
+
+# Rust target (caso queira buildar local)
+target/
+
+# Editor
+.vscode/
+.idea/

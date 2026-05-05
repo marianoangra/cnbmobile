@@ -1,0 +1,75 @@
+# ─── kora.toml ───────────────────────────────────────────────────────────────
+# Configuração do paymaster Kora para o JUICE Mobile.
+#
+# IMPORTANTE: Os campos exatos podem variar entre versões do Kora.
+# Antes de fazer deploy, conferir o schema atual em:
+#   https://github.com/solana-foundation/kora/blob/main/kora.toml.example
+#
+# Este arquivo serve como base — ajustar campos se a versão clonada divergir.
+
+# ─── RPC ─────────────────────────────────────────────────────────────────────
+[network]
+# Helius mainnet — substitui ${HELIUS_KEY} via envsubst no entrypoint OU
+# usa endpoint público se a env var não estiver presente.
+rpc_url = "https://api.mainnet-beta.solana.com"
+# Para HA, descomentar e priorizar o Helius:
+# rpc_url = "https://mainnet.helius-rpc.com/?api-key=${HELIUS_KEY}"
+
+# ─── Paymaster (fee_payer) ──────────────────────────────────────────────────
+[paymaster]
+# Path do JSON da keypair montada via Secret Manager
+keypair_path = "/secrets/kora-keypair.json"
+
+# Modo: "free" → paymaster cobre tudo (sem cobrar token do usuário)
+fee_payment_policy = "free"
+
+# Limite de fee por tx (lamports). 50_000 ≈ 5x o fee base. Anti-abuso.
+max_fee_lamports = 50000
+
+# ─── Whitelist de programas permitidos ──────────────────────────────────────
+[allowed_programs]
+list = [
+  # System Program (transferências de SOL)
+  "11111111111111111111111111111111",
+  # SPL Token Program
+  "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+  # Associated Token Account Program
+  "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+  # Memo Program
+  "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr",
+  # Jupiter v6 (swaps)
+  "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+  # Compute Budget (priority fees, geralmente exigido)
+  "ComputeBudget111111111111111111111111111111",
+]
+
+# ─── Whitelist de mints ────────────────────────────────────────────────────
+# Restringe Kora a só sponsorar txs envolvendo esses tokens.
+[allowed_tokens]
+list = [
+  # CNB mint
+  "Ew92cAS3PmGqeNvUjsDCwHoVsiGeLSynFnzpdLTx2pu4",
+  # SOL nativo (necessário pra swap CNB → SOL via Jupiter, que faz wrap/unwrap)
+  "So11111111111111111111111111111111111111112",
+]
+
+# ─── Rate limits (anti-abuso) ──────────────────────────────────────────────
+[rate_limits]
+per_source_per_minute = 10
+per_source_per_day = 200
+
+# Limite global do servidor (todos os sources combinados)
+global_per_minute = 200
+
+# ─── Servidor HTTP ──────────────────────────────────────────────────────────
+[server]
+host = "0.0.0.0"
+port = 8080
+
+# Timeout de cada chamada (segundos)
+request_timeout_secs = 15
+
+# ─── Logging ────────────────────────────────────────────────────────────────
+[logging]
+level = "info"
+format = "json"  # Cloud Run gosta de JSON estruturado

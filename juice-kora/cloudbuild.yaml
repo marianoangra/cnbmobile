@@ -1,0 +1,50 @@
+# ─── cloudbuild.yaml ─────────────────────────────────────────────────────────
+# CI/CD pipeline pra build e deploy do nó Kora no Cloud Run.
+#
+# Uso manual (do diretório juice-kora/):
+#   gcloud builds submit --config cloudbuild.yaml \
+#     --substitutions=_REGION=us-central1,_SERVICE=juice-kora
+#
+# Trigger automático: Cloud Build → conectar repositório → push em main = deploy.
+
+substitutions:
+  _REGION: us-central1
+  _SERVICE: juice-kora
+  _IMAGE: gcr.io/${PROJECT_ID}/juice-kora:${SHORT_SHA}
+
+steps:
+  # 1. Build da imagem Docker
+  - name: gcr.io/cloud-builders/docker
+    args: ['build', '-t', '${_IMAGE}', '.']
+
+  # 2. Push pro Container Registry
+  - name: gcr.io/cloud-builders/docker
+    args: ['push', '${_IMAGE}']
+
+  # 3. Deploy no Cloud Run (com min-instances=1 pra evitar cold starts)
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE}
+      - --image=${_IMAGE}
+      - --region=${_REGION}
+      - --platform=managed
+      - --allow-unauthenticated
+      - --min-instances=1
+      - --max-instances=10
+      - --memory=512Mi
+      - --cpu=1
+      - --port=8080
+      - --timeout=30s
+      - --concurrency=80
+      # Secrets via Secret Manager (criar antes: gcloud secrets create ...)
+      - --set-secrets=/secrets/kora-keypair.json=kora-keypair:latest
+      - --set-secrets=HELIUS_KEY=helius-key:latest
+
+images:
+  - ${_IMAGE}
+
+options:
+  logging: CLOUD_LOGGING_ONLY

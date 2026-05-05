@@ -12,7 +12,7 @@ import {
   getMnemonic, restoreWalletFromMnemonic, validarMnemonic,
 } from '../services/walletService';
 import { useTheme } from '../context/ThemeContext';
-import { Zap, Lock, AlertCircle, Eye, EyeOff, RefreshCw, ArrowLeft } from 'lucide-react-native';
+import { Zap, Lock, AlertCircle, Eye, EyeOff, RefreshCw, ArrowLeft, Send, ArrowDownUp } from 'lucide-react-native';
 
 const EXPLORER = (addr) =>
   `https://explorer.solana.com/address/${addr}`;
@@ -313,6 +313,25 @@ export default function WalletScreen({ route, navigation }) {
               Seus CNB tokens aparecerão aqui após o primeiro resgate.
             </Text>
           )}
+
+          {cnbBalance > 0 && (
+            <View style={styles.actionsRow}>
+              <TouchableOpacity
+                style={styles.actionBtn}
+                onPress={() => navigation.navigate('TransferCNB', { user })}
+              >
+                <Send size={14} color={colors.background} />
+                <Text style={styles.actionBtnText}>Enviar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionBtn, styles.actionBtnSecondary]}
+                onPress={() => navigation.navigate('Swap', { user })}
+              >
+                <ArrowDownUp size={14} color={colors.primary} />
+                <Text style={styles.actionBtnSecondaryText}>Trocar por SOL</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
         <View style={styles.card}>
@@ -417,6 +436,18 @@ function createStyles(colors) {
     divider:     { width: 1, height: 40, backgroundColor: colors.border },
 
     hint: { textAlign: 'center', color: colors.secondary, fontSize: 12, marginTop: 16 },
+
+    actionsRow: { flexDirection: 'row', gap: 10, marginTop: 16 },
+    actionBtn: {
+      flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+      backgroundColor: colors.primary,
+      borderRadius: 10, paddingVertical: 11,
+    },
+    actionBtnText: { color: colors.background, fontWeight: '700', fontSize: 13 },
+    actionBtnSecondary: {
+      backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.primary,
+    },
+    actionBtnSecondaryText: { color: colors.primary, fontWeight: '700', fontSize: 13 },
 
     provaItem: {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
