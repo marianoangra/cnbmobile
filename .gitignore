@@ -52,3 +52,10 @@ credentials.json
 .qoder/
 .trae/
 skills-lock.json
+
+# artefatos de debug local (screenshots, dumps, logs ad-hoc)
+_*.png
+_*.json
+_*.xml
+_*.txt
+log_*.txt
