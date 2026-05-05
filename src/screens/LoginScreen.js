@@ -37,13 +37,11 @@ export default function LoginScreen({ navigation }) {
   const [loadingApple, setLoadingApple] = useState(false);
   const [appleAvailable, setAppleAvailable] = useState(false);
 
-  const googleRedirectClientId = Platform.OS === 'ios' ? IOS_CLIENT_ID : ANDROID_CLIENT_ID;
   const [googleRequest, googleResponse, googlePromptAsync] = Google.useAuthRequest({
     iosClientId: IOS_CLIENT_ID,
     androidClientId: ANDROID_CLIENT_ID,
     webClientId: WEB_CLIENT_ID,
     scopes: ['openid', 'profile', 'email'],
-    redirectUri: `com.googleusercontent.apps.${googleRedirectClientId.split('.')[0]}:/oauthredirect`,
   });
 
   const opacity = useRef(new Animated.Value(0)).current;

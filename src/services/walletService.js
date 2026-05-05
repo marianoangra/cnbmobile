@@ -183,6 +183,18 @@ export async function getWalletAddress(uid) {
   return bs58.encode(kp.publicKey);
 }
 
+/**
+ * Retorna a secret key (64 bytes ed25519) para assinar transações.
+ * Usar SOMENTE em memória — nunca persistir fora do SecureStore.
+ * Necessário para o Kora paymaster (assinatura local antes do envio).
+ */
+export async function getKeypairBytes(uid) {
+  if (!uid) throw new Error('uid obrigatório');
+  const stored = await SecureStore.getItemAsync(STORE_KEY(uid));
+  if (!stored) throw new Error('Carteira não encontrada — execute getOrCreateWallet primeiro.');
+  return bs58.decode(stored);
+}
+
 // ─── Saldo CNB ───────────────────────────────────────────────────────────────
 
 /**

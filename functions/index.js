@@ -1327,3 +1327,91 @@ exports.backfillReferralPoints = onCall(
     return { creditados: totalCreditados, pontosTotais: totalPontos, detalhes: resultados };
   }
 );
+
+// ─── Monitoramento do saldo do paymaster Kora ────────────────────────────────
+// Roda hourly. Se o saldo SOL do paymaster cair abaixo do threshold,
+// envia email pra DESTINATARIO avisando pra recarregar.
+//
+// Configurar antes de habilitar:
+//   firebase functions:config:set kora.pubkey="<base58_pubkey_paymaster>"
+// OU definir via env Cloud Functions: KORA_PUBKEY=<pubkey>
+const KORA_SALDO_MINIMO_SOL = 0.05;
+
+exports.monitorarKoraSaldo = onSchedule(
+  {
+    schedule: 'every 60 minutes',
+    secrets: [smtpUser, smtpPass],
+    region: 'us-central1',
+  },
+  async () => {
+    const koraPubkey = process.env.KORA_PUBKEY;
+    if (!koraPubkey) {
+      console.warn('[KoraMonitor] KORA_PUBKEY não configurado — pulando.');
+      return;
+    }
+
+    try {
+      const { Connection, PublicKey } = require('@solana/web3.js');
+      const conn = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
+      const pubkey = new PublicKey(koraPubkey);
+      const lamports = await conn.getBalance(pubkey);
+      const sol = lamports / 1e9;
+
+      console.log(`[KoraMonitor] Saldo paymaster: ${sol.toFixed(6)} SOL`);
+
+      // Registra histórico no Firestore para visualização
+      await getFirestore().collection('kora_balance_log').add({
+        sol,
+        lamports,
+        timestamp: FieldValue.serverTimestamp(),
+        threshold: KORA_SALDO_MINIMO_SOL,
+        alertou: sol < KORA_SALDO_MINIMO_SOL,
+      });
+
+      if (sol >= KORA_SALDO_MINIMO_SOL) return;
+
+      // Saldo baixo — manda alerta
+      const transporter = nodemailer.createTransport({
+        host: 'smtp.gmail.com', port: 465, secure: true,
+        auth: { user: smtpUser.value(), pass: smtpPass.value() },
+      });
+
+      const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #ff4d4d; background: #0A0F1E; padding: 20px; border-radius: 8px;">
+            ⚠️ Paymaster Kora com saldo baixo
+          </h2>
+          <p>O paymaster do JUICE Mobile está com saldo abaixo do limite.</p>
+          <table style="width: 100%; border-collapse: collapse; margin-top: 16px;">
+            <tr style="background: #f5f5f5;">
+              <td style="padding: 10px; font-weight: bold;">Pubkey</td>
+              <td style="padding: 10px; font-family: monospace;">${koraPubkey}</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px; font-weight: bold;">Saldo atual</td>
+              <td style="padding: 10px;">${sol.toFixed(6)} SOL</td>
+            </tr>
+            <tr style="background: #f5f5f5;">
+              <td style="padding: 10px; font-weight: bold;">Mínimo configurado</td>
+              <td style="padding: 10px;">${KORA_SALDO_MINIMO_SOL} SOL</td>
+            </tr>
+          </table>
+          <p style="margin-top: 20px;">
+            Recarregar via: <code>solana transfer ${koraPubkey} 0.5</code>
+          </p>
+        </div>
+      `;
+
+      await transporter.sendMail({
+        from: smtpUser.value(),
+        to: DESTINATARIO,
+        subject: `⚠️ Kora paymaster saldo baixo: ${sol.toFixed(4)} SOL`,
+        html,
+      });
+
+      console.log('[KoraMonitor] Alerta de saldo baixo enviado.');
+    } catch (e) {
+      console.error('[KoraMonitor] Falha:', e.message);
+    }
+  }
+);

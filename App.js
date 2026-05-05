@@ -65,6 +65,8 @@ import ProfileScreen from './src/screens/ProfileScreen';
 import WithdrawScreen from './src/screens/WithdrawScreen';
 import EditProfileScreen from './src/screens/EditProfileScreen';
 import WalletScreen from './src/screens/WalletScreen';
+import TransferCNBScreen from './src/screens/TransferCNBScreen';
+import SwapScreen from './src/screens/SwapScreen';
 import DePINInfoScreen from './src/screens/DePINInfoScreen';
 import BuyTokensScreen from './src/screens/BuyTokensScreen';
 import DadosScreen from './src/screens/DadosScreen';
@@ -390,6 +392,14 @@ function AppNavigator({ user, perfil, onAtualizar, atualizarPerfil }) {
         <>
           <Stack.Screen
             name="Wallet" component={WalletScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="TransferCNB" component={TransferCNBScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="Swap" component={SwapScreen}
             options={{ headerShown: false }}
           />
           <Stack.Screen
