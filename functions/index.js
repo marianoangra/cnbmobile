@@ -15,6 +15,7 @@ const smtpUser = defineSecret('SMTP_USER');
 const smtpPass = defineSecret('SMTP_PASS');
 const solanaPrivateKey = defineSecret('SOLANA_PRIVATE_KEY');
 const koraKeypair = defineSecret('kora-keypair');
+const juiceAttestorKeypair = defineSecret('JUICE_ATTESTOR_KEYPAIR');
 
 const DESTINATARIO = 'contato@rafaelmariano.com.br';
 
@@ -650,16 +651,58 @@ exports.registrarAtividadeDiaria = onSchedule(
   }
 );
 
-// ─── Proof of Engagement: registra sessão individual na Solana ───────────────
-// Chamado pelo app ao fim de cada sessão de carregamento.
-// Escreve um Memo com: uidHash (privado), timestamp, duração e pontos da sessão.
-exports.registrarProvasSessao = onCall(
-  { secrets: [solanaPrivateKey], region: 'us-central1' },
+// ─── Per-session nonce issuance for Play Integrity / App Attest ──────────────
+// Chamado pelo app ANTES de iniciar a sessão de carregamento.
+// Emite nonce de 32 bytes e persiste em /sessions/{uid}/nonces/{attestationSessionId}
+// com TTL de 30min. O cliente envia esse nonce ao Play Integrity API (Android)
+// ou usa como challenge para App Attest (iOS), e devolve o token assinado em
+// registrarProvasSessao. Anti-replay: nonce só pode ser consumido uma vez.
+const INTEGRITY_NONCE_TTL_MS = 30 * 60 * 1000;
+
+exports.initSession = onCall(
+  { region: 'us-central1' },
   async (request) => {
     if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
 
     const uid = request.auth.uid;
-    const { duracaoMinutos } = request.data;
+    const db = getFirestore();
+    const attestationSessionId = crypto.randomUUID();
+    // Nonce: 32 bytes base64url — Play Integrity aceita até ~50 chars; App Attest até 32 bytes raw.
+    const nonce = crypto.randomBytes(32).toString('base64url');
+    const expiresAt = Date.now() + INTEGRITY_NONCE_TTL_MS;
+
+    await db
+      .collection('sessions').doc(uid)
+      .collection('nonces').doc(attestationSessionId)
+      .set({
+        nonce,
+        expiresAt,
+        consumed: false,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+
+    console.log(`[initSession] uid=${uid} session=${attestationSessionId} ttl=${INTEGRITY_NONCE_TTL_MS / 60000}min`);
+
+    return { attestationSessionId, nonce, expiresAt };
+  }
+);
+
+// ─── Proof of Engagement: registra sessão individual na Solana ───────────────
+// Chamado pelo app ao fim de cada sessão de carregamento.
+// Emite atestação SAS (Solana Attestation Service) com sessionId, uidHash, duração,
+// pontos, timestamp e (híbrido) wallet do user. Anchor dual-write mantido pra contabilidade.
+//
+// Soft-gate de attestation (Play Integrity / App Attest) aplicado no início:
+// quando INTEGRITY_HARD_ENFORCE=false, apenas loga; quando true, rejeita request
+// sem token válido. Flipar para true depois que a maioria dos clients estiver na
+// build com módulo nativo de attestation.
+exports.registrarProvasSessao = onCall(
+  { secrets: [solanaPrivateKey, juiceAttestorKeypair], region: 'us-central1' },
+  async (request) => {
+    if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
+
+    const uid = request.auth.uid;
+    const { duracaoMinutos, attestationSessionId, integrityToken, platform } = request.data;
 
     if (
       typeof duracaoMinutos !== 'number' ||
@@ -670,60 +713,110 @@ exports.registrarProvasSessao = onCall(
       throw new HttpsError('invalid-argument', 'Duração inválida (1–1440 minutos).');
     }
 
-    const { Connection, PublicKey, Transaction, TransactionInstruction } = require('@solana/web3.js');
-    const MEMO_PROGRAM = new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr');
+    const sasHelper = require('./sas-helper');
     const db = getFirestore();
 
-    // Hash do UID para preservar privacidade na blockchain pública
+    // ─── Soft-gate de attestation (Play Integrity / App Attest) ───────────────
+    // INTEGRITY_HARD_ENFORCE=false: apenas loga (modo de bring-up — clients antigos passam).
+    // INTEGRITY_HARD_ENFORCE=true: rejeita se token ausente ou inválido.
+    const INTEGRITY_HARD_ENFORCE = false;
+    let integrityVerdict = 'NOT_PROVIDED';
+    if (attestationSessionId && integrityToken && platform) {
+      try {
+        const nonceRef = db
+          .collection('sessions').doc(uid)
+          .collection('nonces').doc(attestationSessionId);
+        const nonceSnap = await nonceRef.get();
+        if (!nonceSnap.exists) throw new Error('nonce não encontrado');
+        const nonceData = nonceSnap.data();
+        if (nonceData.consumed) throw new Error('nonce já consumido (replay)');
+        if (Date.now() > nonceData.expiresAt) throw new Error('nonce expirado');
+
+        if (platform === 'android') {
+          const playIntegrity = require('./play-integrity-helper');
+          const result = await playIntegrity.validateIntegrityToken(integrityToken, nonceData.nonce);
+          integrityVerdict = `OK_ANDROID (${result.verdict.appRecognition}|${result.verdict.deviceVerdicts.join(',')})`;
+        } else if (platform === 'ios') {
+          // iOS App Attest — Day 2; por ora soft-pass com log dedicado
+          integrityVerdict = 'IOS_PENDING_DAY2';
+        } else {
+          throw new Error(`platform desconhecida: ${platform}`);
+        }
+
+        // Anti-replay: marca consumido só DEPOIS da validação ter passado
+        await nonceRef.update({ consumed: true, consumedAt: FieldValue.serverTimestamp() });
+      } catch (e) {
+        integrityVerdict = `INVALID (${e.message})`;
+        if (INTEGRITY_HARD_ENFORCE) {
+          console.warn(`[Integrity] HARD-REJECT uid=${uid}: ${e.message}`);
+          throw new HttpsError('permission-denied', 'Integrity check falhou.');
+        }
+        console.warn(`[Integrity] SOFT-REJECT (logged only) uid=${uid}: ${e.message}`);
+      }
+    } else if (INTEGRITY_HARD_ENFORCE) {
+      console.warn(`[Integrity] HARD-REJECT uid=${uid}: token/sessionId/platform ausente`);
+      throw new HttpsError('failed-precondition', 'attestationSessionId, integrityToken e platform são obrigatórios.');
+    }
+    console.log(`[Integrity] uid=${uid} | verdict=${integrityVerdict} | enforce=${INTEGRITY_HARD_ENFORCE}`);
+    // ─── Fim do soft-gate ─────────────────────────────────────────────────────
+
+    // Hash do UID para preservar privacidade na blockchain pública (mesmo padrão do Anchor)
     const uidHash = crypto.createHash('sha256').update(uid).digest('hex').slice(0, 16);
     const pontos = duracaoMinutos * 10 + Math.floor(duracaoMinutos / 60) * 50;
-    const ts = new Date().toISOString();
+    const sessionId = crypto.randomUUID();
+    const endedAtSec = Math.floor(Date.now() / 1000);
+    const ts = new Date(endedAtSec * 1000).toISOString();
 
-    const memo = JSON.stringify({
-      app: 'CNB Mobile',
-      event: 'session',
-      uidHash,
-      ts,
-      dur: duracaoMinutos,
-      pts: pontos,
-    });
+    // Pré-fetch user doc — usado tanto pra hybrid pubkey quanto pra referrer do Anchor
+    let userData = {};
+    try {
+      const userSnap = await db.collection('usuarios').doc(uid).get();
+      if (userSnap.exists) userData = userSnap.data();
+    } catch (e) {
+      console.warn('[Session] Falha ao ler usuarios/' + uid + ':', e.message);
+    }
+    const userPubkey = userData.solanaWallet || null; // null = privacy opt-out
+    const referrerUid = userData.referidoPor ?? null;
 
     try {
-      const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
-      const projectKeypair = carregarKeypair(solanaPrivateKey.value());
+      // ── 1. Emite atestação SAS (substitui o antigo Memo program) ──────────
+      const issuer = await sasHelper.loadIssuerSigner(juiceAttestorKeypair.value());
+      const sasResult = await sasHelper.attestarSessao(issuer, {
+        firebaseUid: uid,
+        sessionId,
+        durationMinutes: duracaoMinutos,
+        endedAtSec,
+        pontos,
+        userPubkey,
+      });
+      const signature = sasResult.signature;
+      const attestationPda = sasResult.attestationPda;
+      const solscanUrl = `https://solscan.io/tx/${signature}`;
 
-      const transaction = new Transaction();
-      transaction.add(new TransactionInstruction({
-        keys: [{ pubkey: projectKeypair.publicKey, isSigner: true, isWritable: false }],
-        programId: MEMO_PROGRAM,
-        data: Buffer.from(memo, 'utf8'),
-      }));
-
-      const { blockhash } = await connection.getLatestBlockhash();
-      transaction.recentBlockhash = blockhash;
-      transaction.feePayer = projectKeypair.publicKey;
-
-      const signature = await connection.sendTransaction(transaction, [projectKeypair]);
-      await connection.confirmTransaction(signature, 'confirmed');
-
+      // ── 2. Persiste em Firestore (3 destinos — mesmo pattern de antes) ────
       const provaData = {
         uidHash,
+        sessionId,
         duracaoMinutos,
         pontos,
         ts,
-        signature,
-        solscanUrl: `https://solscan.io/tx/${signature}`,
+        signature,             // mantido pra compat com docs antigos
+        sasSignature: signature,
+        attestationPda,
+        solscanUrl,
         criadoEm: FieldValue.serverTimestamp(),
       };
 
-      // Salva na coleção global (anônima via uidHash) + subcoleção do usuário + stats globais
       await Promise.all([
         db.collection('provas_sessao').add(provaData),
         db.collection('usuarios').doc(uid).collection('provas').add({
+          sessionId,
           duracaoMinutos,
           pontos,
           signature,
-          solscanUrl: `https://solscan.io/tx/${signature}`,
+          sasSignature: signature,
+          attestationPda,
+          solscanUrl,
           criadoEm: FieldValue.serverTimestamp(),
         }),
         db.collection('stats').doc('dashboard').set({
@@ -734,21 +827,25 @@ exports.registrarProvasSessao = onCall(
         }, { merge: true }),
       ]);
 
-      console.log(`[SessionProof] ${uidHash} | ${duracaoMinutos}min | ${pontos}pts | sig: ${signature}`);
+      console.log(`[SAS] session=${sessionId} | ${uidHash} | ${duracaoMinutos}min | ${pontos}pts | pda=${attestationPda} | sig=${signature}`);
 
-      // Dual-write: espelha pontos/minutos no Anchor program (devnet)
+      // ── 3. Anchor dual-write (mantido — contabilidade de pontos/minutos) ──
       try {
-        const userSnap = await db.collection('usuarios').doc(uid).get();
-        const referrerUid = userSnap.exists ? (userSnap.data().referidoPor ?? null) : null;
+        const projectKeypair = carregarKeypair(solanaPrivateKey.value());
         const anchorSig = await acumularPontosOnChain(projectKeypair, uid, pontos, duracaoMinutos, referrerUid);
         console.log(`[Anchor] acumular_pontos ok | sig: ${anchorSig}`);
       } catch (anchorErr) {
         console.warn('[Anchor] acumular_pontos falhou (não crítico):', anchorErr.message);
       }
 
-      return { signature };
+      return {
+        signature,           // backward-compat (useCarregamento.js lê r?.data?.signature)
+        sasSignature: signature,
+        attestationPda,
+        sessionId,
+      };
     } catch (e) {
-      console.warn('[SessionProof] Falha ao registrar on-chain (não crítico):', e.message);
+      console.warn('[SAS] Falha ao emitir atestação (não crítico):', e?.message || e);
       return { error: 'falha' };
     }
   }

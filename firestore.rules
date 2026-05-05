@@ -11,6 +11,13 @@ service cloud.firestore {
     // ── Sessões (token de dispositivo único, isolado por usuário) ────────────
     match /sessions/{uid} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
+
+      // ── Nonces de attestation (Play Integrity / App Attest) ──
+      // Escrita exclusivamente via Admin SDK em initSession + registrarProvasSessao.
+      // Cliente não tem permissão direta — nonce só viaja via Cloud Function.
+      match /nonces/{nonceId} {
+        allow read, write: if false;
+      }
     }
 
     // ── Perfis de usuário ────────────────────────────────────────────────────
