@@ -1,0 +1,16 @@
+{
+  "name": "juice-kora",
+  "version": "1.0.0",
+  "description": "Solana paymaster (gasless feePayer) for JUICE Mobile",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@solana/web3.js": "^1.98.0",
+    "express": "^4.21.2"
+  }
+}

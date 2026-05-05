@@ -1,0 +1,7 @@
+node_modules
+*.json.bak
+kora-keypair.json
+*.bat
+README.md
+generate-keypair.js
+.gitignore

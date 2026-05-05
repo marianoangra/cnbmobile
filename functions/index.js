@@ -14,6 +14,7 @@ initializeApp();
 const smtpUser = defineSecret('SMTP_USER');
 const smtpPass = defineSecret('SMTP_PASS');
 const solanaPrivateKey = defineSecret('SOLANA_PRIVATE_KEY');
+const koraKeypair = defineSecret('kora-keypair');
 
 const DESTINATARIO = 'contato@rafaelmariano.com.br';
 
@@ -1331,29 +1332,23 @@ exports.backfillReferralPoints = onCall(
 // ─── Monitoramento do saldo do paymaster Kora ────────────────────────────────
 // Roda hourly. Se o saldo SOL do paymaster cair abaixo do threshold,
 // envia email pra DESTINATARIO avisando pra recarregar.
-//
-// Configurar antes de habilitar:
-//   firebase functions:config:set kora.pubkey="<base58_pubkey_paymaster>"
-// OU definir via env Cloud Functions: KORA_PUBKEY=<pubkey>
+// Lê o pubkey direto do secret `kora-keypair` (mesma fonte do paymaster).
 const KORA_SALDO_MINIMO_SOL = 0.05;
 
 exports.monitorarKoraSaldo = onSchedule(
   {
     schedule: 'every 60 minutes',
-    secrets: [smtpUser, smtpPass],
+    secrets: [smtpUser, smtpPass, koraKeypair],
     region: 'us-central1',
   },
   async () => {
-    const koraPubkey = process.env.KORA_PUBKEY;
-    if (!koraPubkey) {
-      console.warn('[KoraMonitor] KORA_PUBKEY não configurado — pulando.');
-      return;
-    }
-
     try {
-      const { Connection, PublicKey } = require('@solana/web3.js');
+      const { Connection, Keypair } = require('@solana/web3.js');
       const conn = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
-      const pubkey = new PublicKey(koraPubkey);
+      const arr = JSON.parse(koraKeypair.value());
+      const kp = Keypair.fromSecretKey(Uint8Array.from(arr));
+      const pubkey = kp.publicKey;
+      const koraPubkey = pubkey.toBase58();
       const lamports = await conn.getBalance(pubkey);
       const sol = lamports / 1e9;
 
@@ -1413,5 +1408,120 @@ exports.monitorarKoraSaldo = onSchedule(
     } catch (e) {
       console.error('[KoraMonitor] Falha:', e.message);
     }
+  }
+);
+
+// ─── Paymaster Kora (assina txs como feePayer) ───────────────────────────────
+// Substitui o Cloud Run quando há restrição de org policy bloqueando
+// invocações públicas. Auth via Firebase (httpsCallable já valida).
+//
+// Whitelists: programas (System, Token, ATA, Memo, Jupiter v6, ComputeBudget)
+//             mints (CNB, wSOL)
+const KORA_ALLOWED_PROGRAMS = new Set([
+  '11111111111111111111111111111111',
+  'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
+  'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
+  'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr',
+  'JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4',
+  'ComputeBudget111111111111111111111111111111',
+]);
+
+// Rate limit em memória (por uid). Em produção considerar Firestore + TTL.
+const _koraBuckets = new Map();
+function _koraRateLimitOk(uid) {
+  const now = Date.now();
+  const cutoffMin = now - 60_000;
+  const cutoffDay = now - 86_400_000;
+  const b = _koraBuckets.get(uid) || { min: [], day: [] };
+  b.min = b.min.filter(t => t > cutoffMin);
+  b.day = b.day.filter(t => t > cutoffDay);
+  if (b.min.length >= 10) return false;
+  if (b.day.length >= 200) return false;
+  b.min.push(now);
+  b.day.push(now);
+  _koraBuckets.set(uid, b);
+  return true;
+}
+
+let _koraKeypairCache = null;
+function _carregarKoraKeypair(secretValue) {
+  if (_koraKeypairCache) return _koraKeypairCache;
+  const { Keypair } = require('@solana/web3.js');
+  const arr = JSON.parse(secretValue);
+  _koraKeypairCache = Keypair.fromSecretKey(Uint8Array.from(arr));
+  return _koraKeypairCache;
+}
+
+exports.assinarTxKora = onCall(
+  { secrets: [koraKeypair], region: 'us-central1' },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'Login necessário.');
+    }
+    const uid = request.auth.uid;
+    const { transaction } = request.data || {};
+    if (!transaction || typeof transaction !== 'string') {
+      throw new HttpsError('invalid-argument', 'transaction (base64) obrigatória.');
+    }
+
+    if (!_koraRateLimitOk(uid)) {
+      throw new HttpsError('resource-exhausted', 'Rate limit: máx 10/min, 200/dia.');
+    }
+
+    const {
+      Connection, Transaction, VersionedTransaction,
+    } = require('@solana/web3.js');
+    const conn = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
+    const PAYMASTER = _carregarKoraKeypair(koraKeypair.value());
+
+    const txBytes = Buffer.from(transaction, 'base64');
+
+    // Tenta v0 primeiro, fallback legacy
+    let signature;
+    try {
+      const vtx = VersionedTransaction.deserialize(txBytes);
+      const accountKeys = vtx.message.staticAccountKeys.map(k => k.toBase58());
+
+      // Valida feePayer
+      if (accountKeys[0] !== PAYMASTER.publicKey.toBase58()) {
+        throw new HttpsError('failed-precondition', 'feePayer da tx não é o paymaster.');
+      }
+      // Valida programas
+      for (const ix of vtx.message.compiledInstructions) {
+        const pid = accountKeys[ix.programIdIndex];
+        if (!KORA_ALLOWED_PROGRAMS.has(pid)) {
+          throw new HttpsError('failed-precondition', `Programa não permitido: ${pid}`);
+        }
+      }
+
+      vtx.sign([PAYMASTER]);
+      signature = await conn.sendTransaction(vtx, { skipPreflight: false, maxRetries: 3 });
+    } catch (vtxErr) {
+      if (vtxErr instanceof HttpsError) throw vtxErr;
+      // Fallback: legacy Transaction
+      try {
+        const tx = Transaction.from(txBytes);
+        if (!tx.feePayer || !tx.feePayer.equals(PAYMASTER.publicKey)) {
+          throw new HttpsError('failed-precondition', 'feePayer da tx não é o paymaster.');
+        }
+        for (const ix of tx.instructions) {
+          const pid = ix.programId.toBase58();
+          if (!KORA_ALLOWED_PROGRAMS.has(pid)) {
+            throw new HttpsError('failed-precondition', `Programa não permitido: ${pid}`);
+          }
+        }
+        tx.partialSign(PAYMASTER);
+        signature = await conn.sendRawTransaction(tx.serialize(), {
+          skipPreflight: false, maxRetries: 3,
+        });
+      } catch (legacyErr) {
+        if (legacyErr instanceof HttpsError) throw legacyErr;
+        console.error('[Kora] erro:', legacyErr.message);
+        throw new HttpsError('internal', `Falha ao processar tx: ${legacyErr.message}`);
+      }
+    }
+
+    console.log(`[Kora] uid=${uid} sig=${signature}`);
+    return { signature };
   }
 );

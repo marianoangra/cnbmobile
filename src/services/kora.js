@@ -1,22 +1,21 @@
 'use strict';
 
 /**
- * kora.js — Cliente do paymaster Kora (Solana)
+ * kora.js — Cliente do paymaster Kora
  *
- * O Kora é um relayer que assina transações como `feePayer`, permitindo que
- * a carteira do usuário transacione mesmo sem SOL.
+ * O paymaster vive como Cloud Function (`assinarTxKora`) — usa Firebase Auth
+ * automaticamente via httpsCallable, sem precisar expor endpoint público.
  *
  * Fluxo:
  *   1. App monta as instructions (transfer, swap, etc.)
- *   2. Adiciona feePayer = KORA_PUBKEY e blockhash recente
+ *   2. Define feePayer = KORA_PUBKEY e blockhash recente
  *   3. Usuário assina parcialmente (partialSign)
- *   4. App envia tx serializada pro Kora
- *   5. Kora finaliza assinatura como feePayer e submete pra rede
- *   6. Retorna a signature confirmada
+ *   4. App envia tx serializada (base64) pra Cloud Function
+ *   5. Function valida (whitelist programas) + assina como feePayer + submete
+ *   6. Retorna { signature }
  *
  * Variáveis de ambiente:
- *   EXPO_PUBLIC_KORA_URL    — endpoint JSON-RPC (ex: https://juice-kora.run.app/v1/sign)
- *   EXPO_PUBLIC_KORA_PUBKEY — pubkey base58 do paymaster (feePayer)
+ *   EXPO_PUBLIC_KORA_PUBKEY — pubkey base58 do paymaster (feePayer da tx)
  */
 
 import {
@@ -27,8 +26,8 @@ import {
   VersionedTransaction,
 } from '@solana/web3.js';
 import { Buffer } from 'buffer';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 
-const KORA_URL    = process.env.EXPO_PUBLIC_KORA_URL    || '';
 const KORA_PUBKEY = process.env.EXPO_PUBLIC_KORA_PUBKEY || '';
 
 const _HELIUS_KEY = process.env.EXPO_PUBLIC_HELIUS_KEY;
@@ -39,9 +38,9 @@ const RPC_URL = _HELIUS_KEY && _HELIUS_KEY !== 'sua-api-key-aqui'
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function ensureConfigured() {
-  if (!KORA_URL || !KORA_PUBKEY) {
+  if (!KORA_PUBKEY) {
     throw new Error(
-      'Kora não configurado. Defina EXPO_PUBLIC_KORA_URL e EXPO_PUBLIC_KORA_PUBKEY no .env.'
+      'Kora não configurado. Defina EXPO_PUBLIC_KORA_PUBKEY no .env.'
     );
   }
 }
@@ -55,18 +54,12 @@ export function getConnection() {
   return new Connection(RPC_URL, 'confirmed');
 }
 
-/** Faz a chamada JSON-RPC ao Kora. */
-async function koraRpc(method, params) {
+/** Chama a Cloud Function `assinarTxKora`. */
+async function callKoraFunction(transactionBase64) {
   ensureConfigured();
-  const res = await fetch(KORA_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
-  });
-  if (!res.ok) throw new Error(`Kora HTTP ${res.status}`);
-  const json = await res.json();
-  if (json.error) throw new Error(`Kora: ${json.error.message || 'erro desconhecido'}`);
-  return json.result;
+  const fn = httpsCallable(getFunctions(), 'assinarTxKora');
+  const res = await fn({ transaction: transactionBase64 });
+  return res?.data?.signature;
 }
 
 // ─── API pública ─────────────────────────────────────────────────────────────
@@ -92,20 +85,18 @@ export async function sendSponsored(instructions, userKeypairBytes, opts = {}) {
   tx.feePayer = koraPk;
   tx.recentBlockhash = blockhash;
 
-  // Assinaturas locais (usuário + signers extras)
   const signers = [userKp, ...(opts.extraSigners ?? [])];
   tx.partialSign(...signers);
 
-  // Serializa SEM exigir todas as assinaturas (Kora ainda vai assinar como feePayer)
   const serialized = tx.serialize({ requireAllSignatures: false }).toString('base64');
-
-  const result = await koraRpc('signAndSend', { transaction: serialized });
-  return typeof result === 'string' ? result : result.signature;
+  const sig = await callKoraFunction(serialized);
+  if (!sig) throw new Error('Kora não retornou signature.');
+  return sig;
 }
 
 /**
  * Envia uma VersionedTransaction (v0) já montada — usado pelo Jupiter.
- * Espera-se que a tx já tenha `feePayer = KORA_PUBKEY` (Jupiter aceita feePayer custom).
+ * Espera-se que a tx já tenha `feePayer = KORA_PUBKEY`.
  *
  * @param {string} swapTransactionBase64 - tx base64 retornada pelo Jupiter
  * @param {Uint8Array} userKeypairBytes
@@ -117,25 +108,23 @@ export async function sendSponsoredV0(swapTransactionBase64, userKeypairBytes) {
 
   const txBytes = Buffer.from(swapTransactionBase64, 'base64');
   const vtx = VersionedTransaction.deserialize(txBytes);
-
-  // Assina como signer da carteira (Kora vai assinar como feePayer no servidor)
   vtx.sign([userKp]);
 
   const reSerialized = Buffer.from(vtx.serialize()).toString('base64');
-  const result = await koraRpc('signAndSend', { transaction: reSerialized });
-  return typeof result === 'string' ? result : result.signature;
+  const sig = await callKoraFunction(reSerialized);
+  if (!sig) throw new Error('Kora não retornou signature.');
+  return sig;
 }
 
 /**
- * Status do paymaster (saldo, latência) — para UI de debug ou tela de admin.
+ * Status do paymaster (saldo SOL via RPC público).
  */
 export async function getKoraHealth() {
-  if (!KORA_URL) return { ok: false, reason: 'não configurado' };
+  if (!KORA_PUBKEY) return { ok: false, reason: 'não configurado' };
   try {
-    const t0 = Date.now();
-    const res = await fetch(KORA_URL.replace(/\/v1\/sign\/?$/, '/health'));
-    const ms = Date.now() - t0;
-    return { ok: res.ok, latencyMs: ms };
+    const conn = getConnection();
+    const lamports = await conn.getBalance(new PublicKey(KORA_PUBKEY));
+    return { ok: true, sol: lamports / 1e9 };
   } catch (e) {
     return { ok: false, reason: e.message };
   }
