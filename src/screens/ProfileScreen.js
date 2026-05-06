@@ -22,9 +22,12 @@ import Avatar from '../components/Avatar';
 import {
   Wallet, Share2, Copy, LogOut,
   ChevronRight, Shield, Bell, Settings, Award, User, Users, Database, Inbox, Cpu, Zap,
+  BadgeCheck,
 } from 'lucide-react-native';
+import * as WebBrowser from 'expo-web-browser';
 import { useAccent } from '../context/AccentContext';
 import { useTheme } from '../context/ThemeContext';
+import { subscribeUserAttestations } from '../services/attestations';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 const PRIMARY = '#c6ff4a';
@@ -137,6 +140,8 @@ export default function ProfileScreen({ route, navigation }) {
 
   const [saques, setSaques]               = useState([]);
   const [loadingSaques, setLoadingSaques] = useState(true);
+  const [attestations, setAttestations]   = useState([]);
+  const [loadingAttestations, setLoadingAttestations] = useState(true);
   const [afiliados, setAfiliados]         = useState({ codigo: '', total: 0, ativas: 0, bonus5k: false, bonus10k: false });
   const [perfilLocal, setPerfilLocal]     = useState(perfil);
   const [minhaPos, setMinhaPos]           = useState(null);
@@ -167,6 +172,16 @@ export default function ProfileScreen({ route, navigation }) {
       .then(setSaques)
       .catch(() => setSaques([]))
       .finally(() => setLoadingSaques(false));
+  }, [perfil?.uid]);
+
+  useEffect(() => {
+    if (!perfil?.uid) return;
+    setLoadingAttestations(true);
+    const unsub = subscribeUserAttestations(perfil.uid, (atts) => {
+      setAttestations(atts);
+      setLoadingAttestations(false);
+    }, { max: 30 });
+    return unsub;
   }, [perfil?.uid]);
 
   useEffect(() => {
@@ -681,6 +696,76 @@ export default function ProfileScreen({ route, navigation }) {
                     }
                   </TouchableOpacity>
                 </View>
+              </View>
+            )}
+          </Animated.View>
+
+          {/* ── Provas on-chain (atestações SAS de cada sessão) ── */}
+          <Animated.View style={[{ marginBottom: 24 }, a3]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <Text style={{ fontSize: 18, fontWeight: '600', color: colors.text }}>
+                Provas on-chain
+              </Text>
+              {attestations.length > 0 && (
+                <View style={{
+                  backgroundColor: colors.primaryMid,
+                  borderRadius: 99, paddingHorizontal: 8, paddingVertical: 3,
+                  borderWidth: 1, borderColor: colors.primaryStrong,
+                }}>
+                  <Text style={{ fontSize: 13, color: PRIMARY, fontWeight: '600' }}>
+                    {attestations.length}
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {loadingAttestations ? (
+              <ActivityIndicator color={PRIMARY} style={{ marginTop: 16 }} />
+            ) : attestations.length === 0 ? (
+              <View style={{
+                backgroundColor: colors.surfaceAlt,
+                borderWidth: 1, borderColor: colors.border,
+                borderRadius: 14, padding: 24, alignItems: 'center',
+              }}>
+                <BadgeCheck size={28} color={colors.textGhost} style={{ marginBottom: 8 }} />
+                <Text style={{ color: colors.textDim, fontSize: 16, textAlign: 'center', lineHeight: 22 }}>
+                  Cada sessão de carregamento vira uma prova permanente na Solana.{'\n'}
+                  A primeira aparece aqui após teu próximo carregamento.
+                </Text>
+              </View>
+            ) : (
+              <View style={{ gap: 8 }}>
+                {attestations.map(att => (
+                  <TouchableOpacity
+                    key={att.id}
+                    onPress={() => att.solscanUrl && WebBrowser.openBrowserAsync(att.solscanUrl).catch(() => {})}
+                    disabled={!att.solscanUrl}
+                    activeOpacity={0.75}
+                    style={{
+                      flexDirection: 'row', alignItems: 'center', gap: 12,
+                      backgroundColor: colors.surfaceAlt,
+                      borderWidth: 1, borderColor: colors.border,
+                      borderRadius: 12, padding: 14,
+                    }}
+                  >
+                    <View style={{
+                      width: 36, height: 36, borderRadius: 18,
+                      backgroundColor: att.isSas ? colors.primaryMid : colors.border,
+                      alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <BadgeCheck size={16} color={att.isSas ? PRIMARY : colors.textGhost} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 16, color: colors.text, fontWeight: '500' }}>
+                        {att.duracaoMinutos} min · {(att.pontos ?? 0).toLocaleString('pt-BR')} pts
+                      </Text>
+                      <Text style={{ fontSize: 13, color: colors.textFaint, marginTop: 2 }}>
+                        {formatarData(att.criadoEm)}{att.isSas ? ' · SAS' : ' · legado'}
+                      </Text>
+                    </View>
+                    {att.solscanUrl && <ChevronRight size={16} color={colors.textGhost} />}
+                  </TouchableOpacity>
+                ))}
               </View>
             )}
           </Animated.View>

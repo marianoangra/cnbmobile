@@ -71,6 +71,35 @@ service cloud.firestore {
       // Campos server-only (bloqueados pelos hasOnly acima): indicacoesAtivas,
       // bonus5kGranted, bonus10kGranted, contadoComoAtivo — escritos apenas por
       // onReferreeBecameActive / backfillMilestones.js via Admin SDK.
+
+      // ── Sessões de carregamento (gera atestação SAS via trigger) ───────────
+      // Workaround para callable v2 bloqueada por org policy: app escreve aqui
+      // ao final da sessão; o trigger atestarSessaoCarregamento (functions/index.js)
+      // reage, emite atestação SAS on-chain, atualiza o doc com
+      // {status:'ATTESTED', sasSignature, attestationPda, solscanUrl}.
+      match /sessoes/{sessionId} {
+        // Usuário só lê suas próprias sessões.
+        allow read: if request.auth != null && request.auth.uid == uid;
+
+        // Cria com PENDING + duracaoMinutos válido. Campos opcionais para
+        // Play Integrity (Android) e App Attest (iOS) — validados pelo trigger.
+        // Outras escritas via Admin SDK.
+        allow create: if request.auth != null
+          && request.auth.uid == uid
+          && request.resource.data.duracaoMinutos is int
+          && request.resource.data.duracaoMinutos >= 1
+          && request.resource.data.duracaoMinutos <= 1440
+          && request.resource.data.status == 'PENDING'
+          && request.resource.data.keys().hasOnly(['duracaoMinutos', 'status', 'criadoEm', 'integrityToken', 'platform'])
+          && (request.resource.data.integrityToken == null
+              || (request.resource.data.integrityToken is string
+                  && request.resource.data.integrityToken.size() < 5000))
+          && (request.resource.data.platform == null
+              || request.resource.data.platform in ['android', 'ios']);
+
+        // Update e delete só via Admin SDK (trigger).
+        allow update, delete: if false;
+      }
     }
 
     // ── Lookup de códigos de afiliado ────────────────────────────────────────

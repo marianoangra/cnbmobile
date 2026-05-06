@@ -31,6 +31,7 @@ import { setUsuarioCrash } from './src/services/crashlytics';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { AccentProvider, useAccent } from './src/context/AccentContext';
 import ErrorBoundary from './src/components/ErrorBoundary';
+import AttestationToast from './src/components/AttestationToast';
 import { Home, Zap, Trophy, User, Target } from 'lucide-react-native';
 import Svg, { Polygon, Circle } from 'react-native-svg';
 
@@ -642,14 +643,17 @@ function AppContent() {
 
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
       <AccentProvider modo={perfil?.modo}>
-        <NavigationContainer ref={navigationRef}>
-          <AppNavigator
-            user={user}
-            perfil={perfil}
-            onAtualizar={onAtualizar}
-            atualizarPerfil={atualizarPerfilDireto}
-          />
-        </NavigationContainer>
+        <View style={{ flex: 1 }}>
+          <NavigationContainer ref={navigationRef}>
+            <AppNavigator
+              user={user}
+              perfil={perfil}
+              onAtualizar={onAtualizar}
+              atualizarPerfil={atualizarPerfilDireto}
+            />
+          </NavigationContainer>
+          <AttestationToast />
+        </View>
       </AccentProvider>
     </SafeAreaProvider>
   );

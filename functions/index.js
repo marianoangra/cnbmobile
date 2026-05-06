@@ -1622,3 +1622,173 @@ exports.assinarTxKora = onCall(
     return { signature };
   }
 );
+
+// ─── Atestação de sessão via Firestore trigger ──────────────────────────────
+// Workaround pro IAM bloqueado em callable v2: app escreve doc em
+// `usuarios/{uid}/sessoes/{sessionId}` com {duracaoMinutos, status:'PENDING'}.
+// Este trigger reage, emite atestação SAS on-chain, atualiza o doc com
+// {status:'ATTESTED', sasSignature, attestationPda, solscanUrl}, e o app
+// escuta via onSnapshot pra mostrar toast.
+//
+// Bypassa o IAM dos callable v2 porque triggers Firestore rodam com identity
+// interna (admin SDK), sem precisar de roles/run.invoker pra allUsers.
+exports.atestarSessaoCarregamento = onDocumentCreated(
+  {
+    document: 'usuarios/{uid}/sessoes/{sessionId}',
+    secrets: [solanaPrivateKey, juiceAttestorKeypair],
+    region: 'us-central1',
+    // SAS write + Anchor dual-write + UserAccount creation chega perto de 256 MiB
+    // em cold-start. 512 dá folga e mantém custo trivial (1 invocação por sessão).
+    memory: '512MiB',
+  },
+  async (event) => {
+    const { uid, sessionId } = event.params;
+    const data = event.data?.data();
+    if (!data) return;
+
+    // Idempotência: só processa novos docs em PENDING (ignora ATTESTING/ATTESTED/FAILED)
+    if (data.status !== 'PENDING') return;
+
+    const duracaoMinutos = data.duracaoMinutos;
+    if (!Number.isInteger(duracaoMinutos) || duracaoMinutos < 1 || duracaoMinutos > 1440) {
+      await event.data.ref.update({
+        status: 'FAILED',
+        error: 'duracaoMinutos inválido (esperado inteiro 1..1440)',
+        falhouEm: FieldValue.serverTimestamp(),
+      });
+      return;
+    }
+
+    // ─── Soft-gate de Play Integrity (Android) / App Attest (iOS) ─────────────
+    // sessionId (doc ID) é usado como nonce — Firestore garante unicidade,
+    // protegendo de replay sem precisar de outra collection.
+    // INTEGRITY_HARD_ENFORCE=false: apenas loga (bring-up — clients antigos passam).
+    // INTEGRITY_HARD_ENFORCE=true: marca doc como FAILED se token ausente/inválido.
+    const INTEGRITY_HARD_ENFORCE = false;
+    let integrityVerdict = 'NOT_PROVIDED';
+    const { integrityToken, platform } = data;
+
+    if (integrityToken && platform === 'android') {
+      try {
+        const playIntegrity = require('./play-integrity-helper');
+        const result = await playIntegrity.validateIntegrityToken(integrityToken, sessionId);
+        integrityVerdict = `OK_ANDROID (${result.verdict.appRecognition}|${result.verdict.deviceVerdicts.join(',')})`;
+      } catch (e) {
+        integrityVerdict = `INVALID (${e.message})`;
+        if (INTEGRITY_HARD_ENFORCE) {
+          console.warn(`[Integrity] HARD-REJECT uid=${uid} session=${sessionId}: ${e.message}`);
+          try {
+            await event.data.ref.update({
+              status: 'FAILED',
+              error: `Integrity check falhou: ${e.message}`.slice(0, 500),
+              falhouEm: FieldValue.serverTimestamp(),
+            });
+          } catch {}
+          return;
+        }
+        console.warn(`[Integrity] SOFT-REJECT (logged only) uid=${uid} session=${sessionId}: ${e.message}`);
+      }
+    } else if (platform === 'ios') {
+      // iOS App Attest — Day 5; por ora soft-pass com log dedicado
+      integrityVerdict = 'IOS_PENDING_DAY5';
+    } else if (INTEGRITY_HARD_ENFORCE) {
+      console.warn(`[Integrity] HARD-REJECT uid=${uid} session=${sessionId}: integrityToken/platform ausente`);
+      try {
+        await event.data.ref.update({
+          status: 'FAILED',
+          error: 'integrityToken e platform são obrigatórios',
+          falhouEm: FieldValue.serverTimestamp(),
+        });
+      } catch {}
+      return;
+    }
+    console.log(`[Integrity] uid=${uid} session=${sessionId} | verdict=${integrityVerdict} | enforce=${INTEGRITY_HARD_ENFORCE}`);
+    // ─── Fim do soft-gate ─────────────────────────────────────────────────────
+
+    const sasHelper = require('./sas-helper');
+    const db = getFirestore();
+
+    // Marca como em processamento (evita race se trigger reexecuta)
+    try { await event.data.ref.update({ status: 'ATTESTING' }); } catch {}
+
+    const uidHash = crypto.createHash('sha256').update(uid).digest('hex').slice(0, 16);
+    const pontos = duracaoMinutos * 10 + Math.floor(duracaoMinutos / 60) * 50;
+    const endedAtSec = Math.floor((data.criadoEm?.toMillis?.() ?? Date.now()) / 1000);
+
+    // Pré-fetch user (wallet híbrido + referrer pro Anchor)
+    let userData = {};
+    try {
+      const userSnap = await db.collection('usuarios').doc(uid).get();
+      if (userSnap.exists) userData = userSnap.data();
+    } catch (e) {
+      console.warn('[SAS] Falha ao ler usuarios/' + uid + ':', e.message);
+    }
+    const userPubkey = userData.solanaWallet || null;
+    const referrerUid = userData.referidoPor ?? null;
+
+    try {
+      // 1. Emite atestação SAS
+      const issuer = await sasHelper.loadIssuerSigner(juiceAttestorKeypair.value());
+      const sasResult = await sasHelper.attestarSessao(issuer, {
+        firebaseUid: uid,
+        sessionId,
+        durationMinutes: duracaoMinutos,
+        endedAtSec,
+        pontos,
+        userPubkey,
+      });
+
+      const solscanUrl = `https://solscan.io/tx/${sasResult.signature}`;
+
+      // 2. Atualiza doc da sessão + stats globais + provas anônimas (3 escritas)
+      await Promise.all([
+        event.data.ref.update({
+          status: 'ATTESTED',
+          uidHash,
+          pontos,
+          sasSignature: sasResult.signature,
+          attestationPda: sasResult.attestationPda,
+          solscanUrl,
+          atestadaEm: FieldValue.serverTimestamp(),
+        }),
+        db.collection('stats').doc('dashboard').set({
+          totalMinutos:    FieldValue.increment(duracaoMinutos),
+          totalSessoes:    FieldValue.increment(1),
+          totalPontos:     FieldValue.increment(pontos),
+          ultimaAtividade: FieldValue.serverTimestamp(),
+        }, { merge: true }),
+        db.collection('provas_sessao').add({
+          uidHash,
+          sessionId,
+          duracaoMinutos,
+          pontos,
+          ts: new Date(endedAtSec * 1000).toISOString(),
+          sasSignature: sasResult.signature,
+          attestationPda: sasResult.attestationPda,
+          solscanUrl,
+          criadoEm: FieldValue.serverTimestamp(),
+        }),
+      ]);
+
+      console.log(`[SAS] session=${sessionId} | ${uidHash} | ${duracaoMinutos}min | ${pontos}pts | pda=${sasResult.attestationPda} | sig=${sasResult.signature}`);
+
+      // 3. Anchor dual-write (mantido — contabilidade de pontos/minutos)
+      try {
+        const projectKeypair = carregarKeypair(solanaPrivateKey.value());
+        const anchorSig = await acumularPontosOnChain(projectKeypair, uid, pontos, duracaoMinutos, referrerUid);
+        console.log(`[Anchor] acumular_pontos ok | sig: ${anchorSig}`);
+      } catch (anchorErr) {
+        console.warn('[Anchor] acumular_pontos falhou (não crítico):', anchorErr.message);
+      }
+    } catch (e) {
+      console.error('[SAS] Falha:', e?.message || e);
+      try {
+        await event.data.ref.update({
+          status: 'FAILED',
+          error: String(e?.message || e).slice(0, 500),
+          falhouEm: FieldValue.serverTimestamp(),
+        });
+      } catch {}
+    }
+  }
+);

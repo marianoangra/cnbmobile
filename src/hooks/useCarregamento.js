@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { AppState } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import * as Battery from 'expo-battery';
+import * as Crypto from 'expo-crypto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getFunctions, httpsCallable } from 'firebase/functions';
+import { collection, doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
+import { db } from '../services/firebase';
+import { requestIntegrityToken } from '../../modules/play-integrity';
 import { iniciarForegroundService, pararForegroundService, servicoRodando, SESSAO_KEY } from '../services/backgroundService';
 import { logInicioCarregamento, logFimCarregamento, logSessaoOnChain } from '../services/analytics';
 import { calcularPontosTotal, adicionarMinutoComBonus } from '../services/pontos';
-import { emitPontosUpdate } from '../services/chargeEvents';
+import { emitPontosUpdate, emitSessionAttested } from '../services/chargeEvents';
 import { notificarInicioCarregamento } from '../services/notificacoes';
 
 const LIMITE_MINUTOS_ANTI_BOT = 480; // 8 horas contínuas
@@ -187,10 +190,76 @@ export function useCarregamento(uid, onPontosAdicionados) {
       await AsyncStorage.removeItem(SESSAO_KEY).catch(() => {});
       try { await pararForegroundService(); } catch {}
       if (minutos > 0) {
-        // Registra prova on-chain da sessão (não-bloqueante — falha silenciosa)
-        httpsCallable(getFunctions(), 'registrarProvasSessao')({ duracaoMinutos: minutos })
-          .then(r => logSessaoOnChain(minutos, calcularPontosTotal(minutos), r?.data?.signature))
-          .catch(() => logSessaoOnChain(minutos, calcularPontosTotal(minutos), null));
+        // Cria doc da sessão no Firestore — o trigger atestarSessaoCarregamento
+        // (functions/index.js) reage, emite atestação SAS, e atualiza o mesmo
+        // doc com status='ATTESTED' + sasSignature + attestationPda.
+        // Workaround pro callable v2 estar bloqueado por org policy.
+        //
+        // sessionId gerado localmente (UUID) é doc ID + nonce do Play Integrity
+        // (Android). Firestore garante unicidade do doc ID, protegendo de replay
+        // sem precisar de outra collection.
+        try {
+          const sessionId = Crypto.randomUUID();
+          const docRef = doc(db, 'usuarios', uidRef.current, 'sessoes', sessionId);
+
+          // Anexa integrityToken quando rodando em Android com Play Services.
+          // Falha silenciosa: se Play Integrity falhar (sem Play Services, offline,
+          // device root, etc.), salva sem token — backend está em soft-gate
+          // (INTEGRITY_HARD_ENFORCE=false) e aceita docs sem token como NOT_PROVIDED.
+          let integrityToken = null;
+          let platform = null;
+          if (Platform.OS === 'android') {
+            try {
+              integrityToken = await requestIntegrityToken(sessionId);
+              platform = 'android';
+            } catch (e) {
+              console.warn('[Carregar] Play Integrity falhou, salvando sem token:', e?.message);
+            }
+          }
+
+          const payload = {
+            duracaoMinutos: minutos,
+            status: 'PENDING',
+            criadoEm: serverTimestamp(),
+          };
+          if (integrityToken) {
+            payload.integrityToken = integrityToken;
+            payload.platform = platform;
+          }
+          await setDoc(docRef, payload);
+
+          // Listener com auto-cleanup: dispara toast quando trigger conclui.
+          let cleanupTimer = null;
+          const unsubscribe = onSnapshot(docRef, (snap) => {
+            if (!snap.exists()) return;
+            const data = snap.data();
+            if (data.status === 'ATTESTED') {
+              emitSessionAttested({
+                sessionId: snap.id,
+                signature: data.sasSignature,
+                attestationPda: data.attestationPda,
+                durationMinutes: minutos,
+                pontos: data.pontos ?? calcularPontosTotal(minutos),
+                solscanUrl: data.solscanUrl,
+              });
+              logSessaoOnChain(minutos, calcularPontosTotal(minutos), data.sasSignature);
+              unsubscribe();
+              if (cleanupTimer) clearTimeout(cleanupTimer);
+            } else if (data.status === 'FAILED') {
+              logSessaoOnChain(minutos, calcularPontosTotal(minutos), null);
+              unsubscribe();
+              if (cleanupTimer) clearTimeout(cleanupTimer);
+            }
+          }, () => {
+            unsubscribe?.();
+            if (cleanupTimer) clearTimeout(cleanupTimer);
+          });
+
+          // Auto-cleanup após 90s — mais que suficiente pro trigger SAS (~3s típico)
+          cleanupTimer = setTimeout(() => unsubscribe?.(), 90000);
+        } catch (e) {
+          logSessaoOnChain(minutos, calcularPontosTotal(minutos), null);
+        }
         onAtualizarRef.current?.();
       }
     } finally {

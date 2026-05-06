@@ -37,6 +37,9 @@ yarn-error.*
 # EAS credentials (contém senha do keystore — nunca commitar)
 credentials.json
 
+# Solana keypairs — NUNCA commitar (kora, juice-attestor, etc.)
+*-keypair.json
+
 # typescript
 *.tsbuildinfo
 
