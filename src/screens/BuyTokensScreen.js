@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   View, Text, TouchableOpacity, ScrollView, Linking,
 } from 'react-native';
@@ -22,6 +23,7 @@ function buildWaitlistUrl(user) {
 }
 
 export default function BuyTokensScreen({ navigation }) {
+  const { t } = useTranslation();
   const u = auth.currentUser;
 
   function abrirWaitlist() {
@@ -47,7 +49,7 @@ export default function BuyTokensScreen({ navigation }) {
           }}
         >
           <ArrowLeft size={18} color="rgba(255,255,255,0.6)" />
-          <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>Voltar</Text>
+          <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>{t('buyTokens.back')}</Text>
         </TouchableOpacity>
 
         <ScrollView
@@ -68,7 +70,7 @@ export default function BuyTokensScreen({ navigation }) {
             fontSize: 28, fontWeight: '800', color: '#fff',
             letterSpacing: -0.5, lineHeight: 34, marginBottom: 12,
           }}>
-            Compra de pontos foi descontinuada.
+            {t('buyTokens.deprecatedTitle')}
           </Text>
 
           {/* Subtítulo */}
@@ -76,8 +78,7 @@ export default function BuyTokensScreen({ navigation }) {
             fontSize: 15, color: 'rgba(255,255,255,0.65)',
             lineHeight: 22, marginBottom: 28,
           }}>
-            Os primeiros usuários carregando ganham <Text style={{ color: PRIMARY, fontWeight: '700' }}>$JUICE</Text> no airdrop.
-            Entre na waitlist agora pra garantir sua alocação.
+            {t('buyTokens.deprecatedDesc')}
           </Text>
 
           {/* Card de destaque — por que agora */}
@@ -96,11 +97,10 @@ export default function BuyTokensScreen({ navigation }) {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 14, fontWeight: '700', color: '#fff', marginBottom: 4 }}>
-                Por que pré-TGE
+                {t('buyTokens.whyPreTGE')}
               </Text>
               <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', lineHeight: 19 }}>
-                Snapshot de Proof-of-Human-Activity define a alocação inicial.
-                Quem carrega mais hoje, recebe mais $JUICE quando o token listar.
+                {t('buyTokens.whyPreTGEDesc')}
               </Text>
             </View>
           </View>
@@ -117,7 +117,7 @@ export default function BuyTokensScreen({ navigation }) {
           >
             <Zap size={18} color="#000" strokeWidth={2.5} />
             <Text style={{ fontSize: 15, fontWeight: '800', color: '#000', letterSpacing: 0.2 }}>
-              Entrar na waitlist
+              {t('buyTokens.joinWaitlist')}
             </Text>
             <ExternalLink size={16} color="#000" strokeWidth={2} />
           </TouchableOpacity>
@@ -127,8 +127,7 @@ export default function BuyTokensScreen({ navigation }) {
             fontSize: 11, color: 'rgba(255,255,255,0.35)',
             textAlign: 'center', marginTop: 14, lineHeight: 16,
           }}>
-            Você será redirecionado para cnbmobile.com/airdrop.
-            Seus dados de conta são usados pra preencher o formulário.
+            {t('buyTokens.redirectInfo')}
           </Text>
 
         </ScrollView>

@@ -34,11 +34,11 @@ const PRIMARY = '#c6ff4a';
 const PURPLE  = '#c084fc';
 
 const NIVEIS = [
-  { min: 0,      label: 'Starter',   cor: '#8A9BB0' },
-  { min: 1000,   label: 'Collector', cor: '#4FC3F7' },
-  { min: 10000,  label: 'Earner',    cor: '#81C784' },
-  { min: 50000,  label: 'Miner',     cor: PRIMARY   },
-  { min: 100000, label: 'Validator', cor: '#FFD700' },
+  { min: 0,      labelKey: 'profile.levelStarter',   cor: '#8A9BB0' },
+  { min: 1000,   labelKey: 'profile.levelCollector', cor: '#4FC3F7' },
+  { min: 10000,  labelKey: 'profile.levelEarner',    cor: '#81C784' },
+  { min: 50000,  labelKey: 'profile.levelMiner',     cor: PRIMARY   },
+  { min: 100000, labelKey: 'profile.levelValidator', cor: '#FFD700' },
 ];
 
 function calcularNivel(pontos) {
@@ -50,7 +50,7 @@ function calcularNivel(pontos) {
   return nivel;
 }
 
-const STATUS_LABEL = { pendente: 'Pendente', aprovado: 'Aprovado', rejeitado: 'Rejeitado' };
+const STATUS_KEY = { pendente: 'profile.statusPending', aprovado: 'profile.statusApproved', rejeitado: 'profile.statusRejected' };
 const STATUS_COLOR = { pendente: '#F5A623', aprovado: PRIMARY, rejeitado: '#FF4444' };
 
 // ─── Hook de entrada ──────────────────────────────────────────────────────────
@@ -71,6 +71,7 @@ function useEntrada(delayMs = 0) {
 // ─── Componentes internos ─────────────────────────────────────────────────────
 function NivelBadge({ pontos }) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const nivel = calcularNivel(pontos);
   return (
     <View style={{
@@ -81,7 +82,7 @@ function NivelBadge({ pontos }) {
     }}>
       <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: nivel.cor }} />
       <Text style={{ fontSize: 14, color: nivel.cor, fontWeight: '600' }}>
-        {nivel.label}
+        {t(nivel.labelKey)}
       </Text>
     </View>
   );
@@ -414,7 +415,7 @@ export default function ProfileScreen({ route, navigation }) {
                   {perfilLocal?.email ?? ''}
                 </Text>
                 <Text style={{ fontSize: 13, color: PRIMARY, marginTop: 3 }}>
-                  {calcularNivel(pontos).label}
+                  {t(calcularNivel(pontos).labelKey)}
                 </Text>
               </View>
             </View>
@@ -438,7 +439,7 @@ export default function ProfileScreen({ route, navigation }) {
                     {pontos.toLocaleString('pt-BR')}
                   </Text>
                   <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 1, marginTop: 3 }}>
-                    Pontos
+                    {t('profile.statPoints')}
                   </Text>
                 </View>
                 {/* Divider */}
@@ -449,7 +450,7 @@ export default function ProfileScreen({ route, navigation }) {
                     {minhaPos?.posicao ?? '—'}
                   </Text>
                   <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 1, marginTop: 3 }}>
-                    Ranking
+                    {t('profile.statRanking')}
                   </Text>
                 </View>
                 {/* Divider */}
@@ -458,7 +459,7 @@ export default function ProfileScreen({ route, navigation }) {
                 <View style={{ flex: 1, alignItems: 'center' }}>
                   <Text style={{ fontSize: 24, fontWeight: '600', color: '#fff' }}>{afiliados.total}</Text>
                   <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 1, marginTop: 3 }}>
-                    Indicações
+                    {t('profile.statReferrals')}
                   </Text>
                 </View>
               </View>
@@ -472,31 +473,31 @@ export default function ProfileScreen({ route, navigation }) {
               const items = [];
               if (!isLite) {
                 items.push({
-                  Icon: Wallet, title: 'Carteira Solana',
+                  Icon: Wallet, title: t('profile.solanaWallet'),
                   sub: perfilLocal?.walletAddress ? perfilLocal.walletAddress.slice(0,4) + '…' + perfilLocal.walletAddress.slice(-3) : null,
                   onPress: () => navigation.navigate('Wallet', { user: perfilLocal }),
                 });
               }
               items.push({
-                Icon: Shield, title: 'Privacidade ZK', sub: 'Cloak ativo · saque sem rastro',
+                Icon: Shield, title: t('profile.zkPrivacy'), sub: t('profile.zkPrivacySub'),
                 onPress: () => navigation.navigate('Withdraw', { perfil: perfilLocal, initialAba: 'privado' }),
               });
               items.push({
-                Icon: Bell, title: 'Notificações', sub: notifAtivas ? 'Ativadas' : 'Desativadas',
+                Icon: Bell, title: t('profile.notifications'), sub: notifAtivas ? t('profile.notifEnabledShort') : t('profile.notifDisabledShort'),
                 onPress: handleNotificacoes,
               });
               items.push({
-                Icon: Settings, title: 'Preferências', sub: 'Editar perfil, tema',
+                Icon: Settings, title: t('profile.preferences'), sub: t('profile.preferencesSub'),
                 onPress: handleEditarPerfil,
               });
               if (!isLite) {
                 items.push({
-                  Icon: Database, title: 'Dados', sub: 'Gerencie seus consentimentos',
+                  Icon: Database, title: t('profile.dataLabel'), sub: t('profile.dataSub'),
                   onPress: () => navigation.navigate('Dados'),
                 });
               }
               items.push({
-                Icon: isLite ? Cpu : Zap, title: 'Modo do app', sub: isLite ? 'Lite · simplificado' : 'Tech · experiência completa',
+                Icon: isLite ? Cpu : Zap, title: t('profile.appMode'), sub: isLite ? t('profile.appModeLite') : t('profile.appModeTech'),
                 accent: isLite ? PURPLE : PRIMARY,
                 onPress: () => navigation.navigate('ModoEscolha'),
               });
@@ -546,7 +547,7 @@ export default function ProfileScreen({ route, navigation }) {
                 borderRadius: 99, paddingHorizontal: 8, paddingVertical: 3,
                 borderWidth: 1, borderColor: colors.primaryStrong,
               }}>
-                <Text style={{ fontSize: 13, color: PRIMARY, fontWeight: '600' }}>{afiliados.total} cadastros</Text>
+                <Text style={{ fontSize: 13, color: PRIMARY, fontWeight: '600' }}>{t('profile.registrations', { count: afiliados.total })}</Text>
               </View>
             </View>
 
@@ -559,10 +560,10 @@ export default function ProfileScreen({ route, navigation }) {
               <Users size={15} color={PRIMARY} />
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 16, color: colors.text, fontWeight: '500' }}>
-                  {afiliados.ativas} de {afiliados.total} indicados já ativaram
+                  {t('profile.activatedCount', { active: afiliados.ativas, total: afiliados.total })}
                 </Text>
                 <Text style={{ fontSize: 13, color: colors.textFaint, marginTop: 2 }}>
-                  Ativo = carregou o celular por 3+ minutos
+                  {t('profile.activeNote')}
                 </Text>
               </View>
             </View>
@@ -572,17 +573,17 @@ export default function ProfileScreen({ route, navigation }) {
               fontSize: 13, color: colors.textDim,
               letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10,
             }}>
-              Bônus por indicados ativos
+              {t('profile.activeBonus')}
             </Text>
 
             {/* 5 ativos → 50k pts */}
             <View style={{ marginBottom: 12 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
                 <Text style={{ fontSize: 16, color: afiliados.bonus5k ? PRIMARY : colors.text }}>
-                  5 ativos — +50.000 pts
+                  {t('profile.fiveActives')}
                 </Text>
                 <Text style={{ fontSize: 14, fontWeight: '600', color: afiliados.bonus5k ? PRIMARY : colors.textDim }}>
-                  {afiliados.bonus5k ? 'Recebido' : `${Math.min(afiliados.ativas, 5)}/5`}
+                  {afiliados.bonus5k ? t('profile.received') : `${Math.min(afiliados.ativas, 5)}/5`}
                 </Text>
               </View>
               <View style={{ backgroundColor: colors.surfaceStrong, borderRadius: 99, height: 5, overflow: 'hidden' }}>
@@ -598,10 +599,10 @@ export default function ProfileScreen({ route, navigation }) {
             <View style={{ marginBottom: 16 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
                 <Text style={{ fontSize: 16, color: afiliados.bonus10k ? PRIMARY : colors.text }}>
-                  10 ativos — +100.000 pts
+                  {t('profile.tenActives')}
                 </Text>
                 <Text style={{ fontSize: 14, fontWeight: '600', color: afiliados.bonus10k ? PRIMARY : colors.textDim }}>
-                  {afiliados.bonus10k ? 'Recebido' : `${Math.min(afiliados.ativas, 10)}/10`}
+                  {afiliados.bonus10k ? t('profile.received') : `${Math.min(afiliados.ativas, 10)}/10`}
                 </Text>
               </View>
               <View style={{ backgroundColor: colors.surfaceStrong, borderRadius: 99, height: 5, overflow: 'hidden' }}>
@@ -614,7 +615,7 @@ export default function ProfileScreen({ route, navigation }) {
             </View>
 
             <Text style={{ fontSize: 14, color: colors.textDim, marginBottom: 14 }}>
-              +100 pts imediato por cada novo cadastro via código
+              {t('profile.perReferralBonus')}
             </Text>
 
             {/* Código */}
@@ -662,7 +663,7 @@ export default function ProfileScreen({ route, navigation }) {
             {!perfilLocal?.referidoPor && (
               <View style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 12 }}>
                 <Text style={{ fontSize: 16, color: colors.textFaint, marginBottom: 8 }}>
-                  Tem um código de referência?
+                  {t('profile.hasReferralCode')}
                 </Text>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   <TextInput
@@ -704,7 +705,7 @@ export default function ProfileScreen({ route, navigation }) {
           <Animated.View style={[{ marginBottom: 24 }, a3]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
               <Text style={{ fontSize: 18, fontWeight: '600', color: colors.text }}>
-                Provas on-chain
+                {t('profile.onChainProofs')}
               </Text>
               {attestations.length > 0 && (
                 <View style={{
@@ -729,8 +730,7 @@ export default function ProfileScreen({ route, navigation }) {
               }}>
                 <BadgeCheck size={28} color={colors.textGhost} style={{ marginBottom: 8 }} />
                 <Text style={{ color: colors.textDim, fontSize: 16, textAlign: 'center', lineHeight: 22 }}>
-                  Cada sessão de carregamento vira uma prova permanente na Solana.{'\n'}
-                  A primeira aparece aqui após teu próximo carregamento.
+                  {t('profile.noProofsHint')}
                 </Text>
               </View>
             ) : (
@@ -760,7 +760,7 @@ export default function ProfileScreen({ route, navigation }) {
                         {att.duracaoMinutos} min · {(att.pontos ?? 0).toLocaleString('pt-BR')} pts
                       </Text>
                       <Text style={{ fontSize: 13, color: colors.textFaint, marginTop: 2 }}>
-                        {formatarData(att.criadoEm)}{att.isSas ? ' · SAS' : ' · legado'}
+                        {formatarData(att.criadoEm)}{att.isSas ? t('profile.sasSuffix') : t('profile.legacySuffix')}
                       </Text>
                     </View>
                     {att.solscanUrl && <ChevronRight size={16} color={colors.textGhost} />}
@@ -803,7 +803,7 @@ export default function ProfileScreen({ route, navigation }) {
                           ? s.chavePix
                           : s.walletAddress
                             ? `${s.walletAddress.slice(0, 4)}…${s.walletAddress.slice(-4)}`
-                            : 'Resgate'}
+                            : t('profile.redemption')}
                       </Text>
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
@@ -811,7 +811,7 @@ export default function ProfileScreen({ route, navigation }) {
                         -{(s.pontos ?? 0).toLocaleString('pt-BR')} pts
                       </Text>
                       <Text style={{ fontSize: 14, color: STATUS_COLOR[s.status] ?? colors.textDim, marginTop: 2 }}>
-                        {STATUS_LABEL[s.status] ?? s.status}
+                        {STATUS_KEY[s.status] ? t(STATUS_KEY[s.status]) : s.status}
                       </Text>
                     </View>
                   </View>

@@ -1,44 +1,45 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { TouchableOpacity, Text, StyleSheet, View, Animated } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
-
-const BANNERS = [
-  {
-    id: 'carregar',
-    icon: '⚡',
-    iconBg: '#0d2a0d',
-    bg: '#071507',
-    border: '#39FF6A',
-    titulo: 'Coloque para carregar!',
-    sub: '+10 pts por minuto. Bônus de +50 pts a cada hora.',
-    cor: '#39FF6A',
-  },
-  {
-    id: 'pix',
-    icon: '💰',
-    iconBg: '#2a1500',
-    bg: '#140a00',
-    border: '#F5A623',
-    titulo: 'Saque via PIX',
-    sub: 'Acumule 100.000 pts e receba direto na sua conta.',
-    cor: '#F5A623',
-  },
-  {
-    id: 'ranking',
-    icon: '🏆',
-    iconBg: '#1c1c08',
-    bg: '#0e0e04',
-    border: '#EAB308',
-    titulo: 'Você está no ranking?',
-    sub: 'Veja sua posição entre os maiores acumuladores.',
-    cor: '#EAB308',
-  },
-];
 
 const INTERVALO = 8000;
 
 export default function BannerAd({ onPress, active = true }) {
+  const { t } = useTranslation();
   const { colors } = useTheme();
+  const BANNERS = useMemo(() => [
+    {
+      id: 'carregar',
+      icon: '⚡',
+      iconBg: '#0d2a0d',
+      bg: '#071507',
+      border: '#39FF6A',
+      titulo: t('components.bannerAd1Title'),
+      sub: t('components.bannerAd1Sub'),
+      cor: '#39FF6A',
+    },
+    {
+      id: 'pix',
+      icon: '💰',
+      iconBg: '#2a1500',
+      bg: '#140a00',
+      border: '#F5A623',
+      titulo: t('components.bannerAd2Title'),
+      sub: t('components.bannerAd2Sub'),
+      cor: '#F5A623',
+    },
+    {
+      id: 'ranking',
+      icon: '🏆',
+      iconBg: '#1c1c08',
+      bg: '#0e0e04',
+      border: '#EAB308',
+      titulo: t('components.bannerAd3Title'),
+      sub: t('components.bannerAd3Sub'),
+      cor: '#EAB308',
+    },
+  ], [t]);
   const [indice, setIndice] = useState(0);
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;

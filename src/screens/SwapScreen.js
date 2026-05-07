@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView,
   ActivityIndicator, Alert, Linking,
@@ -51,6 +52,7 @@ async function getSwapTx({ quote, userPubkey, koraPubkey }) {
 
 export default function SwapScreen({ route, navigation }) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { user } = route.params || {};
   const uid = user?.uid;
@@ -73,7 +75,7 @@ export default function SwapScreen({ route, navigation }) {
         setWalletAddr(publicKey);
         setSaldo(await getCNBBalance(publicKey));
       } catch {
-        Alert.alert('Erro', 'Não foi possível carregar a carteira.');
+        Alert.alert(t('common.error'), t('swap.errorWallet'));
       }
     })();
   }, [uid]);
@@ -93,7 +95,7 @@ export default function SwapScreen({ route, navigation }) {
         const q = await getQuote(micros);
         setQuote(q);
       } catch (e) {
-        setErro('Sem liquidez ou erro de cotação.');
+        setErro(t('swap.errorQuote'));
       } finally {
         setLQ(false);
       }
@@ -127,7 +129,7 @@ export default function SwapScreen({ route, navigation }) {
       setSignature(sig);
       setSaldo(await getCNBBalance(walletAddr));
     } catch (e) {
-      setErro(e?.message || 'Falha no swap. Tente novamente.');
+      setErro(e?.message || t('swap.errorSwap'));
     } finally {
       setEnviando(false);
     }
@@ -146,14 +148,12 @@ export default function SwapScreen({ route, navigation }) {
         style={styles.backBtn}
       >
         <ArrowLeft size={18} color="rgba(255,255,255,0.6)" />
-        <Text style={styles.backText}>Voltar</Text>
+        <Text style={styles.backText}>{t('swap.back')}</Text>
       </TouchableOpacity>
 
       <ScrollView contentContainerStyle={styles.scroll}>
         <Text style={styles.title}>Swap CNB → SOL</Text>
-        <Text style={styles.subtitle}>
-          Convert seus CNB direto em SOL via Jupiter, sem taxa de rede.
-        </Text>
+        <Text style={styles.subtitle}>{t('swap.headline')}</Text>
 
         <View style={styles.badge}>
           <Zap size={12} color={colors.primary} fill={colors.primary} />
@@ -162,7 +162,7 @@ export default function SwapScreen({ route, navigation }) {
 
         {/* Input CNB */}
         <View style={styles.card}>
-          <Text style={styles.label}>Você envia</Text>
+          <Text style={styles.label}>{t('swap.youSend')}</Text>
           <View style={styles.row}>
             <TextInput
               style={[styles.input, { flex: 1 }]}
@@ -178,10 +178,10 @@ export default function SwapScreen({ route, navigation }) {
           </View>
           <View style={styles.saldoRow}>
             <Text style={styles.saldoText}>
-              Saldo: {saldo === null ? '—' : `${saldo.toLocaleString('pt-BR')} CNB`}
+              {t('swap.balance', { value: saldo === null ? '—' : `${saldo.toLocaleString('pt-BR')} CNB` })}
             </Text>
             <TouchableOpacity onPress={() => saldo && setValor(String(saldo))}>
-              <Text style={styles.maxLink}>MÁX</Text>
+              <Text style={styles.maxLink}>{t('swap.max')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -194,7 +194,7 @@ export default function SwapScreen({ route, navigation }) {
 
         {/* Output SOL */}
         <View style={styles.card}>
-          <Text style={styles.label}>Você recebe (estimado)</Text>
+          <Text style={styles.label}>{t('swap.youReceive')}</Text>
           <View style={styles.row}>
             <Text style={styles.outValue}>
               {loadingQuote
@@ -210,8 +210,7 @@ export default function SwapScreen({ route, navigation }) {
           {quote && (
             <View style={styles.quoteInfo}>
               <Text style={styles.quoteInfoText}>
-                Slippage: 1% · Impacto:{' '}
-                {priceImpact !== null ? `${priceImpact.toFixed(2)}%` : '—'}
+                {t('swap.slippage', { impact: priceImpact !== null ? `${priceImpact.toFixed(2)}%` : '—' })}
               </Text>
             </View>
           )}
@@ -220,11 +219,11 @@ export default function SwapScreen({ route, navigation }) {
         {!!erro && <Text style={styles.erroBox}>{erro}</Text>}
         {!!signature && (
           <TouchableOpacity style={styles.sucessoBox} onPress={abrirNoExplorer}>
-            <Text style={styles.sucessoTitulo}>✓ Swap enviado</Text>
+            <Text style={styles.sucessoTitulo}>{t('swap.swapSent')}</Text>
             <Text style={styles.sucessoSig}>
               Tx: {signature.slice(0, 8)}...{signature.slice(-6)}
             </Text>
-            <Text style={styles.sucessoLink}>Toque para ver no Solana Explorer ↗</Text>
+            <Text style={styles.sucessoLink}>{t('swap.viewExplorer')}</Text>
           </TouchableOpacity>
         )}
 
@@ -235,12 +234,10 @@ export default function SwapScreen({ route, navigation }) {
         >
           {enviando
             ? <ActivityIndicator color={colors.background} />
-            : <Text style={styles.btnEnviarText}>Trocar agora</Text>}
+            : <Text style={styles.btnEnviarText}>{t('swap.swapNow')}</Text>}
         </TouchableOpacity>
 
-        <Text style={styles.footnote}>
-          Cotação ao vivo via Jupiter. Taxa de rede coberta pelo Kora.
-        </Text>
+        <Text style={styles.footnote}>{t('swap.footerNote')}</Text>
       </ScrollView>
     </SafeAreaView>
   );

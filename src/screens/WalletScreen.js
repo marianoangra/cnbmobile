@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   View, Text, StyleSheet, TouchableOpacity, ActivityIndicator,
   Alert, Linking, ScrollView, RefreshControl, Modal, TextInput,
@@ -24,6 +25,7 @@ function shorten(addr) {
 
 export default function WalletScreen({ route, navigation }) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { user } = route.params || {};
   const uid = user?.uid;
@@ -72,7 +74,7 @@ export default function WalletScreen({ route, navigation }) {
         setProvas(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       } catch { setProvas([]); }
     } catch (e) {
-      Alert.alert('Erro', 'Não foi possível carregar a carteira.');
+      Alert.alert(t('common.error'), t('wallet.errorWallet'));
       setError(true);
     } finally {
       setLoading(false);
@@ -102,7 +104,7 @@ export default function WalletScreen({ route, navigation }) {
   async function verMnemonicSalvo() {
     const m = await getMnemonic(uid);
     if (!m) {
-      Alert.alert('Sem frase de recuperação', 'Esta carteira foi criada antes do sistema de backup. Não é possível exibir a frase.');
+      Alert.alert(t('wallet.noSeedTitle'), t('wallet.noSeedMsg'));
       return;
     }
     setMnemonicParaExibir(m);
@@ -112,11 +114,11 @@ export default function WalletScreen({ route, navigation }) {
     setRestoreErro('');
     const palavras = mnemonicInput.trim().toLowerCase().split(/\s+/);
     if (palavras.length !== 12) {
-      setRestoreErro('A frase deve ter exatamente 12 palavras.');
+      setRestoreErro(t('wallet.errorSeedLength'));
       return;
     }
     if (!validarMnemonic(mnemonicInput)) {
-      setRestoreErro('Frase inválida. Verifique as palavras e tente novamente.');
+      setRestoreErro(t('wallet.errorSeedInvalid'));
       return;
     }
     setLoadingRestore(true);
@@ -125,10 +127,10 @@ export default function WalletScreen({ route, navigation }) {
       setWallet(publicKey);
       setModalRestaurar(false);
       setMnemonicInput('');
-      Alert.alert('Carteira restaurada', 'Sua carteira foi recuperada com sucesso.');
+      Alert.alert(t('wallet.restoredTitle'), t('wallet.restoredMsg'));
       load(true);
     } catch (e) {
-      setRestoreErro(e.message ?? 'Erro ao restaurar. Tente novamente.');
+      setRestoreErro(e.message ?? t('wallet.restoreError'));
     } finally {
       setLoadingRestore(false);
     }
@@ -138,7 +140,7 @@ export default function WalletScreen({ route, navigation }) {
     return (
       <SafeAreaView style={styles.center}>
         <ActivityIndicator color={colors.primary} size="large" />
-        <Text style={styles.loadingText}>Preparando sua carteira...</Text>
+        <Text style={styles.loadingText}>{t('wallet.preparing')}</Text>
       </SafeAreaView>
     );
   }
@@ -147,11 +149,11 @@ export default function WalletScreen({ route, navigation }) {
     return (
       <SafeAreaView style={styles.center}>
         <AlertCircle size={32} color={colors.secondary} style={{ marginBottom: 12 }} />
-        <Text style={styles.loadingText}>Não foi possível carregar a carteira.</Text>
+        <Text style={styles.loadingText}>{t('wallet.loadError')}</Text>
         <TouchableOpacity
           onPress={() => { setLoading(true); load(); }}
           style={{ marginTop: 16, backgroundColor: colors.primary, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 }}>
-          <Text style={{ color: colors.background, fontWeight: 'bold' }}>Tentar novamente</Text>
+          <Text style={{ color: colors.background, fontWeight: 'bold' }}>{t('wallet.retry')}</Text>
         </TouchableOpacity>
       </SafeAreaView>
     );
@@ -166,11 +168,8 @@ export default function WalletScreen({ route, navigation }) {
       <Modal visible={!!mnemonicParaExibir} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
-            <Text style={styles.modalTitulo}>Salve sua frase de recuperação</Text>
-            <Text style={styles.modalSubtitulo}>
-              Essas 12 palavras são a única forma de recuperar sua carteira se trocar de celular.{'\n'}
-              Anote em papel. Não fotografe nem salve em nuvem.
-            </Text>
+            <Text style={styles.modalTitulo}>{t('wallet.seedTitle')}</Text>
+            <Text style={styles.modalSubtitulo}>{t('wallet.seedDesc')}</Text>
 
             {mnemonicVisivel ? (
               <View style={styles.mnemonicGrid}>
@@ -183,7 +182,7 @@ export default function WalletScreen({ route, navigation }) {
               </View>
             ) : (
               <View style={styles.mnemonicBlur}>
-                <Text style={styles.mnemonicBlurText}>Toque para revelar</Text>
+                <Text style={styles.mnemonicBlurText}>{t('wallet.tapReveal')}</Text>
               </View>
             )}
 
@@ -196,13 +195,13 @@ export default function WalletScreen({ route, navigation }) {
                   ? <EyeOff size={14} color={colors.primary} />
                   : <Eye size={14} color={colors.primary} />}
                 <Text style={styles.modalBtnSecondaryText}>
-                  {mnemonicVisivel ? 'Ocultar' : 'Revelar'}
+                  {mnemonicVisivel ? t('wallet.hide') : t('wallet.reveal')}
                 </Text>
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.modalBtnSecondary} onPress={copiarMnemonic}>
                 <Text style={styles.modalBtnSecondaryText}>
-                  {mnemonicCopiado ? '✓ Copiado' : 'Copiar'}
+                  {mnemonicCopiado ? t('wallet.copyDone') : t('wallet.copyBtn')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -211,7 +210,7 @@ export default function WalletScreen({ route, navigation }) {
               style={styles.modalBtnPrimary}
               onPress={() => { setMnemonicParaExibir(null); setMnemonicVisivel(false); }}
             >
-              <Text style={styles.modalBtnPrimaryText}>Já anotei — continuar</Text>
+              <Text style={styles.modalBtnPrimaryText}>{t('wallet.gotItContinue')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -221,13 +220,11 @@ export default function WalletScreen({ route, navigation }) {
       <Modal visible={modalRestaurar} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
-            <Text style={styles.modalTitulo}>Restaurar carteira</Text>
-            <Text style={styles.modalSubtitulo}>
-              Digite suas 12 palavras de recuperação separadas por espaço.
-            </Text>
+            <Text style={styles.modalTitulo}>{t('wallet.restoreTitle')}</Text>
+            <Text style={styles.modalSubtitulo}>{t('wallet.restoreDesc')}</Text>
             <TextInput
               style={[styles.mnemonicInput, restoreErro ? styles.mnemonicInputErro : null]}
-              placeholder="palavra1 palavra2 palavra3 ..."
+              placeholder={t('wallet.restorePlaceholder')}
               placeholderTextColor={colors.secondary}
               value={mnemonicInput}
               onChangeText={v => { setMnemonicInput(v); setRestoreErro(''); }}
@@ -244,14 +241,14 @@ export default function WalletScreen({ route, navigation }) {
             >
               {loadingRestore
                 ? <ActivityIndicator color="#000" />
-                : <Text style={styles.modalBtnPrimaryText}>Restaurar</Text>}
+                : <Text style={styles.modalBtnPrimaryText}>{t('wallet.restoreBtn')}</Text>}
             </TouchableOpacity>
 
             <TouchableOpacity
               style={[styles.modalBtnSecondary, { justifyContent: 'center', marginTop: 8 }]}
               onPress={() => { setModalRestaurar(false); setMnemonicInput(''); setRestoreErro(''); }}
             >
-              <Text style={styles.modalBtnSecondaryText}>Cancelar</Text>
+              <Text style={styles.modalBtnSecondaryText}>{t('wallet.cancel')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -266,31 +263,31 @@ export default function WalletScreen({ route, navigation }) {
         }}
       >
         <ArrowLeft size={18} color="rgba(255,255,255,0.6)" />
-        <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>Voltar</Text>
+        <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>{t('wallet.back')}</Text>
       </TouchableOpacity>
 
       <ScrollView
         contentContainerStyle={styles.scroll}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary} />}
       >
-        <Text style={styles.title}>Minha Carteira CNB</Text>
-        <Text style={styles.subtitle}>Carteira Solana gerada no seu dispositivo</Text>
+        <Text style={styles.title}>{t('wallet.title')}</Text>
+        <Text style={styles.subtitle}>{t('wallet.subtitle')}</Text>
 
         <View style={styles.card}>
-          <Text style={styles.label}>Endereço Solana</Text>
+          <Text style={styles.label}>{t('wallet.address')}</Text>
           <Text style={styles.address}>{shorten(wallet)}</Text>
           <View style={styles.row}>
             <TouchableOpacity style={styles.btn} onPress={copiar}>
-              <Text style={styles.btnText}>{copied ? '✓ Copiado' : 'Copiar endereço'}</Text>
+              <Text style={styles.btnText}>{copied ? t('wallet.copied') : t('wallet.copy')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.btn, styles.btnSecondary]} onPress={abrirExplorer}>
-              <Text style={styles.btnSecondaryText}>Ver no Explorer</Text>
+              <Text style={styles.btnSecondaryText}>{t('wallet.viewExplorer')}</Text>
             </TouchableOpacity>
           </View>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.label}>Saldos</Text>
+          <Text style={styles.label}>{t('wallet.balances')}</Text>
 
           <View style={styles.balanceRow}>
             <View style={styles.balanceItem}>
@@ -309,9 +306,7 @@ export default function WalletScreen({ route, navigation }) {
           </View>
 
           {cnbBalance === 0 && (
-            <Text style={styles.hint}>
-              Seus CNB tokens aparecerão aqui após o primeiro resgate.
-            </Text>
+            <Text style={styles.hint}>{t('wallet.emptyHint')}</Text>
           )}
 
           {cnbBalance > 0 && (
@@ -321,26 +316,24 @@ export default function WalletScreen({ route, navigation }) {
                 onPress={() => navigation.navigate('TransferCNB', { user })}
               >
                 <Send size={14} color={colors.background} />
-                <Text style={styles.actionBtnText}>Enviar</Text>
+                <Text style={styles.actionBtnText}>{t('wallet.send')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.actionBtn, styles.actionBtnSecondary]}
                 onPress={() => navigation.navigate('Swap', { user })}
               >
                 <ArrowDownUp size={14} color={colors.primary} />
-                <Text style={styles.actionBtnSecondaryText}>Trocar por SOL</Text>
+                <Text style={styles.actionBtnSecondaryText}>{t('wallet.swap')}</Text>
               </TouchableOpacity>
             </View>
           )}
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.label}>Provas de Atividade On-Chain</Text>
+          <Text style={styles.label}>{t('wallet.proofsTitle')}</Text>
 
           {provas.length === 0 ? (
-            <Text style={styles.hint}>
-              Suas sessões de carregamento aparecem aqui após serem registradas na Solana.
-            </Text>
+            <Text style={styles.hint}>{t('wallet.proofsHint')}</Text>
           ) : (
             provas.map((p) => (
               <TouchableOpacity
@@ -366,15 +359,10 @@ export default function WalletScreen({ route, navigation }) {
         <View style={styles.infoCard}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 }}>
             <Lock size={14} color={colors.white} />
-            <Text style={[styles.infoTitle, { marginBottom: 0 }]}>Sua chave, seu controle</Text>
+            <Text style={[styles.infoTitle, { marginBottom: 0 }]}>{t('wallet.keyControl')}</Text>
           </View>
-          <Text style={styles.infoText}>
-            A chave privada desta carteira é gerada e armazenada com segurança no seu dispositivo.
-            Nenhum servidor tem acesso a ela.
-          </Text>
-          <Text style={styles.infoText}>
-            Ao resgatar CNB, os tokens são enviados diretamente para este endereço na rede Solana.
-          </Text>
+          <Text style={styles.infoText}>{t('wallet.keyDesc')}</Text>
+          <Text style={styles.infoText}>{t('wallet.redeemDesc')}</Text>
 
           <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
             <TouchableOpacity
@@ -382,7 +370,7 @@ export default function WalletScreen({ route, navigation }) {
               onPress={verMnemonicSalvo}
             >
               <Eye size={14} color={colors.background} />
-              <Text style={[styles.btnText, { flexShrink: 1 }]} numberOfLines={1} adjustsFontSizeToFit>Ver frase de recuperação</Text>
+              <Text style={[styles.btnText, { flexShrink: 1 }]} numberOfLines={1} adjustsFontSizeToFit>{t('wallet.viewSeed')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -390,7 +378,7 @@ export default function WalletScreen({ route, navigation }) {
               onPress={() => setModalRestaurar(true)}
             >
               <RefreshCw size={14} color={colors.primary} />
-              <Text style={styles.btnSecondaryText}>Restaurar</Text>
+              <Text style={styles.btnSecondaryText}>{t('wallet.restore')}</Text>
             </TouchableOpacity>
           </View>
         </View>

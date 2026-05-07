@@ -39,7 +39,7 @@ export default function RegisterScreen({ navigation }) {
 
   async function handleRegister() {
     if (!nome || !email || !senha || !confirmar) return Alert.alert(t('common.attention'), t('register.errorEmpty'));
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return Alert.alert(t('common.attention'), 'Informe um e-mail válido.');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return Alert.alert(t('common.attention'), t('register.errorInvalidEmail'));
     if (senha !== confirmar) return Alert.alert(t('common.attention'), t('register.errorPasswordMatch'));
     if (senha.length < 6) return Alert.alert(t('common.attention'), t('register.errorPasswordLength'));
     setLoading(true);

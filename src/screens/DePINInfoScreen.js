@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   View, Text, Image, ScrollView, TouchableOpacity, Animated, LayoutAnimation, Platform, UIManager,
 } from 'react-native';
@@ -13,63 +14,28 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 
 const PRIMARY = '#c6ff4a';
 
-const FAQ = [
-  {
-    q: 'O CNB Mobile vai virar JUICE Mobile?',
-    a: 'Sim — o rebrand para JUICE Mobile é parte estratégica da implantação completa do sistema na Solana. O novo nome reflete melhor a essência do produto (energia do carregamento → valor on-chain) e posiciona o projeto como a melhor opção dentro do ecossistema DePIN global da Solana, onde competimos com players internacionais. Sua conta, seus pontos e seus CNB tokens permanecem intactos durante a transição — só muda a marca.',
-  },
-  {
-    q: 'O que é DePIN?',
-    a: 'DePIN (Decentralized Physical Infrastructure Network) é uma rede onde usuários comuns contribuem com infraestrutura física — no caso do JUICE Mobile, o ato de carregar o celular — e são recompensados por isso de forma transparente e verificável on-chain.',
-  },
-  {
-    q: 'Como meus pontos são gerados?',
-    a: 'A cada minuto que seu celular permanece carregando, o app credita 10 pontos no seu perfil (com bônus de 50 pontos a cada hora completa). Esses pontos viram CNB tokens na hora do resgate.',
-  },
-  {
-    q: 'Para que serve a carteira Solana?',
-    a: 'A carteira Solana é onde você recebe os tokens CNB quando solicita resgate. Você pode usar uma carteira existente (Phantom, Solflare) ou criar uma nova diretamente no app.',
-  },
-  {
-    q: 'O que é a privacidade ZK?',
-    a: 'Zero-Knowledge Proofs permitem provar que sua atividade é real sem revelar quem você é. O JUICE Mobile registra a prova on-chain usando seu UID hasheado — ninguém consegue identificar você a partir do registro público.',
-  },
-  {
-    q: 'Como funciona o resgate privado?',
-    a: 'Via Cloak Protocol, seus pontos viram SOL sem deixar nenhum link rastreável entre a carteira do projeto e a sua. É como um "PIX privado" para cripto: o destinatário recebe, mas o caminho não fica visível.',
-  },
-  {
-    q: 'Em quanto tempo recebo meus tokens?',
-    a: 'Saques PIX são processados manualmente pela equipe em até 24h úteis. Resgates de CNB tokens via carteira Solana são quase instantâneos (poucos segundos após confirmação na rede).',
-  },
-  {
-    q: 'Posso usar em mais de um aparelho?',
-    a: 'Sua conta é única por usuário, mas só pode estar logada em um aparelho por vez. Se logar em outro, a sessão antiga é encerrada automaticamente.',
-  },
-];
-
-const PILARES = [
-  {
-    Icon: Activity,
-    titulo: 'Atividade Humana Real',
-    desc: 'Cada minuto de carregamento gera uma prova verificável de presença humana na rede Solana.',
-  },
-  {
-    Icon: Shield,
-    titulo: 'ZK On-Chain',
-    desc: 'Zero-Knowledge Proofs garantem que sua atividade é autentica sem expor seus dados pessoais.',
-  },
-  {
-    Icon: Zap,
-    titulo: 'Resgate Privado',
-    desc: 'Via Cloak Protocol, converta pontos em SOL sem link rastreável entre o app e sua carteira.',
-  },
-];
-
 export default function DePINInfoScreen({ navigation }) {
+  const { t } = useTranslation();
   const opacity    = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(32)).current;
   const [faqAberto, setFaqAberto] = useState(null);
+
+  const FAQ = useMemo(() => [
+    { q: t('dePINInfo.faqQ1'), a: t('dePINInfo.faqA1') },
+    { q: t('dePINInfo.faqQ2'), a: t('dePINInfo.faqA2') },
+    { q: t('dePINInfo.faqQ3'), a: t('dePINInfo.faqA3') },
+    { q: t('dePINInfo.faqQ4'), a: t('dePINInfo.faqA4') },
+    { q: t('dePINInfo.faqQ5'), a: t('dePINInfo.faqA5') },
+    { q: t('dePINInfo.faqQ6'), a: t('dePINInfo.faqA6') },
+    { q: t('dePINInfo.faqQ7'), a: t('dePINInfo.faqA7') },
+    { q: t('dePINInfo.faqQ8'), a: t('dePINInfo.faqA8') },
+  ], [t]);
+
+  const PILARES = useMemo(() => [
+    { Icon: Activity, titulo: t('dePINInfo.pillarRealActivityTitle'), desc: t('dePINInfo.pillarRealActivityDesc') },
+    { Icon: Shield,   titulo: t('dePINInfo.pillarZKTitle'),           desc: t('dePINInfo.pillarZKDesc') },
+    { Icon: Zap,      titulo: t('dePINInfo.pillarPrivateTitle'),      desc: t('dePINInfo.pillarPrivateDesc') },
+  ], [t]);
 
   function alternarFaq(index) {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -101,7 +67,7 @@ export default function DePINInfoScreen({ navigation }) {
           }}
         >
           <ArrowLeft size={18} color="rgba(255,255,255,0.6)" />
-          <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>Voltar</Text>
+          <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>{t('dePINInfo.back')}</Text>
         </TouchableOpacity>
 
         <ScrollView
@@ -164,13 +130,13 @@ export default function DePINInfoScreen({ navigation }) {
                 fontSize: 18, fontWeight: '700', color: '#fff',
                 lineHeight: 26, marginBottom: 10,
               }}>
-                Human Activity DePIN
+                {t('dePINInfo.headline')}
               </Text>
               <Text style={{
                 fontSize: 14, color: 'rgba(255,255,255,0.7)',
                 lineHeight: 22,
               }}>
-                O primeiro app que transforma atividade real de usuário em prova on-chain verificável, com resgate privado via ZK.
+                {t('dePINInfo.headlineDesc')}
               </Text>
             </View>
 
@@ -180,7 +146,7 @@ export default function DePINInfoScreen({ navigation }) {
               color: 'rgba(255,255,255,0.4)',
               textTransform: 'uppercase', marginBottom: 14,
             }}>
-              Como funciona
+              {t('dePINInfo.howItWorks')}
             </Text>
 
             <View style={{ gap: 10, marginBottom: 32 }}>
@@ -219,7 +185,7 @@ export default function DePINInfoScreen({ navigation }) {
                 color: 'rgba(255,255,255,0.4)',
                 textTransform: 'uppercase',
               }}>
-                Perguntas frequentes
+                {t('dePINInfo.faqTitle')}
               </Text>
             </View>
 

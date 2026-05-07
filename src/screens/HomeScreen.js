@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useCallback, useState } from 'react';
+import React, { useEffect, useRef, useCallback, useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   View, Text, Image, ScrollView, TouchableOpacity, Alert,
@@ -45,33 +45,12 @@ function saudacaoKey() {
   return 'home.goodEvening';
 }
 
-const FRASES_MOTIVACIONAIS = [
-  'Vamos somar pontos hoje?',
-  'Quero acumular mais pontos!',
-  'Vou ver uma missão interessante hoje',
-  'Cada carregada vale mais um passo',
-  'Sua energia move o ranking',
-  'Hora de subir na classificação!',
-  'Que tal uma nova missão agora?',
-  'Carregar é ganhar — bora lá!',
-  'Mais um dia, mais pontos no bolso',
-  'Você está a um carregamento do topo',
-  'O ranking te espera. Vamos nessa?',
-  'Seus pontos estão chamando!',
-  'Hoje é um bom dia pra carregar',
-  'Missões disponíveis — não perca!',
-  'Pequenos passos, grandes pontos',
-  'Carregue e suba no ranking',
-  'Bora acumular e conquistar!',
-  'Cada kWh conta. Vamos carregar?',
-  'Seu saldo cresce a cada missão',
-  'A liderança está ao seu alcance!',
-];
-
-function fraseDoDia() {
+function fraseDoDia(t) {
+  const lista = t('home.motivational', { returnObjects: true });
+  const arr = Array.isArray(lista) && lista.length ? lista : [''];
   const d = new Date();
   const seed = d.getFullYear() * 1000 + Math.floor((d - new Date(d.getFullYear(), 0, 0)) / 86400000);
-  return FRASES_MOTIVACIONAIS[seed % FRASES_MOTIVACIONAIS.length];
+  return arr[seed % arr.length];
 }
 
 // ─── Hooks ────────────────────────────────────────────────────────────────────
@@ -119,7 +98,7 @@ const ATALHOS = [
 
 // Constrói lista de atividades reais a partir de saques + atividadeDias do perfil
 
-async function buscarAtividades(uid, atividadeDias) {
+async function buscarAtividades(uid, atividadeDias, t) {
   const items = [];
 
   // 1. Últimos saques (máx 3)
@@ -127,11 +106,11 @@ async function buscarAtividades(uid, atividadeDias) {
     const saques = await getSaques(uid);
     saques.slice(0, 3).forEach(s => {
       const ts = s.criadoEm?.toDate ? s.criadoEm.toDate() : new Date(0);
-      const tipo = s.chavePix ? 'Saque PIX' : s.walletAddress ? 'Resgate CNB' : 'Saque';
+      const tipo = s.chavePix ? t('home.withdrawPix') : s.walletAddress ? t('home.redeemCNB') : t('home.withdrawGeneric');
       items.push({
         Icon: ArrowUpRight,
         title: tipo,
-        sub: ts.getTime() ? ts.toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : 'Em processamento',
+        sub: ts.getTime() ? ts.toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : t('home.processing'),
         value: `-${(s.pontos ?? 0).toLocaleString('pt-BR')} pts`,
         pos: false,
         ts: ts.getTime(),
@@ -146,11 +125,11 @@ async function buscarAtividades(uid, atividadeDias) {
     d.setDate(hoje.getDate() - i);
     const pts = atividadeDias?.[diaKeyDe(d)] ?? 0;
     if (pts > 0) {
-      const labelDia = i === 0 ? 'Hoje' : i === 1 ? 'Ontem' : d.toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit' });
+      const labelDia = i === 0 ? t('home.today') : i === 1 ? t('home.yesterday') : d.toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit' });
       items.push({
         Icon: ArrowDownLeft,
-        title: 'Pontos de carregamento',
-        sub: `${labelDia} · carregamento`,
+        title: t('home.chargeActivity'),
+        sub: `${labelDia} · ${t('home.chargeActivitySub')}`,
         value: `+${pts.toLocaleString('pt-BR')} pts`,
         pos: true,
         ts: d.setHours(23, 59, 59),
@@ -386,12 +365,12 @@ export default function HomeScreen({ route, navigation }) {
   useScreenTrace('home_screen');
   const PRIMARY = useAccent();
   const { colors, isDark } = useTheme();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user, perfil, onAtualizar } = route?.params || {};
   const onAtualizarRef = useRef(onAtualizar);
   useEffect(() => { onAtualizarRef.current = onAtualizar; }, [onAtualizar]);
 
-  const [frase] = useState(fraseDoDia);
+  const frase = useMemo(() => fraseDoDia(t), [i18n.language, t]);
   const [atividades, setAtividades]           = useState([]);
   const [loadingAtividades, setLoadingAtiv]   = useState(false);
   const [refreshing, setRefreshing]           = useState(false);
@@ -436,11 +415,11 @@ export default function HomeScreen({ route, navigation }) {
           setNotifAtiva(true);
         } else {
           Alert.alert(
-            'Permissão negada',
-            'Abra as configurações do sistema para habilitar notificações.',
+            t('home.permDeniedTitle'),
+            t('home.permDeniedMsg'),
             [
-              { text: 'Cancelar', style: 'cancel' },
-              { text: 'Abrir configurações', onPress: abrirConfiguracoesSistema },
+              { text: t('home.cancel'), style: 'cancel' },
+              { text: t('home.openSettings'), onPress: abrirConfiguracoesSistema },
             ]
           );
         }
@@ -462,17 +441,17 @@ export default function HomeScreen({ route, navigation }) {
   useEffect(() => {
     if (!perfil?.uid) { setAtividades([]); return; }
     setLoadingAtiv(true);
-    buscarAtividades(perfil.uid, perfil.atividadeDias)
+    buscarAtividades(perfil.uid, perfil.atividadeDias, t)
       .then(setAtividades)
       .catch(() => setAtividades([]))
       .finally(() => setLoadingAtiv(false));
-  }, [perfil?.uid, perfil?.pontos]);
+  }, [perfil?.uid, perfil?.pontos, t]);
 
   const pontos    = perfil?.pontos ?? 0;
   const progresso = Math.min(pontos / META, 1);
   const faltam    = Math.max(META - pontos, 0);
   const podeSacar = pontos >= META;
-  const nome      = perfil?.nome?.split(' ')[0] ?? (user ? t('common.user') : 'Visitante');
+  const nome      = perfil?.nome?.split(' ')[0] ?? (user ? t('common.user') : t('home.visitor'));
   const estaCarregando = useCarregando();
 
   // Badge dinâmico: pontos ganhos hoje vs ontem
@@ -553,10 +532,10 @@ export default function HomeScreen({ route, navigation }) {
               }} />
 
               <Text style={{ fontSize: 20, fontWeight: '700', color: colors.text, marginBottom: 4 }}>
-                Qual é o seu perfil?
+                {t('home.profileModalTitle')}
               </Text>
               <Text style={{ fontSize: 13, color: colors.textFaint, marginBottom: 24, lineHeight: 19 }}>
-                Personalize como o JUICE funciona para você
+                {t('home.profileModalSubtitle')}
               </Text>
 
               {/* ── LITE ── */}
@@ -580,17 +559,17 @@ export default function HomeScreen({ route, navigation }) {
                 </View>
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 5 }}>
-                    <Text style={{ fontSize: 17, fontWeight: '700', color: colors.text }}>Lite</Text>
+                    <Text style={{ fontSize: 17, fontWeight: '700', color: colors.text }}>{t('home.modeLite')}</Text>
                     <View style={{
                       backgroundColor: 'rgba(192,132,252,0.12)',
                       borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2,
                       borderWidth: 1, borderColor: 'rgba(192,132,252,0.30)',
                     }}>
-                      <Text style={{ fontSize: 9, fontWeight: '800', color: '#c084fc', letterSpacing: 1.2 }}>LITE</Text>
+                      <Text style={{ fontSize: 9, fontWeight: '800', color: '#c084fc', letterSpacing: 1.2 }}>{t('home.modeLiteBadge')}</Text>
                     </View>
                   </View>
                   <Text style={{ fontSize: 12, color: colors.textFaint, lineHeight: 18 }}>
-                    Sou novo em Tecnologia — ouvi falar que é só colocar para carregar e ganhar
+                    {t('home.modeLiteDesc')}
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -616,17 +595,17 @@ export default function HomeScreen({ route, navigation }) {
                 </View>
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 5 }}>
-                    <Text style={{ fontSize: 17, fontWeight: '700', color: colors.text }}>Tech</Text>
+                    <Text style={{ fontSize: 17, fontWeight: '700', color: colors.text }}>{t('home.modeTech')}</Text>
                     <View style={{
                       backgroundColor: colors.primaryMid,
                       borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2,
                       borderWidth: 1, borderColor: colors.primaryStrong,
                     }}>
-                      <Text style={{ fontSize: 9, fontWeight: '800', color: PRIMARY, letterSpacing: 1.2 }}>TECH</Text>
+                      <Text style={{ fontSize: 9, fontWeight: '800', color: PRIMARY, letterSpacing: 1.2 }}>{t('home.modeTechBadge')}</Text>
                     </View>
                   </View>
                   <Text style={{ fontSize: 12, color: colors.textFaint, lineHeight: 18 }}>
-                    Avançado em Tech — quero performar e me sinto confiante para utilizar todas as funções
+                    {t('home.modeTechDesc')}
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -651,10 +630,10 @@ export default function HomeScreen({ route, navigation }) {
               borderWidth: 1, borderColor: colors.primaryMid,
             }}>
               <Text style={{ fontSize: 18, fontWeight: '700', color: colors.text, marginBottom: 4 }}>
-                Notificações
+                {t('home.notifModalTitle')}
               </Text>
               <Text style={{ fontSize: 12, color: colors.textFaint, marginBottom: 24 }}>
-                Gerencie os alertas do JUICE
+                {t('home.notifModalSubtitle')}
               </Text>
 
               {/* Toggle lembrete diário */}
@@ -666,10 +645,10 @@ export default function HomeScreen({ route, navigation }) {
               }}>
                 <View style={{ flex: 1, marginRight: 12 }}>
                   <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text, marginBottom: 2 }}>
-                    Lembrete diário de carregamento
+                    {t('home.dailyReminderTitle')}
                   </Text>
                   <Text style={{ fontSize: 11, color: colors.textFaint }}>
-                    Aviso às 20h se você ainda não carregou hoje
+                    {t('home.dailyReminderSub')}
                   </Text>
                 </View>
                 {loadingNotif
@@ -690,10 +669,10 @@ export default function HomeScreen({ route, navigation }) {
                 borderWidth: 1, borderColor: colors.border,
               }}>
                 <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text, marginBottom: 2 }}>
-                  Alertas de pontos e missões
+                  {t('home.missionAlertsTitle')}
                 </Text>
                 <Text style={{ fontSize: 11, color: colors.textFaint }}>
-                  Enviados pelo servidor quando você completa uma missão ou recebe um bônus
+                  {t('home.missionAlertsSub')}
                 </Text>
               </View>
             </View>
@@ -779,7 +758,7 @@ export default function HomeScreen({ route, navigation }) {
           {/* ── Banners (carousel) ── */}
           <Animated.View style={[{ marginBottom: 20 }, a3]}>
             <Text style={{ fontSize: 10, letterSpacing: 2, color: colors.textFaint, textTransform: 'uppercase', marginBottom: 8 }}>
-              Parceiros
+              {t('home.partners')}
             </Text>
             <BannerCarousel uid={perfil?.uid} />
           </Animated.View>

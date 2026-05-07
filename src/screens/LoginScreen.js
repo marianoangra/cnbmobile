@@ -76,7 +76,7 @@ export default function LoginScreen({ navigation }) {
           logLogin('google');
           navigation.goBack();
         } catch (e) {
-          Alert.alert(t('common.error') || 'Erro', e?.message || 'Falha no login com Google');
+          Alert.alert(t('common.error'), e?.message || t('login.googleError'));
         } finally {
           setLoadingGoogle(false);
         }
@@ -84,8 +84,8 @@ export default function LoginScreen({ navigation }) {
     } else if (googleResponse.type === 'error') {
       setLoadingGoogle(false);
       Alert.alert(
-        t('common.error') || 'Erro',
-        googleResponse.error?.message || 'Falha no login com Google',
+        t('common.error'),
+        googleResponse.error?.message || t('login.googleError'),
       );
     } else {
       setLoadingGoogle(false);
@@ -166,21 +166,21 @@ export default function LoginScreen({ navigation }) {
     const emailDigitado = email.trim();
     if (!emailDigitado) {
       return Alert.alert(
-        'Recuperar senha',
-        'Digite seu e-mail no campo acima e toque em "Recuperar senha".',
+        t('login.forgotTitle'),
+        t('login.forgotMsg'),
       );
     }
     try {
       await sendPasswordResetEmail(auth, emailDigitado);
       Alert.alert(
-        'E-mail enviado',
-        `Verifique sua caixa de entrada em ${emailDigitado} e siga as instruções para redefinir sua senha.`,
+        t('login.forgotSentTitle'),
+        t('login.forgotSentMsg', { email: emailDigitado }),
       );
     } catch (e) {
       if (e.code === 'auth/user-not-found' || e.code === 'auth/invalid-email') {
-        Alert.alert('Erro', 'E-mail não encontrado. Verifique e tente novamente.');
+        Alert.alert(t('common.error'), t('login.forgotNotFound'));
       } else {
-        Alert.alert('Erro', 'Não foi possível enviar o e-mail. Tente novamente.');
+        Alert.alert(t('common.error'), t('login.forgotErrorGeneric'));
       }
     }
   }

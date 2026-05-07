@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView,
   ActivityIndicator, Alert, Switch, Linking,
@@ -42,6 +43,7 @@ function shorten(addr) {
 
 export default function TransferCNBScreen({ route, navigation }) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { user } = route.params || {};
   const uid = user?.uid;
@@ -62,7 +64,7 @@ export default function TransferCNBScreen({ route, navigation }) {
         setWalletAddr(publicKey);
         setSaldo(await getCNBBalance(publicKey));
       } catch (e) {
-        Alert.alert('Erro', 'Não foi possível carregar a carteira.');
+        Alert.alert(t('common.error'), t('transfer.errorWallet'));
       }
     })();
   }, [uid]);
@@ -78,11 +80,11 @@ export default function TransferCNBScreen({ route, navigation }) {
     setErro('');
     setSignature(null);
     if (!isValidSolanaAddress(destino)) {
-      setErro('Endereço Solana inválido.');
+      setErro(t('transfer.errorInvalidSolana'));
       return;
     }
     if (valorNumero <= 0 || valorNumero > saldo) {
-      setErro('Quantidade inválida.');
+      setErro(t('transfer.errorInvalidAmount'));
       return;
     }
 
@@ -104,7 +106,7 @@ export default function TransferCNBScreen({ route, navigation }) {
       // Atualiza saldo
       setSaldo(await getCNBBalance(walletAddr));
     } catch (e) {
-      setErro(e?.message || 'Falha ao enviar. Tente novamente.');
+      setErro(e?.message || t('transfer.errorSend'));
     } finally {
       setEnviando(false);
     }
@@ -123,14 +125,12 @@ export default function TransferCNBScreen({ route, navigation }) {
         style={styles.backBtn}
       >
         <ArrowLeft size={18} color="rgba(255,255,255,0.6)" />
-        <Text style={styles.backText}>Voltar</Text>
+        <Text style={styles.backText}>{t('transfer.back')}</Text>
       </TouchableOpacity>
 
       <ScrollView contentContainerStyle={styles.scroll}>
-        <Text style={styles.title}>Enviar CNB</Text>
-        <Text style={styles.subtitle}>
-          Transferência gasless via Kora — não precisa de SOL na sua carteira.
-        </Text>
+        <Text style={styles.title}>{t('transfer.title')}</Text>
+        <Text style={styles.subtitle}>{t('transfer.headline')}</Text>
 
         {/* Badge gasless */}
         <View style={styles.badge}>
@@ -140,21 +140,21 @@ export default function TransferCNBScreen({ route, navigation }) {
 
         {/* Saldo */}
         <View style={styles.card}>
-          <Text style={styles.label}>Saldo disponível</Text>
+          <Text style={styles.label}>{t('transfer.balance')}</Text>
           <Text style={styles.balance}>
             {saldo === null ? '—' : `${saldo.toLocaleString('pt-BR')} CNB`}
           </Text>
           {!!walletAddr && (
-            <Text style={styles.fromAddr}>De: {shorten(walletAddr)}</Text>
+            <Text style={styles.fromAddr}>{t('transfer.from', { address: shorten(walletAddr) })}</Text>
           )}
         </View>
 
         {/* Destino */}
         <View style={styles.card}>
-          <Text style={styles.label}>Endereço de destino</Text>
+          <Text style={styles.label}>{t('transfer.destAddress')}</Text>
           <TextInput
             style={styles.input}
-            placeholder="Ex: 7xKXt...vFs3"
+            placeholder={t('transfer.destPlaceholder')}
             placeholderTextColor={colors.secondary}
             value={destino}
             onChangeText={setDestino}
@@ -162,13 +162,13 @@ export default function TransferCNBScreen({ route, navigation }) {
             autoCorrect={false}
           />
           {!!destino && !isValidSolanaAddress(destino) && (
-            <Text style={styles.erroInline}>Endereço inválido.</Text>
+            <Text style={styles.erroInline}>{t('transfer.invalidAddress')}</Text>
           )}
         </View>
 
         {/* Valor */}
         <View style={styles.card}>
-          <Text style={styles.label}>Quantidade</Text>
+          <Text style={styles.label}>{t('transfer.amount')}</Text>
           <View style={styles.valorRow}>
             <TextInput
               style={[styles.input, { flex: 1, marginBottom: 0 }]}
@@ -182,11 +182,11 @@ export default function TransferCNBScreen({ route, navigation }) {
               onPress={() => saldo && setValor(String(saldo))}
               style={styles.maxBtn}
             >
-              <Text style={styles.maxBtnText}>MÁX</Text>
+              <Text style={styles.maxBtnText}>{t('transfer.max')}</Text>
             </TouchableOpacity>
           </View>
           {valorNumero > 0 && saldo !== null && valorNumero > saldo && (
-            <Text style={styles.erroInline}>Saldo insuficiente.</Text>
+            <Text style={styles.erroInline}>{t('transfer.insufficient')}</Text>
           )}
         </View>
 
@@ -196,12 +196,9 @@ export default function TransferCNBScreen({ route, navigation }) {
             <View style={{ flex: 1 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <Shield size={14} color={colors.primary} />
-                <Text style={styles.privTitulo}>Privacidade básica</Text>
+                <Text style={styles.privTitulo}>{t('transfer.basicPrivacy')}</Text>
               </View>
-              <Text style={styles.privDesc}>
-                Envia através de uma carteira intermediária descartável (2 hops).
-                Esconde o link direto entre você e o destino, mas não é privacidade ZK total.
-              </Text>
+              <Text style={styles.privDesc}>{t('transfer.basicPrivacyDesc')}</Text>
             </View>
             <Switch
               value={privacidade}
@@ -216,11 +213,11 @@ export default function TransferCNBScreen({ route, navigation }) {
         {!!erro && <Text style={styles.erroBox}>{erro}</Text>}
         {!!signature && (
           <TouchableOpacity style={styles.sucessoBox} onPress={abrirNoExplorer}>
-            <Text style={styles.sucessoTitulo}>✓ Transferência enviada</Text>
+            <Text style={styles.sucessoTitulo}>{t('transfer.transferSent')}</Text>
             <Text style={styles.sucessoSig}>
               Tx: {signature.slice(0, 8)}...{signature.slice(-6)}
             </Text>
-            <Text style={styles.sucessoLink}>Toque para ver no Solana Explorer ↗</Text>
+            <Text style={styles.sucessoLink}>{t('transfer.viewExplorer')}</Text>
           </TouchableOpacity>
         )}
 
@@ -236,15 +233,13 @@ export default function TransferCNBScreen({ route, navigation }) {
               <>
                 <Send size={16} color={colors.background} />
                 <Text style={styles.btnEnviarText}>
-                  {privacidade ? 'Enviar com privacidade' : 'Enviar CNB'}
+                  {privacidade ? t('transfer.sendPrivacy') : t('transfer.sendCNB')}
                 </Text>
               </>
             )}
         </TouchableOpacity>
 
-        <Text style={styles.footnote}>
-          A taxa de rede (~$0.0001) é coberta pelo JUICE Mobile via paymaster Kora.
-        </Text>
+        <Text style={styles.footnote}>{t('transfer.footerNote')}</Text>
       </ScrollView>
     </SafeAreaView>
   );

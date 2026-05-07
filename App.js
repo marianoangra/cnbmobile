@@ -11,6 +11,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { onAuthStateChanged } from 'firebase/auth';
+import { useTranslation } from 'react-i18next';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from './src/services/firebase';
 import { registrarSessao, limparSessao, escutarSessao } from './src/services/session';
@@ -304,24 +305,25 @@ function FloatingTabBar({ state, descriptors, navigation }) {
 }
 
 function MainTabs({ user, perfil, onAtualizar, atualizarPerfil }) {
+  const { t } = useTranslation();
   return (
     <Tab.Navigator
       tabBar={(props) => <FloatingTabBar {...props} />}
       sceneContainerStyle={{ backgroundColor: 'transparent' }}
       screenOptions={{ headerShown: false }}>
-      <Tab.Screen name="Home" options={{ tabBarLabel: 'Início' }}>
+      <Tab.Screen name="Home" options={{ tabBarLabel: t('tabs.home') }}>
         {(props) => <HomeScreen {...props} route={{ ...props.route, params: { user, perfil, onAtualizar } }} />}
       </Tab.Screen>
-      <Tab.Screen name="Missoes" options={{ tabBarLabel: 'Missões' }}>
+      <Tab.Screen name="Missoes" options={{ tabBarLabel: t('tabs.missions') }}>
         {(props) => <MissoesScreen {...props} route={{ ...props.route, params: { user, perfil, onAtualizar } }} />}
       </Tab.Screen>
-      <Tab.Screen name="Carregar" options={{ tabBarLabel: 'Carregar' }}>
+      <Tab.Screen name="Carregar" options={{ tabBarLabel: t('tabs.charge') }}>
         {(props) => <ChargingScreen {...props} route={{ ...props.route, params: { user, uid: perfil?.uid, perfil, onAtualizar } }} />}
       </Tab.Screen>
-      <Tab.Screen name="Ranking" options={{ tabBarLabel: 'Ranking' }}>
+      <Tab.Screen name="Ranking" options={{ tabBarLabel: t('tabs.ranking') }}>
         {(props) => <RankingScreen {...props} route={{ ...props.route, params: { uid: perfil?.uid, perfil } }} />}
       </Tab.Screen>
-      <Tab.Screen name="Perfil" options={{ tabBarLabel: 'Perfil' }}>
+      <Tab.Screen name="Perfil" options={{ tabBarLabel: t('tabs.profile') }}>
         {(props) => <ProfileScreen {...props} route={{ ...props.route, params: { user, perfil, onAtualizar, atualizarPerfil } }} />}
       </Tab.Screen>
     </Tab.Navigator>
@@ -330,28 +332,15 @@ function MainTabs({ user, perfil, onAtualizar, atualizarPerfil }) {
 
 function AppNavigator({ user, perfil, onAtualizar, atualizarPerfil }) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const headerStyle = { backgroundColor: colors.card };
   const headerTintColor = colors.white;
 
-  // Primeiro login: perfil.modo ainda null → tela de escolha bloqueia o resto.
-  const precisaEscolherModo = perfil && (perfil.modo === null || perfil.modo === undefined);
+  // Modo: padrão 'tech' até o usuário escolher explicitamente. A escolha vive
+  // como modal acessível pelo Perfil (ProfileScreen → ModoEscolha) — não bloqueia
+  // mais o app na inicialização nem antes do login.
   const modo = perfil?.modo ?? 'tech';
   const isTech = modo === 'tech';
-
-  if (precisaEscolherModo) {
-    return (
-      <Stack.Navigator screenOptions={{ headerShown: false, gestureEnabled: false }}>
-        <Stack.Screen name="ModoEscolha">
-          {(props) => (
-            <ModoEscolhaScreen
-              {...props}
-              route={{ ...props.route, params: { uid: user?.uid, currentMode: null, atualizarPerfil } }}
-            />
-          )}
-        </Stack.Screen>
-      </Stack.Navigator>
-    );
-  }
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -374,7 +363,7 @@ function AppNavigator({ user, perfil, onAtualizar, atualizarPerfil }) {
       />
       <Stack.Screen
         name="EditProfile" component={EditProfileScreen}
-        options={{ headerShown: true, title: 'Editar Perfil', headerStyle, headerTintColor, headerBackTitle: 'Retornar' }}
+        options={{ headerShown: true, title: t('editProfile.title'), headerStyle, headerTintColor, headerBackTitle: t('editProfile.headerBack') }}
       />
       <Stack.Screen name="ModoEscolha">
         {(props) => (
@@ -442,6 +431,7 @@ function precisaAtualizar(atual, minima) {
 
 function AppContent() {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const [user, setUser] = useState(null);
   const [perfil, setPerfil] = useState(null);
   const [pronto, setPronto] = useState(false);
@@ -453,8 +443,8 @@ function AppContent() {
 
   // Garante mínimo de 2s na splash — independente da velocidade do Firebase
   useEffect(() => {
-    const t = setTimeout(() => setSplashDone(true), 2000);
-    return () => clearTimeout(t);
+    const tid = setTimeout(() => setSplashDone(true), 2000);
+    return () => clearTimeout(tid);
   }, []);
 
   useEffect(() => {
@@ -471,7 +461,7 @@ function AppContent() {
         setTimeout(() => rej(new Error('timeout')), 20000)
       );
       let p = await Promise.race([getPerfil(u.uid), timeout]);
-      if (!p) p = await criarPerfil(u.uid, u.displayName ?? u.email ?? 'Usuário', u.email ?? '');
+      if (!p) p = await criarPerfil(u.uid, u.displayName ?? u.email ?? '', u.email ?? '');
       setPerfil(p);
 
       registrarLoginDiario(u.uid).then(async (foiNovoDia) => {
@@ -483,7 +473,7 @@ function AppContent() {
       }).catch(() => {});
     } catch (e) {
       console.warn('Erro ao carregar perfil:', e);
-      setPerfil({ uid: u.uid, nome: u.displayName ?? u.email ?? 'Usuário', email: u.email ?? '', pontos: 0 });
+      setPerfil({ uid: u.uid, nome: u.displayName ?? u.email ?? '', email: u.email ?? '', pontos: 0 });
     }
   }
 
@@ -547,9 +537,9 @@ function AppContent() {
     sessaoUnsubRef.current?.();
     sessaoUnsubRef.current = escutarSessao(uid, token, () => {
       Alert.alert(
-        'Sessão encerrada',
-        'Sua conta foi acessada em outro dispositivo.',
-        [{ text: 'OK' }]
+        t('login.sessionExpired'),
+        t('login.sessionExpiredMsg'),
+        [{ text: t('common.ok') }]
       );
     });
   }
@@ -626,16 +616,15 @@ function AppContent() {
         <View style={updateStyles.overlay}>
           <View style={updateStyles.card}>
             <Text style={updateStyles.emoji}>🚀</Text>
-            <Text style={updateStyles.titulo}>Atualização necessária</Text>
+            <Text style={updateStyles.titulo}>{t('update.title')}</Text>
             <Text style={updateStyles.mensagem}>
-              Uma nova versão do CNB Mobile está disponível com melhorias importantes.
-              Atualize agora para continuar usando o app.
+              {t('update.message')}
             </Text>
             <TouchableOpacity
               style={updateStyles.btn}
               activeOpacity={0.85}
               onPress={() => Linking.openURL(STORE_URL)}>
-              <Text style={updateStyles.btnText}>Atualizar agora</Text>
+              <Text style={updateStyles.btnText}>{t('update.button')}</Text>
             </TouchableOpacity>
           </View>
         </View>

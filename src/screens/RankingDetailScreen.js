@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import Avatar from '../components/Avatar';
@@ -7,6 +8,7 @@ import { Clock, ArrowUpRight, AlertCircle } from 'lucide-react-native';
 const medalhasCor = { 1: '#FFD700', 2: '#C0C0C0', 3: '#CD7F32' };
 
 export default function RankingDetailScreen({ route }) {
+  const { t } = useTranslation();
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { item, isMe } = route.params || {};
@@ -16,7 +18,7 @@ export default function RankingDetailScreen({ route }) {
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <View style={{ paddingTop: 80, alignItems: 'center' }}>
           <AlertCircle size={32} color={colors.secondary} style={{ marginBottom: 12 }} />
-          <Text style={{ color: colors.secondary, textAlign: 'center' }}>Dados não disponíveis.</Text>
+          <Text style={{ color: colors.secondary, textAlign: 'center' }}>{t('rankingDetail.noData')}</Text>
         </View>
       </ScrollView>
     );
@@ -31,10 +33,10 @@ export default function RankingDetailScreen({ route }) {
         </Text>
       </View>
 
-      <Text style={styles.nome}>{item?.nome}{isMe ? ' (você)' : ''}</Text>
+      <Text style={styles.nome}>{item?.nome}{isMe ? t('rankingDetail.you') : ''}</Text>
 
       <View style={styles.pontosCard}>
-        <Text style={styles.label}>Pontos totais</Text>
+        <Text style={styles.label}>{t('rankingDetail.totalPoints')}</Text>
         <Text style={styles.pontos}>{(item?.pontos ?? 0).toLocaleString('pt-BR')}</Text>
       </View>
 
@@ -42,21 +44,21 @@ export default function RankingDetailScreen({ route }) {
         <View style={[styles.card, styles.half]}>
           <Clock size={20} color={colors.secondary} style={{ marginBottom: 6 }} />
           <Text style={styles.statVal}>{item?.minutos ?? 0}</Text>
-          <Text style={styles.statLabel}>Min. carregando</Text>
+          <Text style={styles.statLabel}>{t('rankingDetail.minutesCharging')}</Text>
         </View>
         <View style={[styles.card, styles.half]}>
           <ArrowUpRight size={20} color={colors.secondary} style={{ marginBottom: 6 }} />
           <Text style={styles.statVal}>{item?.saques ?? 0}</Text>
-          <Text style={styles.statLabel}>Saques</Text>
+          <Text style={styles.statLabel}>{t('rankingDetail.withdrawals')}</Text>
         </View>
       </View>
 
       <View style={styles.rankCard}>
-        <Text style={styles.rankLabel}>Posição global</Text>
+        <Text style={styles.rankLabel}>{t('rankingDetail.globalPosition')}</Text>
         <Text style={[styles.rankPos, { color: medalhasCor[item?.posicao] ?? colors.primary }]}>
           {item?.posicao <= 3 ? item?.posicao : `#${item?.posicao}`}
         </Text>
-        <Text style={styles.rankSub}>Ranking CNB Mobile</Text>
+        <Text style={styles.rankSub}>{t('rankingDetail.title')}</Text>
       </View>
     </ScrollView>
   );

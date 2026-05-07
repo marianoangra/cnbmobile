@@ -1,4 +1,5 @@
 import React, { useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Animated, TouchableOpacity, Image, View, Text, useWindowDimensions, Linking, Alert } from 'react-native';
 
 const WHATSAPP_URL = 'https://chat.whatsapp.com/GsIEmnUPKsn2W95HEjPwW8';
@@ -6,6 +7,7 @@ const BANNER_H = 180;
 const ICON_SIZE = 92;
 
 export default function WhatsappBanner() {
+  const { t } = useTranslation();
   const scale = useRef(new Animated.Value(1)).current;
   const { width } = useWindowDimensions();
   const imgWidth = width - 40;
@@ -18,11 +20,11 @@ export default function WhatsappBanner() {
   }
   function handlePress() {
     Alert.alert(
-      'Entrar no grupo oficial JUICE',
-      'Você será redirecionado para o WhatsApp.',
+      t('components.whatsappAlertTitle'),
+      t('components.whatsappAlertMsg'),
       [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Abrir', onPress: () => Linking.openURL(WHATSAPP_URL) },
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('components.whatsappOpen'), onPress: () => Linking.openURL(WHATSAPP_URL) },
       ],
     );
   }
@@ -85,7 +87,7 @@ export default function WhatsappBanner() {
               letterSpacing: 1.4,
               marginBottom: 6,
             }}>
-              GRUPO OFICIAL
+              {t('components.whatsappBadge')}
             </Text>
             <Text style={{
               color: '#ffffff',
@@ -93,7 +95,7 @@ export default function WhatsappBanner() {
               fontWeight: '800',
               lineHeight: 25,
             }}>
-              Entre na{'\n'}comunidade JUICE
+              {t('components.whatsappLine')}
             </Text>
             <Text style={{
               color: '#7CFFB7',
@@ -102,14 +104,14 @@ export default function WhatsappBanner() {
               letterSpacing: 1.2,
               marginTop: 6,
             }}>
-              CONCORRA A PRÊMIOS
+              {t('components.whatsappPrize')}
             </Text>
             <Text style={{
               color: 'rgba(255,255,255,0.75)',
               fontSize: 12,
               marginTop: 6,
             }}>
-              Toque para participar
+              {t('components.whatsappTap')}
             </Text>
           </View>
         </View>

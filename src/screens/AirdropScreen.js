@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   View, Text, TouchableOpacity, ScrollView, TextInput,
   ActivityIndicator, KeyboardAvoidingView, Platform,
@@ -22,6 +23,7 @@ function formatarJuice(pontos) {
 }
 
 export default function AirdropScreen({ route, navigation }) {
+  const { t, i18n } = useTranslation();
   const { perfil } = route?.params || {};
   const user = auth.currentUser;
 
@@ -37,7 +39,7 @@ export default function AirdropScreen({ route, navigation }) {
 
   async function entrarNaLista() {
     if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      setErro('Digite um e-mail válido.');
+      setErro(t('airdrop.errorInvalidEmail'));
       return;
     }
     setErro('');
@@ -58,12 +60,12 @@ export default function AirdropScreen({ route, navigation }) {
         pontosApp:     pontosAtuais,
         juiceEstimado: juiceEstimado,
         source:        'app',
-        locale:        'pt',
+        locale:        i18n.language || 'pt',
         criadoEm:      serverTimestamp(),
       });
       setSucesso(true);
     } catch (e) {
-      setErro('Não foi possível registrar agora. Tente novamente.');
+      setErro(t('airdrop.errorRegister'));
     } finally {
       setEnviando(false);
     }
@@ -90,7 +92,7 @@ export default function AirdropScreen({ route, navigation }) {
             }}
           >
             <ArrowLeft size={18} color="rgba(255,255,255,0.6)" />
-            <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>Voltar</Text>
+            <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>{t('airdrop.back')}</Text>
           </TouchableOpacity>
 
           <ScrollView
@@ -111,7 +113,7 @@ export default function AirdropScreen({ route, navigation }) {
               }}>
                 <Star size={10} color={PRIMARY} strokeWidth={2.5} />
                 <Text style={{ fontSize: 10, color: PRIMARY, fontWeight: '700', letterSpacing: 1 }}>
-                  WAITLIST · PRE-TGE
+                  {t('airdrop.waitlistBadge')}
                 </Text>
               </View>
               {/* Badge do app */}
@@ -120,7 +122,7 @@ export default function AirdropScreen({ route, navigation }) {
                 borderRadius: 99, paddingHorizontal: 8, paddingVertical: 4,
               }}>
                 <Text style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', fontWeight: '600' }}>
-                  PRIORIDADE DO APP
+                  {t('airdrop.priorityBadge')}
                 </Text>
               </View>
             </View>
@@ -129,7 +131,7 @@ export default function AirdropScreen({ route, navigation }) {
               $JUICE Airdrop
             </Text>
             <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', marginBottom: 24, lineHeight: 19 }}>
-              Carregue primeiro, receba primeiro. Cadastre seu e-mail para garantir prioridade no snapshot.
+              {t('airdrop.headlineSub')}
             </Text>
 
             {/* Card de estimativa */}
@@ -142,7 +144,7 @@ export default function AirdropScreen({ route, navigation }) {
               }}
             >
               <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginBottom: 4 }}>
-                Seus pontos acumulados
+                {t('airdrop.yourPoints')}
               </Text>
               <Text style={{ fontSize: 32, fontWeight: '800', color: PRIMARY, letterSpacing: -1 }}>
                 {pontosAtuais.toLocaleString('pt-BR')}
@@ -156,7 +158,7 @@ export default function AirdropScreen({ route, navigation }) {
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <View>
                   <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginBottom: 3 }}>
-                    Estimativa $JUICE no snapshot
+                    {t('airdrop.estimateLabel')}
                   </Text>
                   <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
                     <Text style={{ fontSize: 26, fontWeight: '800', color: '#fff' }}>
@@ -175,7 +177,7 @@ export default function AirdropScreen({ route, navigation }) {
               </View>
 
               <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 10 }}>
-                Taxa de conversão: 1.000 pontos = 1 $JUICE · Mínimo: 100 $JUICE (100.000 pts)
+                {t('airdrop.conversionRate')}
               </Text>
 
               {!elegivel && pontosAtuais > 0 && (
@@ -187,7 +189,10 @@ export default function AirdropScreen({ route, navigation }) {
                 }}>
                   <Zap size={13} color="#FFA500" />
                   <Text style={{ flex: 1, fontSize: 11, color: 'rgba(255,200,100,0.9)', lineHeight: 16 }}>
-                    Continue carregando! Faltam {(MINIMO_JUICE * PONTOS_POR_JUICE - pontosAtuais).toLocaleString('pt-BR')} pts para atingir o mínimo de {MINIMO_JUICE} $JUICE.
+                    {t('airdrop.missingMin', {
+                      pts: (MINIMO_JUICE * PONTOS_POR_JUICE - pontosAtuais).toLocaleString('pt-BR'),
+                      min: MINIMO_JUICE,
+                    })}
                   </Text>
                 </View>
               )}
@@ -202,12 +207,12 @@ export default function AirdropScreen({ route, navigation }) {
               }}>
                 {/* E-mail */}
                 <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', marginBottom: 6 }}>
-                  1. Seu e-mail
+                  {t('airdrop.emailLabel')}
                 </Text>
                 <TextInput
                   value={email}
                   onChangeText={setEmail}
-                  placeholder="voce@email.com"
+                  placeholder={t('airdrop.emailPlaceholder')}
                   placeholderTextColor="rgba(255,255,255,0.2)"
                   keyboardType="email-address"
                   autoCapitalize="none"
@@ -222,16 +227,15 @@ export default function AirdropScreen({ route, navigation }) {
 
                 {/* Wallet Solana */}
                 <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', marginBottom: 4 }}>
-                  2. Carteira Solana{' '}
-                  <Text style={{ color: 'rgba(255,255,255,0.35)' }}>(opcional, mas recomendada)</Text>
+                  {t('airdrop.walletLabel')}
                 </Text>
                 <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginBottom: 6, lineHeight: 16 }}>
-                  Conectar agora garante que o drop caia direto na sua carteira.
+                  {t('airdrop.walletHint')}
                 </Text>
                 <TextInput
                   value={wallet}
                   onChangeText={setWallet}
-                  placeholder="Endereço Solana (ex: 7xKp...)"
+                  placeholder={t('airdrop.walletPlaceholder')}
                   placeholderTextColor="rgba(255,255,255,0.2)"
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -260,7 +264,7 @@ export default function AirdropScreen({ route, navigation }) {
                 >
                   {enviando
                     ? <ActivityIndicator color="#000" />
-                    : <Text style={{ color: '#000', fontWeight: '700', fontSize: 15 }}>Entrar na lista</Text>}
+                    : <Text style={{ color: '#000', fontWeight: '700', fontSize: 15 }}>{t('airdrop.joinList')}</Text>}
                 </TouchableOpacity>
               </View>
             ) : (
@@ -273,12 +277,10 @@ export default function AirdropScreen({ route, navigation }) {
               }}>
                 <CheckCircle size={36} color={PRIMARY} strokeWidth={2} style={{ marginBottom: 12 }} />
                 <Text style={{ fontSize: 17, fontWeight: '700', color: '#fff', marginBottom: 6 }}>
-                  Você está na lista!
+                  {t('airdrop.alreadyOnList')}
                 </Text>
                 <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', textAlign: 'center', lineHeight: 19 }}>
-                  {wallet.trim()
-                    ? 'Sua carteira está confirmada para o drop. Avisaremos quando o snapshot fechar.'
-                    : 'E-mail confirmado. Conecte uma carteira antes do snapshot para garantir o drop direto na conta.'}
+                  {wallet.trim() ? t('airdrop.alreadyMsg') : t('airdrop.alreadyMsgNoWallet')}
                 </Text>
               </View>
             )}
@@ -286,9 +288,9 @@ export default function AirdropScreen({ route, navigation }) {
             {/* Reassurance */}
             <View style={{ flexDirection: 'row', gap: 8, marginBottom: 24 }}>
               {[
-                { icon: Shield, label: 'Sem spam · só aviso do snapshot' },
-                { icon: Star,   label: 'Acesso prioritário no TGE' },
-                { icon: Gift,   label: 'Não é uma compra' },
+                { icon: Shield, label: t('airdrop.noSpam') },
+                { icon: Star,   label: t('airdrop.priorityAccess') },
+                { icon: Gift,   label: t('airdrop.notPurchase') },
               ].map(({ icon: Icon, label }) => (
                 <View
                   key={label}
@@ -314,13 +316,13 @@ export default function AirdropScreen({ route, navigation }) {
               borderRadius: 18, padding: 20,
             }}>
               <Text style={{ fontSize: 11, fontWeight: '600', color: 'rgba(255,255,255,0.5)', marginBottom: 14, letterSpacing: 0.5 }}>
-                COMO FUNCIONA O AIRDROP
+                {t('airdrop.howItWorks')}
               </Text>
               {[
-                { n: '1', titulo: 'Use o app antes do snapshot', desc: 'Mais pontos acumulados = maior alocação de $JUICE.' },
-                { n: '2', titulo: 'Snapshot anunciado com 30 dias de antecedência', desc: 'Notificaremos por e-mail e no app.' },
-                { n: '3', titulo: 'Conversão automática', desc: '1.000 pontos = 1 $JUICE. Mínimo: 100 $JUICE (100k pts).' },
-                { n: '4', titulo: 'Drop no TGE', desc: 'Tokens caem direto na carteira Solana cadastrada.' },
+                { n: '1', titulo: t('airdrop.step1Title'), desc: t('airdrop.step1Desc') },
+                { n: '2', titulo: t('airdrop.step2Title'), desc: t('airdrop.step2Desc') },
+                { n: '3', titulo: t('airdrop.step3Title'), desc: t('airdrop.step3Desc') },
+                { n: '4', titulo: t('airdrop.step4Title'), desc: t('airdrop.step4Desc') },
               ].map(({ n, titulo, desc }) => (
                 <View key={n} style={{ flexDirection: 'row', gap: 12, marginBottom: 14 }}>
                   <View style={{

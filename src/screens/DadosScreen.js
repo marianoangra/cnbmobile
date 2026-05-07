@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   View, Text, ScrollView, TouchableOpacity, Switch,
   Alert,
@@ -20,78 +21,14 @@ const PRIMARY   = '#c6ff4a';
 const STORAGE_KEY = '@cnb_dados_consentimentos';
 
 const PERMISSOES = [
-  {
-    id: 'localizacao',
-    Icon: MapPin,
-    titulo: 'Localização',
-    desc: 'Mapeamento de pontos DePIN e validação de presença física na rede.',
-    obrigatorio: false,
-    cor: '#4FC3F7',
-    bonus: 500,
-  },
-  {
-    id: 'rede',
-    Icon: Wifi,
-    titulo: 'Dados de Rede',
-    desc: 'Monitoramento da contribuição na infraestrutura DePIN (tipo de conexão, qualidade).',
-    obrigatorio: false,
-    cor: '#4DB6AC',
-    bonus: 400,
-  },
-  {
-    id: 'horarios',
-    Icon: Clock,
-    titulo: 'Horários de uso',
-    desc: 'Otimização da distribuição de pontos por período e hábitos de carregamento.',
-    obrigatorio: false,
-    cor: '#f9a825',
-    bonus: 300,
-  },
-  {
-    id: 'redes_sociais',
-    Icon: Users,
-    titulo: 'Redes Sociais',
-    desc: 'Missões de engajamento e verificação de conta para desafios.',
-    obrigatorio: false,
-    cor: '#c084fc',
-    bonus: 200,
-  },
-  {
-    id: 'contatos',
-    Icon: Users,
-    titulo: 'Contatos',
-    desc: 'Programa de indicação e convites para amigos participarem da rede.',
-    obrigatorio: false,
-    cor: '#81C784',
-    bonus: 150,
-  },
-  {
-    id: 'camera',
-    Icon: Camera,
-    titulo: 'Câmera',
-    desc: 'Leitura de QR Code e atualização de foto de perfil.',
-    obrigatorio: false,
-    cor: '#FF8A65',
-    bonus: 1000,
-  },
-  {
-    id: 'som',
-    Icon: Mic,
-    titulo: 'Som',
-    desc: 'Áudio do microfone para validação de presença e missões de campo.',
-    obrigatorio: false,
-    cor: '#F06292',
-    bonus: 1000,
-  },
-  {
-    id: 'analiticos',
-    Icon: BarChart3,
-    titulo: 'Dados Analíticos',
-    desc: 'Melhoria contínua da experiência no app. Nenhum dado pessoal identificável é coletado.',
-    obrigatorio: true,
-    cor: PRIMARY,
-    bonus: null,
-  },
+  { id: 'localizacao',   Icon: MapPin,    tituloKey: 'dados.permLocationTitle',  descKey: 'dados.permLocationDesc',  obrigatorio: false, cor: '#4FC3F7', bonus: 500 },
+  { id: 'rede',          Icon: Wifi,      tituloKey: 'dados.permNetworkTitle',   descKey: 'dados.permNetworkDesc',   obrigatorio: false, cor: '#4DB6AC', bonus: 400 },
+  { id: 'horarios',      Icon: Clock,     tituloKey: 'dados.permHoursTitle',     descKey: 'dados.permHoursDesc',     obrigatorio: false, cor: '#f9a825', bonus: 300 },
+  { id: 'redes_sociais', Icon: Users,     tituloKey: 'dados.permSocialTitle',    descKey: 'dados.permSocialDesc',    obrigatorio: false, cor: '#c084fc', bonus: 200 },
+  { id: 'contatos',      Icon: Users,     tituloKey: 'dados.permContactsTitle',  descKey: 'dados.permContactsDesc',  obrigatorio: false, cor: '#81C784', bonus: 150 },
+  { id: 'camera',        Icon: Camera,    tituloKey: 'dados.permCameraTitle',    descKey: 'dados.permCameraDesc',    obrigatorio: false, cor: '#FF8A65', bonus: 1000 },
+  { id: 'som',           Icon: Mic,       tituloKey: 'dados.permSoundTitle',     descKey: 'dados.permSoundDesc',     obrigatorio: false, cor: '#F06292', bonus: 1000 },
+  { id: 'analiticos',    Icon: BarChart3, tituloKey: 'dados.permAnalyticsTitle', descKey: 'dados.permAnalyticsDesc', obrigatorio: true,  cor: PRIMARY,   bonus: null },
 ];
 
 function useEntrada(delayMs = 0) {
@@ -109,8 +46,11 @@ function useEntrada(delayMs = 0) {
 }
 
 function PermissaoCard({ item, valor, onChange, delay }) {
+  const { t } = useTranslation();
   const anim = useEntrada(delay);
-  const { Icon, titulo, desc, obrigatorio, cor, bonus } = item;
+  const { Icon, tituloKey, descKey, obrigatorio, cor, bonus } = item;
+  const titulo = t(tituloKey);
+  const desc = t(descKey);
 
   return (
     <Animated.View style={anim}>
@@ -143,7 +83,7 @@ function PermissaoCard({ item, valor, onChange, delay }) {
                   borderRadius: 99, paddingHorizontal: 6, paddingVertical: 2,
                   borderWidth: 1, borderColor: 'rgba(198,255,74,0.25)',
                 }}>
-                  <Text style={{ fontSize: 9, color: PRIMARY, fontWeight: '700' }}>ESSENCIAL</Text>
+                  <Text style={{ fontSize: 9, color: PRIMARY, fontWeight: '700' }}>{t('dados.sectionEssential')}</Text>
                 </View>
               )}
             </View>
@@ -192,12 +132,12 @@ function PermissaoCard({ item, valor, onChange, delay }) {
                 fontSize: 10,
                 color: valor ? `${cor}99` : 'rgba(255,255,255,0.2)',
               }}>
-                / semana
+                {t('dados.perWeek')}
               </Text>
             </View>
             {!valor && (
               <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)' }}>
-                Ative para ganhar
+                {t('dados.activateToEarn')}
               </Text>
             )}
           </View>
@@ -208,11 +148,12 @@ function PermissaoCard({ item, valor, onChange, delay }) {
 }
 
 function SecaoConta({ navigation, delay }) {
+  const { t } = useTranslation();
   const anim = useEntrada(delay);
   return (
     <Animated.View style={[{ marginTop: 24, marginBottom: 4 }, anim]}>
       <Text style={{ fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.35)', letterSpacing: 1, marginBottom: 10 }}>
-        CONTA
+        {t('dados.sectionAccount')}
       </Text>
       <TouchableOpacity
         onPress={() => navigation.navigate('RelatorioConta')}
@@ -232,9 +173,9 @@ function SecaoConta({ navigation, delay }) {
           <Download size={18} color="#64A0FF" />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 14, fontWeight: '600', color: '#fff' }}>Baixar meus Dados</Text>
+          <Text style={{ fontSize: 14, fontWeight: '600', color: '#fff' }}>{t('dados.downloadData')}</Text>
           <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
-            Solicite um relatório completo da sua conta
+            {t('dados.downloadDataDesc')}
           </Text>
         </View>
         <ChevronRight size={16} color="rgba(255,255,255,0.25)" />
@@ -244,6 +185,7 @@ function SecaoConta({ navigation, delay }) {
 }
 
 export default function DadosScreen({ navigation }) {
+  const { t } = useTranslation();
   const [consentimentos, setConsentimentos] = useState(
     Object.fromEntries(PERMISSOES.map(p => [p.id, p.obrigatorio]))
   );
@@ -290,23 +232,23 @@ export default function DadosScreen({ navigation }) {
 
       setSalvo(true);
       Alert.alert(
-        'Preferências salvas',
-        'Suas escolhas de privacidade foram registradas com sucesso.',
-        [{ text: 'OK' }]
+        t('dados.savedTitle'),
+        t('dados.savedMsg'),
+        [{ text: t('common.ok') }]
       );
     } catch {
-      Alert.alert('Erro', 'Não foi possível salvar. Tente novamente.');
+      Alert.alert(t('common.error'), t('dados.errorSave'));
     }
   }
 
   function handleRevogarTodos() {
     Alert.alert(
-      'Revogar todos',
-      'Isso desativará todos os dados opcionais. Algumas funcionalidades podem ficar limitadas.',
+      t('dados.revokeTitle'),
+      t('dados.revokeMsg'),
       [
-        { text: 'Cancelar', style: 'cancel' },
+        { text: t('dados.cancel'), style: 'cancel' },
         {
-          text: 'Revogar',
+          text: t('dados.revokeBtn'),
           style: 'destructive',
           onPress: () => {
             setConsentimentos(
@@ -345,19 +287,19 @@ export default function DadosScreen({ navigation }) {
             }}
           >
             <ArrowLeft size={18} color="rgba(255,255,255,0.6)" />
-            <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>Voltar</Text>
+            <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>{t('dados.back')}</Text>
           </TouchableOpacity>
 
           <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 12 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <View>
-                <Text style={{ fontSize: 22, fontWeight: '700', color: '#fff' }}>Meus Dados</Text>
+                <Text style={{ fontSize: 22, fontWeight: '700', color: '#fff' }}>{t('dados.title')}</Text>
                 <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginTop: 3 }}>
-                  {totalAtivos} de {totalOpc} opcionais ativos
+                  {t('dados.optionalActive', { active: totalAtivos, total: totalOpc })}
                 </Text>
               </View>
               <TouchableOpacity onPress={handleRevogarTodos} activeOpacity={0.7} style={{ paddingTop: 4 }}>
-                <Text style={{ fontSize: 12, color: 'rgba(255,100,100,0.8)' }}>Revogar todos</Text>
+                <Text style={{ fontSize: 12, color: 'rgba(255,100,100,0.8)' }}>{t('dados.revokeAll')}</Text>
               </TouchableOpacity>
             </View>
 
@@ -372,7 +314,7 @@ export default function DadosScreen({ navigation }) {
             }}>
               <View>
                 <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginBottom: 2 }}>
-                  Bônus semanal ativo
+                  {t('dados.weekBonusActive')}
                 </Text>
                 <Text style={{ fontSize: 20, fontWeight: '700', color: bonusAtivo > 0 ? PRIMARY : 'rgba(255,255,255,0.25)' }}>
                   +{bonusAtivo.toLocaleString('pt-BR')} pts
@@ -380,7 +322,7 @@ export default function DadosScreen({ navigation }) {
               </View>
               <View style={{ alignItems: 'flex-end' }}>
                 <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 2 }}>
-                  Potencial máximo
+                  {t('dados.maxPotential')}
                 </Text>
                 <Text style={{ fontSize: 14, fontWeight: '600', color: 'rgba(255,255,255,0.5)' }}>
                   +{bonusMaximo.toLocaleString('pt-BR')} pts
@@ -405,7 +347,7 @@ export default function DadosScreen({ navigation }) {
             }}>
               <Info size={16} color={PRIMARY} style={{ marginTop: 1 }} />
               <Text style={{ flex: 1, fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 18 }}>
-                O CNB Mobile usa <Text style={{ color: PRIMARY, fontWeight: '600' }}>Zero-Knowledge Proofs</Text> para validar sua atividade sem expor seus dados pessoais. Você controla o que compartilha.
+                {t('dados.zkInfo')}
               </Text>
             </View>
           </Animated.View>
@@ -429,8 +371,7 @@ export default function DadosScreen({ navigation }) {
           {/* Rodapé legal */}
           <Animated.View style={[{ marginTop: 24, marginBottom: 20 }, aBtn]}>
             <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', lineHeight: 17, textAlign: 'center' }}>
-              Seus dados nunca são vendidos a terceiros. Para mais informações, consulte nossa{' '}
-              <Text style={{ color: 'rgba(198,255,74,0.6)' }}>Política de Privacidade</Text>.
+              {t('dados.neverSold')}
             </Text>
           </Animated.View>
 
@@ -453,7 +394,7 @@ export default function DadosScreen({ navigation }) {
                 color: salvo ? PRIMARY : '#000',
                 fontWeight: '700', fontSize: 15,
               }}>
-                {salvo ? 'Preferências salvas' : 'Salvar preferências'}
+                {salvo ? t('dados.savedTitle') : t('dados.save')}
               </Text>
             </TouchableOpacity>
           </Animated.View>

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   View, Text, TouchableOpacity, ActivityIndicator, Alert, Platform, StatusBar,
 } from 'react-native';
@@ -11,13 +12,12 @@ const PRIMARY = '#c6ff4a';
 const PURPLE  = '#c084fc';
 
 function ModeCard({ tipo, selecionado, onPress }) {
+  const { t } = useTranslation();
   const isLite = tipo === 'lite';
   const accent = isLite ? PURPLE : PRIMARY;
   const Icon   = isLite ? Cpu : Zap;
-  const titulo = isLite ? 'Lite' : 'Tech';
-  const desc   = isLite
-    ? 'O essencial: carregar, missões, ranking e saque PIX. Privacidade ZK fica acessível pelo perfil.'
-    : 'Experiência completa: wallet, DePIN, dados on-chain, compra de tokens e CNB Privado em destaque.';
+  const titulo = isLite ? t('modoEscolha.lite') : t('modoEscolha.tech');
+  const desc   = isLite ? t('modoEscolha.liteDesc') : t('modoEscolha.techDesc');
 
   return (
     <TouchableOpacity
@@ -55,30 +55,27 @@ function ModeCard({ tipo, selecionado, onPress }) {
 }
 
 export default function ModoEscolhaScreen({ route, navigation }) {
+  const { t } = useTranslation();
   const { uid, currentMode, atualizarPerfil } = route?.params || {};
   const [selecionado, setSelecionado] = useState(currentMode ?? 'tech');
   const [salvando, setSalvando] = useState(false);
 
   async function confirmar() {
     if (!uid) {
-      Alert.alert('Erro', 'Sessão expirada. Faça login novamente.');
+      Alert.alert(t('common.error'), t('modoEscolha.errorSession'));
       return;
     }
     setSalvando(true);
     try {
       await atualizarModo(uid, selecionado);
-      // Atualiza state local no App.js — força re-render do AppNavigator,
-      // que troca o stack pra MainTabs e desmonta esta tela.
       atualizarPerfil?.({ modo: selecionado });
-      // Se for o caso de "trocar modo" via Perfil (não onboarding), volta.
       if (currentMode != null && navigation.canGoBack?.()) {
         navigation.goBack();
       }
-      // Em todo caso, libera o estado pra evitar travamento se a troca de stack falhar.
       setSalvando(false);
     } catch (e) {
       console.warn('[ModoEscolha] erro:', e);
-      Alert.alert('Erro', 'Não foi possível salvar. Tente novamente.');
+      Alert.alert(t('common.error'), t('modoEscolha.errorSave'));
       setSalvando(false);
     }
   }
@@ -89,10 +86,10 @@ export default function ModoEscolhaScreen({ route, navigation }) {
       <SafeAreaView style={{ flex: 1 }}>
         <View style={{ flex: 1, paddingHorizontal: 20, paddingTop: Platform.OS === 'ios' ? 12 : 24 }}>
           <Text style={{ fontSize: 28, fontWeight: '700', color: '#fff', marginBottom: 6 }}>
-            Escolha seu modo
+            {t('modoEscolha.title')}
           </Text>
           <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', marginBottom: 28 }}>
-            Você pode trocar a qualquer momento no Perfil.
+            {t('modoEscolha.subtitle')}
           </Text>
 
           <ModeCard tipo="tech" selecionado={selecionado === 'tech'} onPress={() => setSelecionado('tech')} />
@@ -111,7 +108,7 @@ export default function ModoEscolhaScreen({ route, navigation }) {
             }}>
             {salvando
               ? <ActivityIndicator color="#000" />
-              : <Text style={{ color: '#000', fontSize: 16, fontWeight: '700' }}>Confirmar</Text>}
+              : <Text style={{ color: '#000', fontSize: 16, fontWeight: '700' }}>{t('modoEscolha.confirm')}</Text>}
           </TouchableOpacity>
         </View>
       </SafeAreaView>

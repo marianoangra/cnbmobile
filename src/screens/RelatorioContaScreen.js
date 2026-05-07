@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Alert,
 } from 'react-native';
@@ -30,6 +31,7 @@ function useEntrada(delayMs = 0) {
 }
 
 export default function RelatorioContaScreen({ navigation }) {
+  const { t } = useTranslation();
   const [solicitado, setSolicitado] = useState(false);
   const [carregando, setCarregando] = useState(false);
 
@@ -46,7 +48,7 @@ export default function RelatorioContaScreen({ navigation }) {
       await solicitarRelatoriofn();
       setSolicitado(true);
     } catch (e) {
-      Alert.alert('Erro', 'Não foi possível enviar o relatório. Tente novamente.');
+      Alert.alert(t('common.error'), t('relatorio.errorSend'));
       console.warn('[RelatorioContaScreen]', e?.message);
     } finally {
       setCarregando(false);
@@ -72,15 +74,15 @@ export default function RelatorioContaScreen({ navigation }) {
             }}
           >
             <ArrowLeft size={18} color="rgba(255,255,255,0.6)" />
-            <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>Voltar</Text>
+            <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>{t('relatorio.back')}</Text>
           </TouchableOpacity>
 
           <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16 }}>
             <Text style={{ fontSize: 22, fontWeight: '700', color: '#fff' }}>
-              Pedir Relatório da Conta
+              {t('relatorio.title')}
             </Text>
             <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginTop: 4 }}>
-              Exportação dos seus dados pessoais
+              {t('relatorio.subtitle')}
             </Text>
           </View>
         </Animated.View>
@@ -107,26 +109,25 @@ export default function RelatorioContaScreen({ navigation }) {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 15, fontWeight: '700', color: '#fff' }}>
-                    Relatório completo da conta
+                    {t('relatorio.fullReportTitle')}
                   </Text>
                   <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginTop: 3 }}>
-                    Configurações, atividade e dados da CNB
+                    {t('relatorio.fullReportSub')}
                   </Text>
                 </View>
               </View>
 
               <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', lineHeight: 20 }}>
-                Crie um relatório com as configurações e os dados da sua conta da CNB. Essa ação gerará um arquivo com os dados e será enviado para o email cadastrado do usuário em até{' '}
-                <Text style={{ color: '#fff', fontWeight: '600' }}>72 horas</Text>.
+                {t('relatorio.description')}
               </Text>
 
               {/* O que será incluído */}
               <View style={{ gap: 8 }}>
                 {[
-                  'Dados de perfil e configurações',
-                  'Histórico de pontos e resgates',
-                  'Preferências de privacidade',
-                  'Registros de atividade na rede',
+                  t('relatorio.item1'),
+                  t('relatorio.item2'),
+                  t('relatorio.item3'),
+                  t('relatorio.item4'),
                 ].map((item, i) => (
                   <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <View style={{
@@ -151,7 +152,7 @@ export default function RelatorioContaScreen({ navigation }) {
               <Mail size={16} color={PRIMARY} />
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 2 }}>
-                  Será enviado para
+                  {t('relatorio.sentTo')}
                 </Text>
                 <Text style={{ fontSize: 13, fontWeight: '600', color: '#fff' }}>{email}</Text>
               </View>
@@ -170,10 +171,10 @@ export default function RelatorioContaScreen({ navigation }) {
                 <CheckCircle2 size={18} color={PRIMARY} style={{ marginTop: 1 }} />
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 14, fontWeight: '700', color: PRIMARY, marginBottom: 4 }}>
-                    Solicitação enviada
+                    {t('relatorio.requestSent')}
                   </Text>
                   <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', lineHeight: 18 }}>
-                    Você receberá o relatório em <Text style={{ color: '#fff', fontWeight: '600' }}>{email}</Text> em até 72 horas.
+                    {t('relatorio.requestSentMsg', { email })}
                   </Text>
                 </View>
               </View>
@@ -188,7 +189,7 @@ export default function RelatorioContaScreen({ navigation }) {
             }}>
               <Clock size={13} color="rgba(255,255,255,0.25)" />
               <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', flex: 1 }}>
-                O prazo de entrega é de até 72 horas após a solicitação. Verifique sua caixa de spam caso não receba.
+                {t('relatorio.deliveryNote')}
               </Text>
             </View>
           </Animated.View>
@@ -216,12 +217,12 @@ export default function RelatorioContaScreen({ navigation }) {
                 <>
                   <CheckCircle2 size={16} color={PRIMARY} />
                   <Text style={{ color: PRIMARY, fontWeight: '700', fontSize: 15 }}>
-                    Solicitação enviada
+                    {t('relatorio.requestSent')}
                   </Text>
                 </>
               ) : (
                 <Text style={{ color: '#000', fontWeight: '700', fontSize: 15 }}>
-                  Solicitar relatório
+                  {t('relatorio.requestBtn')}
                 </Text>
               )}
             </TouchableOpacity>

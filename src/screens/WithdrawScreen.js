@@ -78,26 +78,26 @@ export default function WithdrawScreen({ route, navigation }) {
   const podeConfirmarPix = pontosDisponiveis >= 100000 && qtdPix >= 100000 && qtdPix <= pontosDisponiveis && nome.trim() && pixValido(pix);
 
   async function handleSaquePix() {
-    if (!perfil?.uid) return Alert.alert('Erro', 'Dados do perfil não carregados.');
-    if (!nome.trim()) return Alert.alert('Atenção', 'Informe seu nome completo.');
-    if (!pixValido(pix)) return Alert.alert('Atenção', 'Informe uma chave PIX válida (CPF, e-mail, telefone ou chave aleatória).');
-    if (qtdPix < 100000) return Alert.alert('Atenção', 'Mínimo de 100.000 pontos.');
-    if (qtdPix > pontosDisponiveis) return Alert.alert('Atenção', 'Pontos insuficientes.');
+    if (!perfil?.uid) return Alert.alert(t('common.error'), t('withdraw.errorProfile'));
+    if (!nome.trim()) return Alert.alert(t('common.attention'), t('withdraw.errorMissingName'));
+    if (!pixValido(pix)) return Alert.alert(t('common.attention'), t('withdraw.errorInvalidPix'));
+    if (qtdPix < 100000) return Alert.alert(t('common.attention'), t('withdraw.errorMin'));
+    if (qtdPix > pontosDisponiveis) return Alert.alert(t('common.attention'), t('withdraw.errorInsufficient'));
 
     Alert.alert(
-      'Confirmar Saque PIX',
-      `Nome: ${nome.trim()}\nChave PIX: ${pix.trim()}\nPontos: ${qtdPix.toLocaleString('pt-BR')}\n\nPagamento em até 72h.`,
+      t('withdraw.confirmPixTitle'),
+      t('withdraw.confirmPixMsg', { nome: nome.trim(), chave: pix.trim(), pontos: qtdPix.toLocaleString('pt-BR') }),
       [
-        { text: 'Cancelar', style: 'cancel' },
+        { text: t('withdraw.cancel'), style: 'cancel' },
         {
-          text: 'Confirmar', onPress: async () => {
+          text: t('withdraw.confirm'), onPress: async () => {
             setLoadingPix(true);
             try {
               await solicitarSaque(perfil.uid, nome.trim(), pix.trim(), qtdPix);
               logSaqueSolicitado(qtdPix);
-              Alert.alert('Saque solicitado!', 'Processaremos em até 72 horas.', [{ text: 'OK', onPress: () => navigation.goBack() }]);
+              Alert.alert(t('withdraw.requestedTitle'), t('withdraw.requestedMsg'), [{ text: t('common.ok'), onPress: () => navigation.goBack() }]);
             } catch (e) {
-              Alert.alert('Erro', e.message ?? 'Tente novamente.');
+              Alert.alert(t('common.error'), e.message ?? t('withdraw.tryAgain'));
             } finally { setLoadingPix(false); }
           },
         },
@@ -116,18 +116,22 @@ export default function WithdrawScreen({ route, navigation }) {
     solanaValido(walletPrivado);
 
   async function handleResgatePrivado() {
-    if (!perfil?.uid) return Alert.alert('Erro', 'Dados do perfil não carregados.');
-    if (!solanaValido(walletPrivado)) return Alert.alert('Atenção', 'Informe um endereço Solana válido.');
-    if (qtdPrivadoArredondado < BLOCO_PRIVADO) return Alert.alert('Atenção', 'Mínimo de 100.000 pontos.');
-    if (qtdPrivadoArredondado > pontosDisponiveis) return Alert.alert('Atenção', 'Pontos insuficientes.');
+    if (!perfil?.uid) return Alert.alert(t('common.error'), t('withdraw.errorProfile'));
+    if (!solanaValido(walletPrivado)) return Alert.alert(t('common.attention'), t('withdraw.errorInvalidSolana'));
+    if (qtdPrivadoArredondado < BLOCO_PRIVADO) return Alert.alert(t('common.attention'), t('withdraw.errorMin'));
+    if (qtdPrivadoArredondado > pontosDisponiveis) return Alert.alert(t('common.attention'), t('withdraw.errorInsufficient'));
 
     Alert.alert(
-      'Confirmar Resgate Privado',
-      `Carteira: ${walletPrivado.trim().slice(0, 8)}...${walletPrivado.trim().slice(-6)}\nPontos: ${qtdPrivadoArredondado.toLocaleString('pt-BR')}\nVocê receberá: ~${solLiquido.toFixed(4)} SOL\n\nA transação será privada — sem link on-chain entre o projeto e sua carteira.`,
+      t('withdraw.confirmPrivateTitle'),
+      t('withdraw.confirmPrivateMsg', {
+        wallet: `${walletPrivado.trim().slice(0, 8)}...${walletPrivado.trim().slice(-6)}`,
+        pontos: qtdPrivadoArredondado.toLocaleString('pt-BR'),
+        sol: solLiquido.toFixed(4),
+      }),
       [
-        { text: 'Cancelar', style: 'cancel' },
+        { text: t('withdraw.cancel'), style: 'cancel' },
         {
-          text: 'Confirmar', onPress: async () => {
+          text: t('withdraw.confirm'), onPress: async () => {
             setLoadingPrivado(true);
             try {
               const result = await resgatarPrivadoFn({
@@ -136,12 +140,12 @@ export default function WithdrawScreen({ route, navigation }) {
               });
               const sig = result.data?.signature ?? '';
               Alert.alert(
-                'SOL enviado com privacidade',
-                `~${solLiquido.toFixed(4)} SOL enviados via Cloak.\n\nAssinatura: ${sig.slice(0, 16)}...\n\nNenhum link on-chain entre o projeto e sua carteira.`,
-                [{ text: 'OK', onPress: () => navigation.goBack() }]
+                t('withdraw.privateSentTitle'),
+                t('withdraw.privateSentMsg', { sol: solLiquido.toFixed(4), sig: `${sig.slice(0, 16)}...` }),
+                [{ text: t('common.ok'), onPress: () => navigation.goBack() }]
               );
             } catch (e) {
-              Alert.alert('Erro', e.message ?? 'Tente novamente.');
+              Alert.alert(t('common.error'), e.message ?? t('withdraw.tryAgain'));
             } finally { setLoadingPrivado(false); }
           },
         },
@@ -153,18 +157,21 @@ export default function WithdrawScreen({ route, navigation }) {
   const podeConfirmarCNB = pontosDisponiveis >= 100000 && qtdCNB >= 100000 && qtdCNB <= pontosDisponiveis && solanaValido(wallet);
 
   async function handleResgateCNB() {
-    if (!perfil?.uid) return Alert.alert('Erro', 'Dados do perfil não carregados.');
-    if (!solanaValido(wallet)) return Alert.alert('Atenção', 'Informe um endereço de carteira Solana válido.');
-    if (qtdCNB < 100000) return Alert.alert('Atenção', 'Mínimo de 100.000 pontos.');
-    if (qtdCNB > pontosDisponiveis) return Alert.alert('Atenção', 'Pontos insuficientes.');
+    if (!perfil?.uid) return Alert.alert(t('common.error'), t('withdraw.errorProfile'));
+    if (!solanaValido(wallet)) return Alert.alert(t('common.attention'), t('withdraw.errorInvalidSolana'));
+    if (qtdCNB < 100000) return Alert.alert(t('common.attention'), t('withdraw.errorMin'));
+    if (qtdCNB > pontosDisponiveis) return Alert.alert(t('common.attention'), t('withdraw.errorInsufficient'));
 
     Alert.alert(
-      'Confirmar Resgate CNB',
-      `Carteira: ${wallet.trim().slice(0, 8)}...${wallet.trim().slice(-6)}\nTokens CNB: ${qtdCNB.toLocaleString('pt-BR')}\n\nOs tokens serão enviados diretamente na Solana.`,
+      t('withdraw.confirmCNBTitle'),
+      t('withdraw.confirmCNBMsg', {
+        wallet: `${wallet.trim().slice(0, 8)}...${wallet.trim().slice(-6)}`,
+        tokens: qtdCNB.toLocaleString('pt-BR'),
+      }),
       [
-        { text: 'Cancelar', style: 'cancel' },
+        { text: t('withdraw.cancel'), style: 'cancel' },
         {
-          text: 'Confirmar', onPress: async () => {
+          text: t('withdraw.confirm'), onPress: async () => {
             setLoadingCNB(true);
             try {
               logResgateCNB(qtdCNB, wallet.trim());
@@ -172,12 +179,12 @@ export default function WithdrawScreen({ route, navigation }) {
               const sig = result.data?.signature ?? '';
               logResgateCNBSucesso(qtdCNB, sig);
               Alert.alert(
-                'CNB enviado com sucesso',
-                `${qtdCNB.toLocaleString('pt-BR')} CNB tokens enviados para sua carteira Solana.\n\nSignature: ${sig.slice(0, 16)}...`,
-                [{ text: 'OK', onPress: () => navigation.goBack() }]
+                t('withdraw.cnbSentTitle'),
+                t('withdraw.cnbSentMsg', { tokens: qtdCNB.toLocaleString('pt-BR'), sig: `${sig.slice(0, 16)}...` }),
+                [{ text: t('common.ok'), onPress: () => navigation.goBack() }]
               );
             } catch (e) {
-              Alert.alert('Erro', e.message ?? 'Tente novamente.');
+              Alert.alert(t('common.error'), e.message ?? t('withdraw.tryAgain'));
             } finally { setLoadingCNB(false); }
           },
         },
@@ -204,10 +211,10 @@ export default function WithdrawScreen({ route, navigation }) {
           contentContainerStyle={styles.container}
           keyboardShouldPersistTaps="handled"
           automaticallyAdjustKeyboardInsets={true}>
-          <Text style={styles.title}>Resgatar</Text>
+          <Text style={styles.title}>{t('withdraw.redeem')}</Text>
 
           <View style={styles.card}>
-            <Text style={styles.label}>Seus pontos disponíveis</Text>
+            <Text style={styles.label}>{t('withdraw.yourAvailable')}</Text>
             <Text style={styles.pontos}>{pontosDisponiveis.toLocaleString('pt-BR')}</Text>
           </View>
 
@@ -233,7 +240,7 @@ export default function WithdrawScreen({ route, navigation }) {
               activeOpacity={0.8}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                 <Lock size={12} color={aba === 'privado' ? '#c084fc' : colors.secondary} />
-                <Text style={[styles.tabText, aba === 'privado' && styles.tabTextPrivado]}>Privado</Text>
+                <Text style={[styles.tabText, aba === 'privado' && styles.tabTextPrivado]}>{t('withdraw.private')}</Text>
               </View>
             </TouchableOpacity>
           </View>
@@ -243,51 +250,51 @@ export default function WithdrawScreen({ route, navigation }) {
               <View style={styles.infoCard}>
                 <View style={styles.infoRow}>
                   <DollarSign size={13} color={colors.primary} />
-                  <Text style={styles.infoLine}>Mínimo: 100.000 pontos</Text>
+                  <Text style={styles.infoLine}>{t('withdraw.minPoints')}</Text>
                 </View>
                 <View style={styles.infoRow}>
                   <Clock size={13} color={colors.primary} />
-                  <Text style={styles.infoLine}>Prazo: até 72 horas</Text>
+                  <Text style={styles.infoLine}>{t('withdraw.deadline')}</Text>
                 </View>
               </View>
 
-              <Text style={styles.fieldLabel}>Nome completo</Text>
+              <Text style={styles.fieldLabel}>{t('withdraw.fullName')}</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Seu nome completo"
+                placeholder={t('withdraw.fullNamePlaceholder')}
                 placeholderTextColor={colors.secondary}
                 value={nome}
                 onChangeText={setNome}
                 autoCapitalize="words"
               />
 
-              <Text style={styles.fieldLabel}>Chave PIX</Text>
+              <Text style={styles.fieldLabel}>{t('withdraw.pixKey')}</Text>
               <TextInput
                 style={styles.input}
-                placeholder="CPF, e-mail, telefone ou chave aleatória"
+                placeholder={t('withdraw.pixPlaceholder')}
                 placeholderTextColor={colors.secondary}
                 value={pix}
                 onChangeText={setPix}
                 autoCapitalize="none"
               />
 
-              <Text style={styles.fieldLabel}>Quantidade de pontos</Text>
+              <Text style={styles.fieldLabel}>{t('withdraw.amountPoints')}</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Mínimo 100.000"
+                placeholder={t('withdraw.amountPlaceholder')}
                 placeholderTextColor={colors.secondary}
                 value={quantidade}
                 onChangeText={v => setQuantidade(formatarPontos(v))}
                 keyboardType="numeric"
               />
-              {qtdPix > 0 && qtdPix < 100000 && <Text style={styles.erro}>Mínimo de 100.000 pontos.</Text>}
-              {qtdPix > pontosDisponiveis && qtdPix > 0 && <Text style={styles.erro}>Você não tem pontos suficientes.</Text>}
+              {qtdPix > 0 && qtdPix < 100000 && <Text style={styles.erro}>{t('withdraw.errorMinShort')}</Text>}
+              {qtdPix > pontosDisponiveis && qtdPix > 0 && <Text style={styles.erro}>{t('withdraw.errorInsufficientShort')}</Text>}
 
               <TouchableOpacity
                 style={[styles.btn, !podeConfirmarPix && styles.btnDisabled]}
                 onPress={handleSaquePix}
                 disabled={loadingPix || !podeConfirmarPix}>
-                {loadingPix ? <ActivityIndicator color={colors.background} /> : <Text style={styles.btnText}>Confirmar Saque PIX</Text>}
+                {loadingPix ? <ActivityIndicator color={colors.background} /> : <Text style={styles.btnText}>{t('withdraw.confirmPixBtn')}</Text>}
               </TouchableOpacity>
             </>
           )}
@@ -296,25 +303,25 @@ export default function WithdrawScreen({ route, navigation }) {
             <>
               <View style={styles.infoCardSolana}>
                 <View style={styles.infoRow}>
-                  <Text style={styles.infoLineSolana}>◎ 1 ponto = 1 CNB Token</Text>
+                  <Text style={styles.infoLineSolana}>{t('withdraw.rate')}</Text>
                 </View>
                 <View style={styles.infoRow}>
                   <Key size={13} color="#9945FF" />
-                  <Text style={styles.infoLineSolana}>Mínimo: 100.000 pontos</Text>
+                  <Text style={styles.infoLineSolana}>{t('withdraw.minPoints')}</Text>
                 </View>
                 <View style={styles.infoRow}>
                   <Zap size={13} color="#9945FF" />
-                  <Text style={styles.infoLineSolana}>Envio imediato na Solana</Text>
+                  <Text style={styles.infoLineSolana}>{t('withdraw.instantSolana')}</Text>
                 </View>
                 <View style={styles.infoRow}>
                   <Smartphone size={13} color="#9945FF" />
                   <Text style={styles.infoLineSolana}>
-                    {walletNativa ? 'Sua carteira CNB já está selecionada' : 'Use Phantom, Solflare ou crie sua carteira no app'}
+                    {walletNativa ? t('withdraw.yourWalletSelected') : t('withdraw.useExternal')}
                   </Text>
                 </View>
               </View>
 
-              <Text style={styles.fieldLabel}>Endereço da carteira Solana</Text>
+              <Text style={styles.fieldLabel}>{t('withdraw.solanaAddress')}</Text>
 
               {walletNativa && (
                 <TouchableOpacity
@@ -323,7 +330,7 @@ export default function WithdrawScreen({ route, navigation }) {
                   activeOpacity={0.8}>
                   <Text style={styles.walletNativaTagIcon}>◎</Text>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.walletNativaTagTitle}>Minha Carteira CNB</Text>
+                    <Text style={styles.walletNativaTagTitle}>{t('withdraw.myCNBWallet')}</Text>
                     <Text style={styles.walletNativaTagAddr}>{walletNativa.slice(0, 8)}...{walletNativa.slice(-6)}</Text>
                   </View>
                   {wallet === walletNativa && <Text style={styles.walletNativaCheck}>✓</Text>}
@@ -332,7 +339,7 @@ export default function WithdrawScreen({ route, navigation }) {
 
               <TextInput
                 style={styles.input}
-                placeholder="Ex: 8Zrt5KwcFzmH..."
+                placeholder={t('withdraw.addressPlaceholder')}
                 placeholderTextColor={colors.secondary}
                 value={wallet}
                 onChangeText={setWallet}
@@ -340,23 +347,23 @@ export default function WithdrawScreen({ route, navigation }) {
                 autoCorrect={false}
               />
               {wallet.length > 0 && !solanaValido(wallet) && (
-                <Text style={styles.erro}>Endereço Solana inválido.</Text>
+                <Text style={styles.erro}>{t('withdraw.invalidSolana')}</Text>
               )}
 
-              <Text style={styles.fieldLabel}>Quantidade de pontos</Text>
+              <Text style={styles.fieldLabel}>{t('withdraw.amountPoints')}</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Mínimo 100.000"
+                placeholder={t('withdraw.amountPlaceholder')}
                 placeholderTextColor={colors.secondary}
                 value={quantidadeCNB}
                 onChangeText={v => setQuantidadeCNB(formatarPontos(v))}
                 keyboardType="numeric"
               />
               {qtdCNB > 0 && (
-                <Text style={styles.conversao}>= {qtdCNB.toLocaleString('pt-BR')} CNB Tokens</Text>
+                <Text style={styles.conversao}>{t('withdraw.equalsCNB', { count: qtdCNB.toLocaleString('pt-BR') })}</Text>
               )}
-              {qtdCNB > 0 && qtdCNB < 100000 && <Text style={styles.erro}>Mínimo de 100.000 pontos.</Text>}
-              {qtdCNB > pontosDisponiveis && qtdCNB > 0 && <Text style={styles.erro}>Você não tem pontos suficientes.</Text>}
+              {qtdCNB > 0 && qtdCNB < 100000 && <Text style={styles.erro}>{t('withdraw.errorMinShort')}</Text>}
+              {qtdCNB > pontosDisponiveis && qtdCNB > 0 && <Text style={styles.erro}>{t('withdraw.errorInsufficientShort')}</Text>}
 
               <TouchableOpacity
                 style={[styles.btnSolana, !podeConfirmarCNB && styles.btnDisabled]}
@@ -364,7 +371,7 @@ export default function WithdrawScreen({ route, navigation }) {
                 disabled={loadingCNB || !podeConfirmarCNB}>
                 {loadingCNB
                   ? <ActivityIndicator color="#0A0F1E" />
-                  : <Text style={styles.btnSolanaText}>Resgatar CNB Tokens ◎</Text>}
+                  : <Text style={styles.btnSolanaText}>{t('withdraw.redeemCNBBtn')}</Text>}
               </TouchableOpacity>
             </>
           )}
@@ -375,38 +382,38 @@ export default function WithdrawScreen({ route, navigation }) {
               <View style={{ backgroundColor: 'rgba(192,132,252,0.07)', borderWidth: 1, borderColor: 'rgba(192,132,252,0.2)', borderRadius: 16, padding: 16, marginBottom: 16 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                   <Lock size={14} color="#c084fc" />
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#c084fc' }}>O que é o Saque Privado?</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#c084fc' }}>{t('withdraw.whatIsPrivate')}</Text>
                 </View>
                 <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', lineHeight: 20, marginBottom: 12 }}>
-                  O Saque Privado usa <Text style={{ color: '#c084fc', fontWeight: '600' }}>Zero-Knowledge Proofs (ZK)</Text> para converter seus pontos em SOL sem criar um link rastreável entre o CNB Mobile e sua carteira Solana.
+                  {t('withdraw.privateDesc1')}
                 </Text>
                 <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', lineHeight: 20 }}>
-                  Nenhum observador on-chain consegue relacionar seu resgate ao app — sua privacidade financeira é garantida matematicamente.
+                  {t('withdraw.privateDesc2')}
                 </Text>
               </View>
 
               <View style={styles.infoCardPrivado}>
                 <View style={styles.infoRow}>
                   <Lock size={13} color="#c4b5fd" />
-                  <Text style={styles.infoLinePrivado}>Resgate privado via Cloak Protocol</Text>
+                  <Text style={styles.infoLinePrivado}>{t('withdraw.privateBadge')}</Text>
                 </View>
                 <View style={styles.infoRow}>
-                  <Text style={styles.infoLinePrivado}>◎ 100.000 pontos = ~0.005 SOL líquido</Text>
+                  <Text style={styles.infoLinePrivado}>{t('withdraw.privateRate')}</Text>
                 </View>
                 <View style={styles.infoRow}>
                   <Shield size={13} color="#c4b5fd" />
-                  <Text style={styles.infoLinePrivado}>Sem link on-chain entre projeto e você</Text>
+                  <Text style={styles.infoLinePrivado}>{t('withdraw.privateNoLink')}</Text>
                 </View>
                 <View style={styles.infoRow}>
                   <Zap size={13} color="#c4b5fd" />
-                  <Text style={styles.infoLinePrivado}>ZK-proof gerado automaticamente</Text>
+                  <Text style={styles.infoLinePrivado}>{t('withdraw.privateZK')}</Text>
                 </View>
               </View>
 
-              <Text style={styles.fieldLabel}>Endereço da carteira Solana</Text>
+              <Text style={styles.fieldLabel}>{t('withdraw.solanaAddress')}</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Ex: 8Zrt5KwcFzmH..."
+                placeholder={t('withdraw.addressPlaceholder')}
                 placeholderTextColor={colors.secondary}
                 value={walletPrivado}
                 onChangeText={setWalletPrivado}
@@ -414,13 +421,13 @@ export default function WithdrawScreen({ route, navigation }) {
                 autoCorrect={false}
               />
               {walletPrivado.length > 0 && !solanaValido(walletPrivado) && (
-                <Text style={styles.erro}>Endereço Solana inválido.</Text>
+                <Text style={styles.erro}>{t('withdraw.invalidSolana')}</Text>
               )}
 
-              <Text style={styles.fieldLabel}>Quantidade de pontos (múltiplos de 100.000)</Text>
+              <Text style={styles.fieldLabel}>{t('withdraw.amountMultiple')}</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Mínimo 100.000"
+                placeholder={t('withdraw.amountPlaceholder')}
                 placeholderTextColor={colors.secondary}
                 value={quantidadePrivado}
                 onChangeText={v => setQuantidadePrivado(formatarPontos(v))}
@@ -428,14 +435,14 @@ export default function WithdrawScreen({ route, navigation }) {
               />
               {qtdPrivadoArredondado > 0 && (
                 <Text style={styles.conversaoPrivado}>
-                  ≈ {solLiquido.toFixed(4)} SOL líquido (após fee do relay)
+                  {t('withdraw.estimatedSol', { sol: solLiquido.toFixed(4) })}
                 </Text>
               )}
               {qtdPrivado > 0 && qtdPrivadoArredondado < BLOCO_PRIVADO && (
-                <Text style={styles.erro}>Mínimo de 100.000 pontos.</Text>
+                <Text style={styles.erro}>{t('withdraw.errorMinShort')}</Text>
               )}
               {qtdPrivadoArredondado > pontosDisponiveis && qtdPrivadoArredondado > 0 && (
-                <Text style={styles.erro}>Você não tem pontos suficientes.</Text>
+                <Text style={styles.erro}>{t('withdraw.errorInsufficientShort')}</Text>
               )}
 
               <TouchableOpacity
@@ -446,7 +453,7 @@ export default function WithdrawScreen({ route, navigation }) {
                   ? <ActivityIndicator color="#ffffff" />
                   : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                       <Lock size={15} color="#fff" />
-                      <Text style={styles.btnPrivadoText}>Resgatar SOL Privado</Text>
+                      <Text style={styles.btnPrivadoText}>{t('withdraw.redeemPrivateBtn')}</Text>
                     </View>}
               </TouchableOpacity>
 
@@ -458,7 +465,7 @@ export default function WithdrawScreen({ route, navigation }) {
 
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center', marginTop: 16 }}>
             <AlertTriangle size={12} color={colors.secondary} />
-            <Text style={[styles.aviso, { marginTop: 0 }]}>Os pontos serão debitados da sua conta ao confirmar.</Text>
+            <Text style={[styles.aviso, { marginTop: 0 }]}>{t('withdraw.debitNotice')}</Text>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
