@@ -290,7 +290,18 @@ export async function solicitarSaque(uid, nome, chavePix, quantidade) {
   const usuarioRef = doc(db, 'usuarios', uid);
   await runTransaction(db, async (t) => {
     const snap = await t.get(usuarioRef);
-    if (!snap.exists() || snap.data().pontos < quantidade) throw new Error('Pontos insuficientes.');
+    if (!snap.exists()) throw new Error('Usuário não encontrado.');
+    const data = snap.data();
+
+    // Bloqueia saque se conta estiver banida ou suspeita
+    if (data.contaBanida === true) {
+      throw new Error('⚠️ Conta suspensa por atividade irregular. Entre em contato: contato@rafaelmariano.com.br');
+    }
+    if (data.saquesBloqueados === true) {
+      throw new Error('🔍 Saques temporariamente bloqueados para análise de segurança. Entre em contato: contato@rafaelmariano.com.br');
+    }
+
+    if (data.pontos < quantidade) throw new Error('Pontos insuficientes.');
     t.update(usuarioRef, { pontos: increment(-quantidade), saques: increment(1) });
     t.set(doc(collection(db, 'saques')), {
       uid, nome, chavePix, pontos: quantidade, status: 'pendente', criadoEm: serverTimestamp(),

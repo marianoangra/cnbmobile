@@ -6,6 +6,7 @@ import { getFunctions, httpsCallable } from 'firebase/functions';
 import { iniciarForegroundService, pararForegroundService, servicoRodando, SESSAO_KEY } from '../services/backgroundService';
 import { logInicioCarregamento, logFimCarregamento, logSessaoOnChain } from '../services/analytics';
 import { calcularPontosTotal, adicionarMinutoComBonus } from '../services/pontos';
+import { getDeviceHash } from '../services/deviceFingerprint';
 import { emitPontosUpdate } from '../services/chargeEvents';
 import { notificarInicioCarregamento } from '../services/notificacoes';
 
@@ -188,7 +189,9 @@ export function useCarregamento(uid, onPontosAdicionados) {
       try { await pararForegroundService(); } catch {}
       if (minutos > 0) {
         // Registra prova on-chain da sessão (não-bloqueante — falha silenciosa)
-        httpsCallable(getFunctions(), 'registrarProvasSessao')({ duracaoMinutos: minutos })
+        getDeviceHash().then(deviceHash =>
+          httpsCallable(getFunctions(), 'registrarProvasSessao')({ duracaoMinutos: minutos, deviceHash })
+        )
           .then(r => logSessaoOnChain(minutos, calcularPontosTotal(minutos), r?.data?.signature))
           .catch(() => logSessaoOnChain(minutos, calcularPontosTotal(minutos), null));
         onAtualizarRef.current?.();

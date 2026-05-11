@@ -305,38 +305,114 @@ exports.onReferralCreated = onDocumentCreated(
 );
 
 // ─── Bônus de milestone: 50k pts por 5 indicações ativas, 100k por 10 ──────
-// "Ativa" = indicado com minutos >= 3 (carregou pelo menos 3 minutos).
-// Transição detectada por onDocumentUpdated em usuarios/{uid}: minutos < 3 → ≥3.
+// "Ativa" = indicado com minutos >= 60 (1 hora real de carregamento).
+// SEGURANÇA: valida device hash, IP hash e cadeia circular de indicações.
 // Idempotência: contadoComoAtivo no indicado impede recontagem;
 // bonus5kGranted/bonus10kGranted no indicador impedem duplo crédito.
+
+// Detecta referral circular: percorre a cadeia referidoPor até MAX_DEPTH.
+// Retorna true se o uid do indicado aparecer na cadeia (fraude em anel).
+async function detectarReferralCircular(db, refereeUid, referrerUid, maxDepth = 15) {
+  const visitados = new Set([refereeUid]);
+  let currentUid = referrerUid;
+  for (let i = 0; i < maxDepth; i++) {
+    if (!currentUid) break;
+    if (visitados.has(currentUid)) return true; // ciclo detectado
+    visitados.add(currentUid);
+    try {
+      const snap = await db.doc(`usuarios/${currentUid}`).get();
+      if (!snap.exists) break;
+      currentUid = snap.data().referidoPor ?? null;
+    } catch { break; }
+  }
+  return false;
+}
+
 exports.onReferreeBecameActive = onDocumentUpdated(
   { document: 'usuarios/{uid}', region: 'us-central1' },
   async (event) => {
     const before = event.data?.before?.data();
-    const after = event.data?.after?.data();
+    const after  = event.data?.after?.data();
     if (!before || !after) return;
 
     const minutosBefore = before.minutos ?? 0;
-    const minutosAfter = after.minutos ?? 0;
-    if (minutosBefore >= 3 || minutosAfter < 3) return;
+    const minutosAfter  = after.minutos  ?? 0;
+
+    // MUDANÇA: threshold elevado de 3 → 60 minutos (1h de uso real obrigatório)
+    const MINUTOS_PARA_ATIVAR = 60;
+    if (minutosBefore >= MINUTOS_PARA_ATIVAR || minutosAfter < MINUTOS_PARA_ATIVAR) return;
 
     const referidoPor = after.referidoPor;
     if (!referidoPor) return;
-
     if (after.contadoComoAtivo === true) return;
 
     const refereeUid = event.params.uid;
     const db = getFirestore();
-    const refereeRef = db.doc(`usuarios/${refereeUid}`);
+    const refereeRef  = db.doc(`usuarios/${refereeUid}`);
     const referrerRef = db.doc(`usuarios/${referidoPor}`);
 
+    // ── Verificação anti-fraude 1: conta banida/suspeita não conta ────────────
+    if (after.contaBanida === true || after.contaSuspeita === true) {
+      console.warn(`[AntiF] Indicado ${refereeUid} está banido/suspeito. Ignorando ativação.`);
+      await refereeRef.update({ contadoComoAtivo: true }); // marca para não reprocessar
+      return;
+    }
+
+    // ── Verificação anti-fraude 2: referral circular (anel de contas) ────────
+    const ehCircular = await detectarReferralCircular(db, refereeUid, referidoPor);
+    if (ehCircular) {
+      console.warn(`[AntiF] Referral circular detectado: ${refereeUid} → ${referidoPor}. Bloqueado.`);
+      await refereeRef.update({
+        contadoComoAtivo: true,
+        fraudeDetectada: 'referral_circular',
+      });
+      return;
+    }
+
+    // ── Verificação anti-fraude 3: mesmo device hash que o indicador ─────────
+    const referrerSnap0 = await referrerRef.get();
+    if (referrerSnap0.exists) {
+      const referrerData0 = referrerSnap0.data();
+
+      // Banido não pode receber bônus de indicação
+      if (referrerData0.contaBanida === true) {
+        console.warn(`[AntiF] Indicador ${referidoPor} está banido. Ignorando ativação.`);
+        await refereeRef.update({ contadoComoAtivo: true });
+        return;
+      }
+
+      const refereeDevice   = after.deviceHash ?? null;
+      const referrerDevice  = referrerData0.deviceHash ?? null;
+      const refereeIp       = after.ipHash ?? null;
+      const referrerIp      = referrerData0.ipHash ?? null;
+
+      // Mesmo dispositivo físico → fraude
+      if (refereeDevice && referrerDevice && refereeDevice === referrerDevice) {
+        console.warn(`[AntiF] Mesmo deviceHash: ${refereeUid} e ${referidoPor}. Bloqueado.`);
+        await refereeRef.update({ contadoComoAtivo: true, fraudeDetectada: 'mesmo_dispositivo' });
+        return;
+      }
+
+      // Mesmo IP → sinaliza suspeita mas não bloqueia (pode ser família)
+      if (refereeIp && referrerIp && refereeIp === referrerIp) {
+        console.warn(`[AntiF] Mesmo ipHash: ${refereeUid} e ${referidoPor}. Marcando suspeita.`);
+        await refereeRef.update({ ipCoincide: true });
+        // Continua mas não bloqueia — IP compartilhado pode ser legítimo (residência, roteador)
+      }
+    }
+
+    // ── Transação: credita bônus ao indicador ─────────────────────────────────
     try {
       await db.runTransaction(async (t) => {
-        const refereeSnap = await t.get(refereeRef);
+        const refereeSnap  = await t.get(refereeRef);
         if (!refereeSnap.exists) return;
         const refereeData = refereeSnap.data();
         if (refereeData.contadoComoAtivo === true) return;
-        if ((refereeData.minutos ?? 0) < 3) return;
+        if ((refereeData.minutos ?? 0) < MINUTOS_PARA_ATIVAR) return;
+        if (refereeData.contaBanida === true || refereeData.contaSuspeita === true) {
+          t.update(refereeRef, { contadoComoAtivo: true });
+          return;
+        }
 
         const referrerSnap = await t.get(referrerRef);
         if (!referrerSnap.exists) {
@@ -344,6 +420,11 @@ exports.onReferreeBecameActive = onDocumentUpdated(
           return;
         }
         const referrerData = referrerSnap.data();
+        if (referrerData.contaBanida === true) {
+          t.update(refereeRef, { contadoComoAtivo: true });
+          return;
+        }
+
         const ativasDepois = (referrerData.indicacoesAtivas ?? 0) + 1;
 
         const update = { indicacoesAtivas: FieldValue.increment(1) };
@@ -670,7 +751,7 @@ exports.registrarProvasSessao = onCall(
     if (!request.auth) throw new HttpsError('unauthenticated', 'Login necessário.');
 
     const uid = request.auth.uid;
-    const { duracaoMinutos } = request.data;
+    const { duracaoMinutos, deviceHash: deviceHashCliente } = request.data;
 
     if (
       typeof duracaoMinutos !== 'number' ||
@@ -689,6 +770,21 @@ exports.registrarProvasSessao = onCall(
     const uidHash = crypto.createHash('sha256').update(uid).digest('hex').slice(0, 16);
     const pontos = duracaoMinutos * 10 + Math.floor(duracaoMinutos / 60) * 50;
     const ts = new Date().toISOString();
+
+    // ── Rastreamento anti-fraude: device hash + IP hash ─────────────────────
+    const ipRaw = request.rawRequest?.ip ?? request.rawRequest?.headers?.['x-forwarded-for'] ?? '';
+    const ipHash = ipRaw ? crypto.createHash('sha256').update(ipRaw.split(',')[0].trim()).digest('hex').slice(0, 16) : null;
+    const deviceHash = (typeof deviceHashCliente === 'string' && deviceHashCliente.length >= 16)
+      ? deviceHashCliente.slice(0, 64)  // aceita até 64 chars (SHA-256 truncado)
+      : null;
+
+    // Atualiza device/IP hash no perfil (usado em onReferreeBecameActive para detectar fraude)
+    try {
+      const profileUpdate = { ultimaSessao: new Date() };
+      if (deviceHash) profileUpdate.deviceHash = deviceHash;
+      if (ipHash)     profileUpdate.ipHash = ipHash;
+      await db.doc(`usuarios/${uid}`).update(profileUpdate);
+    } catch { /* não crítico */ }
 
     const memo = JSON.stringify({
       app: 'CNB Mobile',
@@ -1342,3 +1438,7 @@ exports.backfillReferralPoints = onCall(
     return { creditados: totalCreditados, pontosTotais: totalPontos, detalhes: resultados };
   }
 );
+
+// ─── Investigação de fraude (temporário) ────────────────────────────────────
+const { investigarFraude } = require('./investigarFraude');
+exports.investigarFraude = investigarFraude;

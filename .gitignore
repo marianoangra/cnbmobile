@@ -52,3 +52,12 @@ credentials.json
 .qoder/
 .trae/
 skills-lock.json
+
+# Temporary fraud investigation scripts
+functions/acaoImediata.js
+functions/chamar_investigar.js
+functions/investigar2.js
+functions/investigar3.js
+functions/investigarFraude.js
+# Service account key — never commit
+functions/sa-key.json

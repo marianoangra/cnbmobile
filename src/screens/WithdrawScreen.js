@@ -48,6 +48,17 @@ export default function WithdrawScreen({ route, navigation }) {
   const [loadingPrivado, setLoadingPrivado] = useState(false);
 
   const pontosDisponiveis = perfil?.pontos ?? 0;
+  const contaBanida    = perfil?.contaBanida    === true;
+  const contaSuspeita  = perfil?.contaSuspeita  === true;
+  const sacoBloqueado  = perfil?.saquesBloqueados === true;
+  const alertaMensagem = perfil?.alertaSeguranca?.mensagem ?? null;
+
+  // Mostra alerta de segurança ao abrir a tela se conta estiver bloqueada
+  useEffect(() => {
+    if ((contaBanida || sacoBloqueado) && alertaMensagem) {
+      Alert.alert('🔒 Conta Restrita', alertaMensagem, [{ text: 'Entendi' }]);
+    }
+  }, []);
 
   useEffect(() => {
     if (!perfil?.uid) return;
@@ -205,6 +216,31 @@ export default function WithdrawScreen({ route, navigation }) {
           keyboardShouldPersistTaps="handled"
           automaticallyAdjustKeyboardInsets={true}>
           <Text style={styles.title}>Resgatar</Text>
+
+          {/* Banner de segurança — visível para contas banidas/suspeitas */}
+          {(contaBanida || sacoBloqueado) && (
+            <View style={{
+              backgroundColor: contaBanida ? '#3D0000' : '#2D2000',
+              borderWidth: 1,
+              borderColor: contaBanida ? '#FF3B30' : '#FF9500',
+              borderRadius: 10,
+              padding: 14,
+              marginBottom: 16,
+              flexDirection: 'row',
+              alignItems: 'flex-start',
+              gap: 10,
+            }}>
+              <AlertTriangle size={20} color={contaBanida ? '#FF3B30' : '#FF9500'} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: contaBanida ? '#FF6B6B' : '#FFB340', fontWeight: '700', fontSize: 13, marginBottom: 4 }}>
+                  {contaBanida ? '⛔ Conta Suspensa' : '⚠️ Conta em Análise'}
+                </Text>
+                <Text style={{ color: '#aaa', fontSize: 12, lineHeight: 17 }}>
+                  {alertaMensagem ?? 'Saques bloqueados. Entre em contato: contato@rafaelmariano.com.br'}
+                </Text>
+              </View>
+            </View>
+          )}
 
           <View style={styles.card}>
             <Text style={styles.label}>Seus pontos disponíveis</Text>
