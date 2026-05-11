@@ -1,7 +1,7 @@
 const { onDocumentCreated, onDocumentUpdated } = require('firebase-functions/v2/firestore');
 const { onCall, onRequest, HttpsError } = require('firebase-functions/v2/https');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
-const { defineSecret } = require('firebase-functions/params');
+const { defineSecret, defineString } = require('firebase-functions/params');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const nodemailer = require('nodemailer');
@@ -14,6 +14,18 @@ initializeApp();
 const smtpUser = defineSecret('SMTP_USER');
 const smtpPass = defineSecret('SMTP_PASS');
 const solanaPrivateKey = defineSecret('SOLANA_PRIVATE_KEY');
+const testerSecret = defineSecret('TESTER_SECRET');
+const adminUids = defineString('ADMIN_UIDS', { default: 'X619NYBpp5OqXKTBomuFTISuQGY2' });
+
+// Escapa caracteres HTML para prevenir HTML injection em emails
+function escHtml(str) {
+  return String(str ?? '—')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 const DESTINATARIO = 'contato@rafaelmariano.com.br';
 
@@ -54,19 +66,19 @@ exports.notificarSaque = onDocumentCreated(
         <table style="width: 100%; border-collapse: collapse; margin-top: 16px;">
           <tr style="background: #f5f5f5;">
             <td style="padding: 10px; font-weight: bold; width: 40%;">ID do Saque</td>
-            <td style="padding: 10px;">${saqueId}</td>
+            <td style="padding: 10px;">${escHtml(saqueId)}</td>
           </tr>
           <tr>
             <td style="padding: 10px; font-weight: bold;">UID do Usuário</td>
-            <td style="padding: 10px;">${uid ?? '—'}</td>
+            <td style="padding: 10px;">${escHtml(uid)}</td>
           </tr>
           <tr style="background: #f5f5f5;">
             <td style="padding: 10px; font-weight: bold;">Nome Completo</td>
-            <td style="padding: 10px;">${nome ?? '—'}</td>
+            <td style="padding: 10px;">${escHtml(nome)}</td>
           </tr>
           <tr>
             <td style="padding: 10px; font-weight: bold;">Chave PIX</td>
-            <td style="padding: 10px; font-size: 16px; color: #333;">${chavePix ?? '—'}</td>
+            <td style="padding: 10px; font-size: 16px; color: #333;">${escHtml(chavePix)}</td>
           </tr>
           <tr style="background: #f5f5f5;">
             <td style="padding: 10px; font-weight: bold;">Pontos Solicitados</td>
@@ -76,7 +88,7 @@ exports.notificarSaque = onDocumentCreated(
           </tr>
           <tr>
             <td style="padding: 10px; font-weight: bold;">Data/Hora</td>
-            <td style="padding: 10px;">${data}</td>
+            <td style="padding: 10px;">${escHtml(data)}</td>
           </tr>
         </table>
         <p style="margin-top: 24px; color: #666; font-size: 13px;">
@@ -133,17 +145,17 @@ exports.notificarSolicitacaoCompra = onDocumentCreated(
           <strong>Status:</strong> Aguardando pagamento via PIX. Aguarde o comprovante por e-mail antes de creditar os pontos.
         </p>
         <table style="width: 100%; border-collapse: collapse;">
-          <tr style="background: #f5f5f5;"><td style="padding:10px;font-weight:bold;width:35%;">ID</td><td style="padding:10px;">${id}</td></tr>
-          <tr><td style="padding:10px;font-weight:bold;">Cliente</td><td style="padding:10px;">${nome ?? '—'}</td></tr>
-          <tr style="background: #f5f5f5;"><td style="padding:10px;font-weight:bold;">UID</td><td style="padding:10px;font-family:monospace;font-size:11px;">${uid ?? '—'}</td></tr>
-          <tr><td style="padding:10px;font-weight:bold;">E-mail</td><td style="padding:10px;">${email ?? '—'}</td></tr>
-          <tr style="background: #f5f5f5;"><td style="padding:10px;font-weight:bold;">Valor (R$)</td><td style="padding:10px;font-size:16px;font-weight:bold;">R$ ${valorBRLFmt}</td></tr>
-          <tr><td style="padding:10px;font-weight:bold;">Pontos solicitados</td><td style="padding:10px;font-size:18px;font-weight:bold;color:#00AA55;">${cnbFmt} pontos CNB</td></tr>
-          <tr style="background: #f5f5f5;"><td style="padding:10px;font-weight:bold;">Data/Hora</td><td style="padding:10px;">${data}</td></tr>
+          <tr style="background: #f5f5f5;"><td style="padding:10px;font-weight:bold;width:35%;">ID</td><td style="padding:10px;">${escHtml(id)}</td></tr>
+          <tr><td style="padding:10px;font-weight:bold;">Cliente</td><td style="padding:10px;">${escHtml(nome)}</td></tr>
+          <tr style="background: #f5f5f5;"><td style="padding:10px;font-weight:bold;">UID</td><td style="padding:10px;font-family:monospace;font-size:11px;">${escHtml(uid)}</td></tr>
+          <tr><td style="padding:10px;font-weight:bold;">E-mail</td><td style="padding:10px;">${escHtml(email)}</td></tr>
+          <tr style="background: #f5f5f5;"><td style="padding:10px;font-weight:bold;">Valor (R$)</td><td style="padding:10px;font-size:16px;font-weight:bold;">R$ ${escHtml(valorBRLFmt)}</td></tr>
+          <tr><td style="padding:10px;font-weight:bold;">Pontos solicitados</td><td style="padding:10px;font-size:18px;font-weight:bold;color:#00AA55;">${escHtml(cnbFmt)} pontos CNB</td></tr>
+          <tr style="background: #f5f5f5;"><td style="padding:10px;font-weight:bold;">Data/Hora</td><td style="padding:10px;">${escHtml(data)}</td></tr>
         </table>
         <p style="margin-top: 24px; color: #666; font-size: 12px;">
           Para creditar manualmente após confirmação:
-          <a href="https://console.firebase.google.com/project/cnbmobile-2053c/firestore/data/usuarios/${uid}">Firestore → usuarios/${uid}</a>
+          <a href="https://console.firebase.google.com/project/cnbmobile-2053c/firestore/data/usuarios/${escHtml(uid)}">Firestore → usuarios/${escHtml(uid)}</a>
         </p>
       </div>
     `;
@@ -198,10 +210,10 @@ exports.notificarNovoLead = onDocumentCreated(
           ✉️ Novo lead na lista de espera CNB
         </h2>
         <table style="width: 100%; border-collapse: collapse;">
-          <tr style="background: #f5f5f5;"><td style="padding:10px;font-weight:bold;width:30%;">E-mail</td><td style="padding:10px;font-size:16px;"><a href="mailto:${email}">${email}</a></td></tr>
-          <tr><td style="padding:10px;font-weight:bold;">Idioma</td><td style="padding:10px;">${localeFlag} ${locale}</td></tr>
-          <tr style="background: #f5f5f5;"><td style="padding:10px;font-weight:bold;">Origem</td><td style="padding:10px;">${source ?? '—'}</td></tr>
-          <tr><td style="padding:10px;font-weight:bold;">Data/Hora</td><td style="padding:10px;">${data}</td></tr>
+          <tr style="background: #f5f5f5;"><td style="padding:10px;font-weight:bold;width:30%;">E-mail</td><td style="padding:10px;font-size:16px;"><a href="mailto:${escHtml(email)}">${escHtml(email)}</a></td></tr>
+          <tr><td style="padding:10px;font-weight:bold;">Idioma</td><td style="padding:10px;">${localeFlag} ${escHtml(locale)}</td></tr>
+          <tr style="background: #f5f5f5;"><td style="padding:10px;font-weight:bold;">Origem</td><td style="padding:10px;">${escHtml(source)}</td></tr>
+          <tr><td style="padding:10px;font-weight:bold;">Data/Hora</td><td style="padding:10px;">${escHtml(data)}</td></tr>
           <tr style="background: #f5f5f5;"><td style="padding:10px;font-weight:bold;">Total na fila</td><td style="padding:10px;font-size:16px;font-weight:bold;color:#00AA55;">${total} ${total === 1 ? 'lead' : 'leads'}</td></tr>
         </table>
         <p style="margin-top: 24px; color: #666; font-size: 12px;">
@@ -1075,12 +1087,15 @@ exports.solicitarRelatorio = onCall(
 
 // ─── Envio de push notification para todos os usuários ───────────────────────
 // Só admins podem chamar. Tokens ficam em /push_tokens/{uid}.
-const ADMIN_UIDS = ['X619NYBpp5OqXKTBomuFTISuQGY2'];
+// UIDs de admin lidos do Firebase config (firebase functions:config:set ou env ADMIN_UIDS).
+// Formato: string com UIDs separados por vírgula.
+// Para adicionar um admin: firebase functions:config:set admin.uids="uid1,uid2"
+const getAdminUids = () => adminUids.value().split(',').map(s => s.trim()).filter(Boolean);
 
 exports.enviarNotificacaoGlobal = onCall(
   { region: 'us-central1', invoker: 'public' },
   async (request) => {
-    if (!request.auth || !ADMIN_UIDS.includes(request.auth.uid)) {
+    if (!request.auth || !getAdminUids().includes(request.auth.uid)) {
       throw new HttpsError('permission-denied', 'Não autorizado.');
     }
 
@@ -1169,7 +1184,7 @@ exports.snapshotInicioSemana = onSchedule(
 exports.runSnapshotInicioSemana = onCall(
   { region: 'us-central1' },
   async (request) => {
-    if (!request.auth || !ADMIN_UIDS.includes(request.auth.uid)) {
+    if (!request.auth || !getAdminUids().includes(request.auth.uid)) {
       throw new HttpsError('permission-denied', 'Não autorizado.');
     }
     const total = await executarSnapshotSemanal(getFirestore());
@@ -1181,14 +1196,14 @@ exports.runSnapshotInicioSemana = onCall(
 // Disparada por Apps Script quando uma nova resposta do Forms entra.
 // Idempotente: doc do usuário ganha flag `bonusTesterCreditado: true` na 1ª chamada,
 // chamadas subsequentes pra mesmo email retornam `already_credited` sem efeito.
-// Auth: header `X-CNB-Secret` deve bater com o secret hardcoded abaixo.
+// Auth: header `X-CNB-Secret` deve bater com TESTER_SECRET do Secret Manager.
+// Para criar/rotacionar: firebase functions:secrets:set TESTER_SECRET
 const TESTER_BONUS = 20000;
-const TESTER_SECRET = 'cnb_tester_2026_xK9mPq7nVw3jR8dF2aHyL6sBcE4uTzQ1';
 
 exports.creditarBonusTester = onRequest(
-  { region: 'us-central1', cors: true, invoker: 'public' },
+  { region: 'us-central1', cors: true, invoker: 'public', secrets: [testerSecret] },
   async (req, res) => {
-    if (req.headers['x-cnb-secret'] !== TESTER_SECRET) {
+    if (req.headers['x-cnb-secret'] !== testerSecret.value()) {
       res.status(401).json({ ok: false, reason: 'unauthorized' });
       return;
     }
@@ -1253,7 +1268,7 @@ exports.creditarBonusTester = onRequest(
 exports.backfillReferralPoints = onCall(
   { region: 'us-central1', invoker: 'public' },
   async (request) => {
-    if (!request.auth || !ADMIN_UIDS.includes(request.auth.uid)) {
+    if (!request.auth || !getAdminUids().includes(request.auth.uid)) {
       throw new HttpsError('permission-denied', 'Não autorizado.');
     }
 
