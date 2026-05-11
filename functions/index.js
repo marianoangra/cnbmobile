@@ -365,6 +365,9 @@ exports.onReferreeBecameActive = onDocumentUpdated(
       await refereeRef.update({
         contadoComoAtivo: true,
         fraudeDetectada: 'referral_circular',
+        saquesBloqueados: true,
+        contaSuspeita: true,
+        motivoBloqueio: 'Identificamos que sua conta faz parte de uma rede de indicações circulares — contas que se indicam mutuamente para acumular bônus artificialmente. Essa prática não é permitida e os saques foram bloqueados preventivamente.',
       });
       return;
     }
@@ -389,7 +392,13 @@ exports.onReferreeBecameActive = onDocumentUpdated(
       // Mesmo dispositivo físico → fraude
       if (refereeDevice && referrerDevice && refereeDevice === referrerDevice) {
         console.warn(`[AntiF] Mesmo deviceHash: ${refereeUid} e ${referidoPor}. Bloqueado.`);
-        await refereeRef.update({ contadoComoAtivo: true, fraudeDetectada: 'mesmo_dispositivo' });
+        await refereeRef.update({
+          contadoComoAtivo: true,
+          fraudeDetectada: 'mesmo_dispositivo',
+          saquesBloqueados: true,
+          contaSuspeita: true,
+          motivoBloqueio: 'Identificamos que sua conta e a conta de quem te indicou foram usadas no mesmo dispositivo. Criar múltiplas contas no mesmo aparelho não é permitido e os saques foram bloqueados preventivamente.',
+        });
         return;
       }
 

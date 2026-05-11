@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, Alert, ActivityIndicator, KeyboardAvoidingView, Platform,
+  ScrollView, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getFunctions, httpsCallable } from 'firebase/functions';
@@ -48,15 +48,29 @@ export default function WithdrawScreen({ route, navigation }) {
   const [loadingPrivado, setLoadingPrivado] = useState(false);
 
   const pontosDisponiveis = perfil?.pontos ?? 0;
-  const contaBanida    = perfil?.contaBanida    === true;
-  const contaSuspeita  = perfil?.contaSuspeita  === true;
-  const sacoBloqueado  = perfil?.saquesBloqueados === true;
-  const alertaMensagem = perfil?.alertaSeguranca?.mensagem ?? null;
+  const contaBanida   = perfil?.contaBanida    === true;
+  const contaSuspeita = perfil?.contaSuspeita  === true;
+  const sacoBloqueado = perfil?.saquesBloqueados === true;
+  const estaRestrita  = contaBanida || sacoBloqueado || contaSuspeita;
 
-  // Mostra alerta de segurança ao abrir a tela se conta estiver bloqueada
+  // Motivo: prioriza campo novo motivoBloqueio, fallback para alertaSeguranca legado
+  const motivoBloqueio = perfil?.motivoBloqueio
+    ?? perfil?.alertaSeguranca?.mensagem
+    ?? null;
+
+  const SUPORTE_EMAIL = 'contato@criptonobolso.com.br';
+
+  // Mostra alerta ao abrir a tela se conta estiver restrita
   useEffect(() => {
-    if ((contaBanida || sacoBloqueado) && alertaMensagem) {
-      Alert.alert('🔒 Conta Restrita', alertaMensagem, [{ text: 'Entendi' }]);
+    if (estaRestrita) {
+      const titulo = contaBanida ? '⛔ Conta Suspensa' : '⚠️ Conta em Análise';
+      const corpo  = motivoBloqueio
+        ? `${motivoBloqueio}\n\nSe precisar de ajuda, entre em contato:\n${SUPORTE_EMAIL}`
+        : `Saques bloqueados. Entre em contato:\n${SUPORTE_EMAIL}`;
+      Alert.alert(titulo, corpo, [
+        { text: 'Contatar Suporte', onPress: () => Linking.openURL(`mailto:${SUPORTE_EMAIL}?subject=Conta%20restrita`) },
+        { text: 'Entendi', style: 'cancel' },
+      ]);
     }
   }, []);
 
@@ -217,28 +231,53 @@ export default function WithdrawScreen({ route, navigation }) {
           automaticallyAdjustKeyboardInsets={true}>
           <Text style={styles.title}>Resgatar</Text>
 
-          {/* Banner de segurança — visível para contas banidas/suspeitas */}
-          {(contaBanida || sacoBloqueado) && (
+          {/* Banner de segurança — visível para contas banidas/suspeitas/bloqueadas */}
+          {estaRestrita && (
             <View style={{
-              backgroundColor: contaBanida ? '#3D0000' : '#2D2000',
+              backgroundColor: contaBanida ? '#2A0000' : '#1E1600',
               borderWidth: 1,
               borderColor: contaBanida ? '#FF3B30' : '#FF9500',
-              borderRadius: 10,
-              padding: 14,
+              borderRadius: 14,
+              padding: 16,
               marginBottom: 16,
-              flexDirection: 'row',
-              alignItems: 'flex-start',
-              gap: 10,
             }}>
-              <AlertTriangle size={20} color={contaBanida ? '#FF3B30' : '#FF9500'} />
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: contaBanida ? '#FF6B6B' : '#FFB340', fontWeight: '700', fontSize: 13, marginBottom: 4 }}>
-                  {contaBanida ? '⛔ Conta Suspensa' : '⚠️ Conta em Análise'}
-                </Text>
-                <Text style={{ color: '#aaa', fontSize: 12, lineHeight: 17 }}>
-                  {alertaMensagem ?? 'Saques bloqueados. Entre em contato: contato@rafaelmariano.com.br'}
+              {/* Cabeçalho */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <AlertTriangle size={18} color={contaBanida ? '#FF3B30' : '#FF9500'} />
+                <Text style={{ color: contaBanida ? '#FF6B6B' : '#FFB340', fontWeight: '700', fontSize: 14, flex: 1 }}>
+                  {contaBanida ? '⛔ Conta Suspensa' : '⚠️ Conta em Análise de Segurança'}
                 </Text>
               </View>
+
+              {/* Motivo */}
+              <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 13, lineHeight: 19, marginBottom: 12 }}>
+                {motivoBloqueio ?? 'Sua conta está sob análise de segurança e os saques foram temporariamente bloqueados.'}
+              </Text>
+
+              {/* Divisor */}
+              <View style={{ height: 1, backgroundColor: contaBanida ? 'rgba(255,59,48,0.25)' : 'rgba(255,149,0,0.25)', marginBottom: 12 }} />
+
+              {/* Mensagem de suporte */}
+              <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, lineHeight: 17, marginBottom: 8 }}>
+                Se acreditar que isso é um engano ou precisar de ajuda, entre em contato com nosso suporte:
+              </Text>
+              <TouchableOpacity
+                onPress={() => Linking.openURL(`mailto:${SUPORTE_EMAIL}?subject=Solicita%C3%A7%C3%A3o%20de%20an%C3%A1lise%20de%20conta`)}
+                activeOpacity={0.7}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  backgroundColor: contaBanida ? 'rgba(255,59,48,0.12)' : 'rgba(255,149,0,0.12)',
+                  borderRadius: 8,
+                  paddingVertical: 10,
+                  paddingHorizontal: 12,
+                }}>
+                <Shield size={14} color={contaBanida ? '#FF6B6B' : '#FFB340'} />
+                <Text style={{ color: contaBanida ? '#FF6B6B' : '#FFB340', fontSize: 13, fontWeight: '600' }}>
+                  {SUPORTE_EMAIL}
+                </Text>
+              </TouchableOpacity>
             </View>
           )}
 
